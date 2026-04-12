@@ -1,0 +1,1515 @@
+<?xml version="1.0" ?>
+<robot name="nxp_omniman">
+    <material name="grey">
+        <color rgba="0.5 0.5 0.5 1.0" />
+    </material>
+
+    <link name="base_footprint" />
+
+    <joint name="base_footprint_joint" type="fixed">
+        <parent link="base_footprint" />
+        <child link="base_link" />
+        <origin xyz="0 0 0.09" rpy="0 0 0" />
+    </joint>
+
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Base/Base_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Base/Base_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="11.60351" />
+            <origin xyz="0.007471 -0.002650 0.013517" rpy="0 0 0" />
+            <inertia ixx="0.130641" ixy="-0.005256" ixz="0.002401"
+                     iyy="0.100394" iyz="-0.001007"
+                     izz="0.170553" />
+        </inertial>
+    </link>
+
+    <!-- ==================== Front_left Wheel ==================== -->
+
+    <joint name="Front_left_couple_fixed_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="Front_left_couple_link" />
+        <origin xyz="0.091 0.087 -0.043" rpy="0 0 0" />
+    </joint>
+
+    <link name="Front_left_couple_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_couple_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_couple_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.079152" />
+            <origin xyz="0.000000 0.010425 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000016" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000029" iyz="0.000000"
+                    izz="0.000016" />
+        </inertial>
+    </link>
+
+    <link name="Front_left_plate_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_plate_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_plate_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.330894" />
+            <origin xyz="0.000000 0.025959 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000188" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000187" iyz="0.000000"
+                    izz="0.000188" />
+        </inertial>
+    </link>
+
+    <joint name="Front_left_plate_continuous_joint" type="continuous">
+        <parent link="Front_left_couple_link" />
+        <child link="Front_left_plate_link" />
+        <origin xyz="0 0.01729 0" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+    </joint>
+
+    <link name="Front_left_roller_link1">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link1.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link1.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_left_roller_continuous_joint1" type="fixed">
+        <parent link="Front_left_plate_link" />
+        <child link="Front_left_roller_link1" />
+        <origin xyz="-0.0077812 0.025962 0.037903" rpy="-2.68 -0.14308 0.79578" />
+        <axis xyz="1 0 0" />
+    </joint>
+
+    <link name="Front_left_roller_link2">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link2.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link2.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_left_roller_continuous_joint2" type="fixed">
+        <parent link="Front_left_plate_link" />
+        <child link="Front_left_roller_link2" />
+        <origin xyz="0.0184027 0.0259619 0.0340368" rpy="-0.0755575 0.342615 0.849182" />
+        <axis xyz="1 0 0" />
+    </joint>
+
+    <link name="Front_left_roller_link3">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link3.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link3.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_left_roller_continuous_joint3" type="fixed">
+        <parent link="Front_left_plate_link" />
+        <child link="Front_left_roller_link3" />
+        <origin xyz="0.0359757 0.0259619 0.0142447" rpy="-0.88859 0.717228 1.21759" />
+        <axis xyz="1 0 0" />
+    </joint>
+
+    <link name="Front_left_roller_link4">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link4.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link4.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_left_roller_continuous_joint4" type="fixed">
+        <parent link="Front_left_plate_link" />
+        <child link="Front_left_roller_link4" />
+        <origin xyz="0.0367153 0.0259619 -0.0122127" rpy="1.56019 0.735675 1.87604" />
+        <axis xyz="1 0 0" />
+    </joint>
+
+    <link name="Front_left_roller_link5">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link5.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link5.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_left_roller_continuous_joint5" type="fixed">
+        <parent link="Front_left_plate_link" />
+        <child link="Front_left_roller_link5" />
+        <origin xyz="0.0202754 0.0259619 -0.0329556" rpy="0.652229 0.379944 2.27611" />
+        <axis xyz="1 0 0" />
+    </joint>
+
+    <link name="Front_left_roller_link6">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link6.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link6.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_left_roller_continuous_joint6" type="fixed">
+        <parent link="Front_left_plate_link" />
+        <child link="Front_left_roller_link6" />
+        <origin xyz="-0.00565156 0.0259619 -0.0382783" rpy="-0.253974 -0.103067 2.35085" />
+        <axis xyz="1 0 0" />
+    </joint>
+
+    <link name="Front_left_roller_link7">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link7.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link7.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_left_roller_continuous_joint7" type="fixed">
+        <parent link="Front_left_plate_link" />
+        <child link="Front_left_roller_link7" />
+        <origin xyz="-0.0289341 0.0259619 -0.0256901" rpy="-0.593154 -0.556829 2.1572" />
+        <axis xyz="1 0 0" />
+    </joint>
+
+    <link name="Front_left_roller_link_8">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link8.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link8.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_left_roller_continuous_joint8" type="fixed">
+        <parent link="Front_left_plate_link" />
+        <child link="Front_left_roller_link_8" />
+        <origin xyz="-0.0386781 0.0259619 -0.00108124" rpy="-0.745113 -0.784992 1.5993" />
+        <axis xyz="1 0 0" />
+    </joint>
+
+    <link name="Front_left_roller_link_9">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link9.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_left_wheel/Front_left_roller_link9.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_left_roller_continuous_joint9" type="fixed">
+        <parent link="Front_left_plate_link" />
+        <child link="Front_left_roller_link_9" />
+        <origin xyz="-0.0303242 0.0259619 0.0240335" rpy="-0.366861 -0.587658 1.0153" />
+        <axis xyz="1 0 0" />
+    </joint>
+
+    <!-- ==================== Rear_left Wheel ==================== -->
+
+    <joint name="Rear_left_couple_fixed_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="Rear_left_couple_link" />
+        <origin xyz="-0.091 0.087 -0.043" rpy="0 0 0" />
+    </joint>
+
+    <link name="Rear_left_couple_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_couple_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_couple_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.079152" />
+            <origin xyz="0.000000 0.010425 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000016" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000029" iyz="0.000000"
+                    izz="0.000016" />
+        </inertial>
+    </link>
+
+    <link name="Rear_left_plate_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_plate_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_plate_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.330915" />
+            <origin xyz="-0.000002 0.025958 -0.000002" rpy="0 0 0" />
+            <inertia ixx="0.000188" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000187" iyz="0.000000"
+                    izz="0.000188" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_left_plate_continuous_joint" type="continuous">
+        <parent link="Rear_left_couple_link" />
+        <child link="Rear_left_plate_link" />
+        <origin xyz="0 0.01729 0" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+    </joint>
+
+    <link name="Rear_left_roller_link1">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link1.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link1.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_left_roller_continuous_joint1" type="fixed">
+        <parent link="Rear_left_plate_link" />
+        <child link="Rear_left_roller_link1" />
+        <origin xyz="-0.0056516 0.025962 0.038278" rpy="-0.057514 0.10307 2.3508" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_left_roller_link2">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link2.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link2.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_left_roller_continuous_joint2" type="fixed">
+        <parent link="Rear_left_plate_link" />
+        <child link="Rear_left_roller_link2" />
+        <origin xyz="0.020275 0.025962 0.032956" rpy="0.44031 0.37994 -0.86548" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_left_roller_link3">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link3.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link3.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_left_roller_continuous_joint3" type="fixed">
+        <parent link="Rear_left_plate_link" />
+        <child link="Rear_left_roller_link3" />
+        <origin xyz="0.036715 0.025962 0.012213" rpy="0.42911 0.73568 -1.2656" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_left_roller_link4">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link4.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link4.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_left_roller_continuous_joint4" type="fixed">
+        <parent link="Rear_left_plate_link" />
+        <child link="Rear_left_roller_link4" />
+        <origin xyz="0.035976 0.025962 -0.014245" rpy="0.21486 0.71723 -1.924" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_left_roller_link5">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link5.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link5.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_left_roller_continuous_joint5" type="fixed">
+        <parent link="Rear_left_plate_link" />
+        <child link="Rear_left_roller_link5" />
+        <origin xyz="0.018403 0.025962 -0.034037" rpy="-0.14058 0.34261 -2.2924" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_left_roller_link6">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link6.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link6.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_left_roller_continuous_joint6" type="fixed">
+        <parent link="Rear_left_plate_link" />
+        <child link="Rear_left_roller_link6" />
+        <origin xyz="-0.0077812 0.025962 -0.037903" rpy="-0.11441 -0.14308 -2.3458" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_left_roller_link7">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link7.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link7.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_left_roller_continuous_joint7" type="fixed">
+        <parent link="Rear_left_plate_link" />
+        <child link="Rear_left_roller_link7" />
+        <origin xyz="-0.030324 0.025962 -0.024034" rpy="0.16788 -0.58766 -2.1263" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_left_roller_link8">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link8.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link8.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_left_roller_continuous_joint8" type="fixed">
+        <parent link="Rear_left_plate_link" />
+        <child link="Rear_left_roller_link8" />
+        <origin xyz="-0.038678 0.025962 0.0010812" rpy="-1.4841 -0.78499 -1.5423" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_left_roller_link9">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link9.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_left_wheel/Rear_left_roller_link9.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_left_roller_continuous_joint9" type="fixed">
+        <parent link="Rear_left_plate_link" />
+        <child link="Rear_left_roller_link9" />
+        <origin xyz="-0.028934 0.025962 0.02569" rpy="-2.0319 -0.55683 -0.98439" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <!-- ==================== Front_right Wheel ==================== -->
+
+    <joint name="Front_right_couple_fixed_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="Front_right_couple_link" />
+        <origin xyz="0.091 -0.087 -0.043" rpy="0 0 0" />
+    </joint>
+
+    <link name="Front_right_couple_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_couple_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_couple_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.079152" />
+            <origin xyz="0.000000 -0.010425 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000016" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000029" iyz="0.000000"
+                    izz="0.000016" />
+        </inertial>
+    </link>
+
+    <link name="Front_right_plate_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_plate_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_plate_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.330915" />
+            <origin xyz="-0.000002 -0.025922 -0.000002" rpy="0 0 0" />
+            <inertia ixx="0.000188" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000187" iyz="0.000000"
+                    izz="0.000188" />
+        </inertial>
+    </link>
+
+    <joint name="Front_right_plate_continuous_joint" type="continuous">
+        <parent link="Front_right_couple_link" />
+        <child link="Front_right_plate_link" />
+        <origin xyz="0 -0.01729 0" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+    </joint>
+
+    <link name="Front_right_roller_link1">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link1.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link1.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_right_roller_continuous_joint1" type="fixed">
+        <parent link="Front_right_plate_link" />
+        <child link="Front_right_roller_link1" />
+        <origin xyz="-0.0056516 -0.025918 0.038278" rpy="-2.8062 0.10307 2.3508" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Front_right_roller_link2">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link2.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link2.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_right_roller_continuous_joint2" type="fixed">
+        <parent link="Front_right_plate_link" />
+        <child link="Front_right_roller_link2" />
+        <origin xyz="0.020275 -0.025918 0.032956" rpy="1.2242 -0.37994 2.2761" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Front_right_roller_link3">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link3.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link3.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_right_roller_continuous_joint3" type="fixed">
+        <parent link="Front_right_plate_link" />
+        <child link="Front_right_roller_link3" />
+        <origin xyz="0.036715 -0.025918 0.012213" rpy="1.6359 -0.73568 1.876" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Front_right_roller_link4">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link4.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link4.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_right_roller_continuous_joint4" type="fixed">
+        <parent link="Front_right_plate_link" />
+        <child link="Front_right_roller_link4" />
+        <origin xyz="0.035976 -0.025918 -0.014245" rpy="1.5021 -0.71723 1.2176" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Front_right_roller_link5">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link5.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link5.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_right_roller_continuous_joint5" type="fixed">
+        <parent link="Front_right_plate_link" />
+        <child link="Front_right_roller_link5" />
+        <origin xyz="0.018403 -0.025918 -0.034037" rpy="0.97207 -0.34261 0.84918" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Front_right_roller_link6">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link6.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link6.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_right_roller_continuous_joint6" type="fixed">
+        <parent link="Front_right_plate_link" />
+        <child link="Front_right_roller_link6" />
+        <origin xyz="-0.0077812 -0.025918 -0.037903" rpy="0.8796 0.14308 0.79578" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Front_right_roller_link7">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link7.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link7.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_right_roller_continuous_joint7" type="fixed">
+        <parent link="Front_right_plate_link" />
+        <child link="Front_right_roller_link7" />
+        <origin xyz="-0.030324 -0.025918 -0.024034" rpy="1.1988 0.58766 1.0153" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Front_right_roller_link8">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link8.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link8.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_right_roller_continuous_joint8" type="fixed">
+        <parent link="Front_right_plate_link" />
+        <child link="Front_right_roller_link8" />
+        <origin xyz="-0.038678 -0.025918 0.0010812" rpy="2.4069 0.78499 1.5993" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Front_right_roller_link9">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link9.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Front_right_wheel/Front_right_roller_link9.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Front_right_roller_continuous_joint9" type="fixed">
+        <parent link="Front_right_plate_link" />
+        <child link="Front_right_roller_link9" />
+        <origin xyz="-0.028934 -0.025918 0.02569" rpy="-2.7593 0.55683 2.1572" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <!-- ==================== Rear_right Wheel ==================== -->
+
+    <joint name="Rear_right_couple_fixed_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="Rear_right_couple_link" />
+        <origin xyz="-0.091 -0.087 -0.043" rpy="0 0 0" />
+    </joint>
+
+    <link name="Rear_right_couple_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_couple_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_couple_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.079152" />
+            <origin xyz="0.000000 -0.010425 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000016" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000029" iyz="0.000000"
+                    izz="0.000016" />
+        </inertial>
+    </link>
+
+    <link name="Rear_right_plate_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_plate_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_plate_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.330894" />
+            <origin xyz="0.000000 -0.025921 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000188" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000187" iyz="0.000000"
+                    izz="0.000188" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_right_plate_continuous_joint" type="continuous">
+        <parent link="Rear_right_couple_link" />
+        <child link="Rear_right_plate_link" />
+        <origin xyz="0 -0.01729 0" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+    </joint>
+
+    <link name="Rear_right_roller_link1">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link1.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link1.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_right_roller_continuous_joint1" type="fixed">
+        <parent link="Rear_right_plate_link" />
+        <child link="Rear_right_roller_link1" />
+        <origin xyz="0.018403 -0.025918 0.034037" rpy="2.1191 0.34261 0.84918" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_right_roller_link2">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link2.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link2.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_right_roller_continuous_joint2" type="fixed">
+        <parent link="Rear_right_plate_link" />
+        <child link="Rear_right_roller_link2" />
+        <origin xyz="0.035976 -0.025918 0.014245" rpy="2.3102 0.71723 1.2176" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_right_roller_link3">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link3.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link3.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_right_roller_continuous_joint3" type="fixed">
+        <parent link="Rear_right_plate_link" />
+        <child link="Rear_right_roller_link3" />
+        <origin xyz="0.036715 -0.025918 -0.012213" rpy="-2.6452 0.73568 1.876" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_right_roller_link4">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link4.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link4.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_right_roller_continuous_joint4" type="fixed">
+        <parent link="Rear_right_plate_link" />
+        <child link="Rear_right_roller_link4" />
+        <origin xyz="0.020275 -0.025918 -0.032956" rpy="-2.428 0.37994 2.2761" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_right_roller_link5">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link5.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link5.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_right_roller_continuous_joint5" type="fixed">
+        <parent link="Rear_right_plate_link" />
+        <child link="Rear_right_roller_link5" />
+        <origin xyz="-0.0056516 -0.025918 -0.038278" rpy="2.7526 -0.10307 2.3508" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_right_roller_link6">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link6.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link6.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_right_roller_continuous_joint6" type="fixed">
+        <parent link="Rear_right_plate_link" />
+        <child link="Rear_right_roller_link6" />
+        <origin xyz="-0.028934 -0.025918 -0.02569" rpy="0.54287 -0.55683 2.1572" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_right_roller_link7">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link7.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link7.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_right_roller_continuous_joint7" type="fixed">
+        <parent link="Rear_right_plate_link" />
+        <child link="Rear_right_roller_link7" />
+        <origin xyz="-0.038678 -0.025918 -0.0010812" rpy="-0.31801 -0.78499 1.5993" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_right_roller_link8">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link8.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link8.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_right_roller_continuous_joint8" type="fixed">
+        <parent link="Rear_right_plate_link" />
+        <child link="Rear_right_roller_link8" />
+        <origin xyz="-0.030324 -0.025918 0.024034" rpy="0.060242 -0.58766 1.0153" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+    <link name="Rear_right_roller_link9">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link9.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Rear_right_wheel/Rear_right_roller_link9.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.009948" />
+            <origin xyz="0.000000 0.000000 0.000000" rpy="0 0 0" />
+            <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000"
+                    iyy="0.000002" iyz="0.000000"
+                    izz="0.000002" />
+        </inertial>
+    </link>
+
+    <joint name="Rear_right_roller_continuous_joint9" type="fixed">
+        <parent link="Rear_right_plate_link" />
+        <child link="Rear_right_roller_link9" />
+        <origin xyz="-0.0077812 -0.025918 0.037903" rpy="0.14094 -0.14308 0.79578" />
+        <axis xyz="-1 0 0" />
+    </joint>
+
+
+    <!-- ==================== Manipulator ==================== -->
+    <joint name="shoulder_yaw_joint" type="revolute">
+        <parent link="base_link" />
+        <child link="shoulder_link" />
+        <origin xyz="0.082 0.000 0.129" rpy="0 0 0" />
+        <axis xyz="0 0 -1" />
+        <limit effort="10" velocity="1.0" lower="-3.14" upper="3.14" />
+    </joint>
+
+    <link name="shoulder_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Shoulder_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Shoulder_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.283407" />
+            <origin xyz="0.000000 -0.002915 0.032463" rpy="0 0 0" />
+            <inertia ixx="0.000301" ixy="0.000000" ixz="0.0000000" 
+                     iyy="0.000191" iyz="-0.000011" 
+                     izz="0.000238" />
+        </inertial>
+    </link>
+
+    <joint name="upper_shoulder_pitch_joint" type="revolute">
+        <parent link="shoulder_link" />
+        <child link="upper_shoulder_link" />
+        <origin xyz="0.0 0.034 0.045" rpy="0 0 0" />
+        <axis xyz="0 -1 0" />
+        <limit effort="10" velocity="1.0" lower="-1.70" upper="1.70" />
+    </joint>
+
+    <link name="upper_shoulder_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Upper_shoulder_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Upper_shoulder_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.334430" />
+            <origin xyz="-0.000059 -0.035570 0.043824" rpy="0 0 0" />
+            <inertia ixx="0.000660" ixy="0.000000" ixz="-0.000002" 
+                     iyy="0.000428" iyz="-0.000003" 
+                     izz="0.000388" />
+        </inertial>
+    </link>
+
+    <joint name="arm_yaw_joint" type="revolute">
+        <parent link="upper_shoulder_link" />
+        <child link="arm_link" />
+        <origin xyz="0.0 -0.036 0.103" rpy="0 0 0" />
+        <axis xyz="0 0 -1" />
+        <limit effort="10" velocity="1.0" lower="-3.14" upper="3.14" />
+    </joint>
+
+    <link name="arm_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Arm_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Arm_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.283407" />
+            <origin xyz="0.000000 -0.002178 0.031926" rpy="0 0 0" />
+            <inertia ixx="0.000299" ixy="0.000000" ixz="0.000000" 
+                     iyy="0.000189" iyz="-0.000011" 
+                     izz="0.000237" />
+        </inertial>
+    </link>
+
+    <joint name="forearm_pitch_joint" type="revolute">
+        <parent link="arm_link" />
+        <child link="forearm_link" />
+        <origin xyz="0.0 0.034 0.045" rpy="0 0 0" />
+        <axis xyz="0 -1 0" />
+        <limit effort="10" velocity="1.0" lower="-2.33" upper="2.4" />
+    </joint>
+
+    <link name="forearm_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Forearm_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Forearm_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.332340" />
+            <origin xyz="-0.000852 -0.036144 0.055987" rpy="0 0 0" />
+            <inertia ixx="0.000671" ixy="0.000000" ixz="-0.000003" 
+                     iyy="0.000410" iyz="0.000006" 
+                     izz="0.000330" />
+        </inertial>
+    </link>
+
+    <joint name="wrist_pitch_joint" type="revolute">
+        <parent link="forearm_link" />
+        <child link="wrist_link" />
+        <origin xyz="0.0 -0.017 0.100" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+        <limit effort="10" velocity="1.0" lower="-1.86" upper="1.69" />
+    </joint>
+
+    <link name="wrist_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Wrist_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Wrist_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.221348" />
+            <origin xyz="0.011223 -0.019000 0.037608" rpy="0 0 0" />
+            <inertia ixx="0.000072" ixy="0.000000" ixz="0.000004" 
+                     iyy="0.000085" iyz="0.000000" 
+                     izz="0.000088" />
+        </inertial>
+    </link>
+
+    <joint name="palm_yaw_joint" type="revolute">
+        <parent link="wrist_link" />
+        <child link="palm_link" />
+        <origin xyz="0.000 -0.019 0.064" rpy="0 0 0" />
+        <axis xyz="0 0 -1" />
+        <limit effort="10" velocity="1.0" lower="-3.14" upper="3.14" />
+    </joint>
+
+    <link name="palm_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Palm_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Palm_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.216056" />
+            <origin xyz="0.008366 0.000000 0.026410" rpy="0 0 0" />
+            <inertia ixx="0.000126" ixy="0.000000" ixz="-0.000007" 
+                     iyy="0.000080" iyz="0.000000" 
+                     izz="0.000145" />
+        </inertial>
+    </link>
+
+    <joint name="left_finger_prismatic_joint" type="prismatic">
+        <parent link="palm_link" />
+        <child link="left_finger_link" />
+        <origin xyz="-0.016 -0.040 0.038" rpy="0 0 0" />
+        <axis xyz="0 -1 0" />
+        <limit effort="1" velocity="4.8" lower="-0.010" upper="0.019" />
+    </joint>
+
+    <joint name="right_finger_prismatic_joint" type="prismatic">
+        <mimic joint="left_finger_prismatic_joint" multiplier="-1.0" offset="0.0" />
+        <parent link="palm_link" />
+        <child link="right_finger_link" />
+        <origin xyz="-0.016 0.040 0.038" rpy="0 0 0" />
+        <axis xyz="0 -1 0" />
+        <limit effort="1" velocity="4.8" lower="-0.019" upper="0.01" />
+    </joint>
+
+    <link name="left_finger_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Left_finger_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Left_finger_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.111661" />
+            <origin xyz="0.016199 0.012512 0.036901" rpy="0 0 0" />
+            <inertia ixx="0.000065" ixy="0.000000" ixz="0.000000" 
+                     iyy="0.000075" iyz="0.000012" 
+                     izz="0.000028" />
+        </inertial>
+    </link>
+
+    <link name="right_finger_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Right_finger_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Manipulator/Right_finger_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.111661" />
+            <origin xyz="0.016201 -0.012604 0.036901" rpy="0 0 0" />
+            <inertia ixx="0.000065" ixy="0.000000" ixz="0.000000" 
+                     iyy="0.000075" iyz="-0.000012" 
+                     izz="0.000028" />
+        </inertial>
+    </link>
+
+    <joint name="ee_joint" type="fixed">
+        <parent link="palm_link" />
+        <child link="ee_link" />
+        <origin xyz="0.000 0.000 0.1" rpy="0 0 0" />
+    </joint>
+
+    <link name="ee_link" />
+
+</robot>

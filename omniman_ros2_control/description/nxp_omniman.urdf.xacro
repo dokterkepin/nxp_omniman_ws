@@ -1,0 +1,154 @@
+<?xml version="1.0"?>
+<robot name="nxp_omniman" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- Include the combined static URDF (base + arm) -->
+    <xacro:include filename="$(find omniman_description)/urdf/omniman.urdf.xacro"/>
+
+    <!-- Include ros2_control hardware macros -->
+    <xacro:include filename="$(find cybergear_control)/description/ros2_control/robstride.ros2_control.urdf.xacro"/>
+    <xacro:include filename="$(find dynamixel_hardware_interface)/ros2_control/dynamixel_motor.ros2_control.xacro"/>
+
+    <!-- Launch arguments -->
+    <xacro:arg name="use_sim" default="false"/>
+    <xacro:arg name="canbus_base" default="can0"/>
+    <xacro:arg name="canbus_arm" default="can1"/>
+    <xacro:arg name="serial_port" default="/dev/ttyUSB0"/>
+
+    <xacro:property name="use_sim" value="$(arg use_sim)"/>
+    <xacro:property name="canbus_base" value="$(arg canbus_base)"/>
+    <xacro:property name="canbus_arm" value="$(arg canbus_arm)"/>
+    <xacro:property name="serial_port" value="$(arg serial_port)"/>
+
+    <xacro:nxp_omniman />
+    <!-- ============================================================
+         Isaac Sim mock hardware (TopicBasedSystem)
+         Set use_sim:=true to activate this block.
+         ============================================================ -->
+    <xacro:if value="${use_sim}">
+        <ros2_control name="OmnimanSimSystem" type="system">
+            <hardware>
+                <plugin>topic_based_ros2_control/TopicBasedSystem</plugin>
+                <param name="joint_commands_topic">/isaac_joint_commands</param>
+                <param name="joint_states_topic">/isaac_joint_states</param>
+            </hardware>
+
+            <!-- Mecanum wheels -->
+            <joint name="Front_left_plate_continuous_joint">
+                <command_interface name="velocity"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="Front_right_plate_continuous_joint">
+                <command_interface name="velocity"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="Rear_left_plate_continuous_joint">
+                <command_interface name="velocity"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="Rear_right_plate_continuous_joint">
+                <command_interface name="velocity"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+
+            <!-- Arm joints -->
+            <joint name="shoulder_yaw_joint">
+                <command_interface name="position"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="upper_shoulder_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="arm_yaw_joint">
+                <command_interface name="position"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="forearm_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="wrist_pitch_joint">
+                <command_interface name="position"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="palm_yaw_joint">
+                <command_interface name="position"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="left_finger_prismatic_joint">
+                <command_interface name="position"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+        </ros2_control>
+    </xacro:if>
+
+    <!-- ============================================================
+         Real Hardware
+         Set use_sim:=false (default) to activate this block.
+         ============================================================ -->
+    <xacro:unless value="${use_sim}">
+
+        <!-- ========== Mecanum Wheels (CyberGear on canbus_base) ========== -->
+        <xacro:macro name="mecanum_wheel_ros2_control" params="name canbus device_id axis_direction joint_name">
+            <ros2_control name="${name}" type="actuator">
+                <hardware>
+                    <plugin>cybergear_control/CybergearActuator</plugin>
+                    <param name="can_interface">${canbus}</param>
+                    <param name="timeout_sec">3.0</param>
+                    <param name="interval_sec">0.01</param>
+                    <param name="device_id">${device_id}</param>
+                    <param name="primary_id">0</param>
+                    <param name="effort_kp">500</param>
+                    <param name="effort_kd">5</param>
+                    <param name="axis_direction">${axis_direction}</param>
+                </hardware>
+                <joint name="${joint_name}">
+                    <command_interface name="velocity"/>
+                    <state_interface name="position"/>
+                    <state_interface name="velocity"/>
+                    <state_interface name="torque"/>
+                    <state_interface name="temperature"/>
+                </joint>
+            </ros2_control>
+        </xacro:macro>
+
+        <xacro:mecanum_wheel_ros2_control
+            name="FrontLeftWheel" canbus="${canbus_base}"
+            device_id="3" axis_direction="-1" joint_name="Front_left_plate_continuous_joint"/>
+        <xacro:mecanum_wheel_ros2_control
+            name="FrontRightWheel" canbus="${canbus_base}"
+            device_id="4" axis_direction="1" joint_name="Front_right_plate_continuous_joint"/>
+        <xacro:mecanum_wheel_ros2_control
+            name="RearLeftWheel" canbus="${canbus_base}"
+            device_id="1" axis_direction="-1" joint_name="Rear_left_plate_continuous_joint"/>
+        <xacro:mecanum_wheel_ros2_control
+            name="RearRightWheel" canbus="${canbus_base}"
+            device_id="2" axis_direction="1" joint_name="Rear_right_plate_continuous_joint"/>
+
+        <!-- ========== Arm Joints (CyberGear on canbus_arm) ========== -->
+        <xacro:robstride_ros2_control name="ShoulderYaw" canbus="${canbus_arm}" device_id="5" joint_name="shoulder_yaw_joint" axis_direction="1"/>
+        <xacro:robstride_ros2_control name="UpperShoulderPitch" canbus="${canbus_arm}" device_id="6" joint_name="upper_shoulder_pitch_joint" axis_direction="1"/>
+        <xacro:robstride_ros2_control name="ArmYaw" canbus="${canbus_arm}" device_id="7" joint_name="arm_yaw_joint" axis_direction="1"/>
+        <xacro:robstride_ros2_control name="ForearmPitch" canbus="${canbus_arm}" device_id="8" joint_name="forearm_pitch_joint" axis_direction="1"/>
+
+        <!-- ========== Wrist + Gripper (Dynamixel on serial_port) ========== -->
+        <xacro:dynamixel_ros2_control name="WristPitch" serial_device="${serial_port}" device_id="9" joint_name="wrist_pitch_joint"/>
+        <xacro:dynamixel_ros2_control name="PalmYaw" serial_device="${serial_port}" device_id="10" joint_name="palm_yaw_joint"/>
+        <xacro:dynamixel_ros2_control name="LeftFingerPrismatic" serial_device="${serial_port}" device_id="11"
+                                      joint_name="left_finger_prismatic_joint"
+                                      use_prismatic="1"
+                                      revolute_max="0.0" revolute_min="-2.5"
+                                      prismatic_max="0.019" prismatic_min="-0.013"/>
+
+    </xacro:unless>
+</robot>

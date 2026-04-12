@@ -1,0 +1,67 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 500
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    mecanum_drive_controller:
+      type: mecanum_drive_controller/MecanumDriveController
+
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    gripper_controller:
+      type: position_controllers/GripperActionController
+
+mecanum_drive_controller:
+  ros__parameters:
+    front_left_wheel_command_joint_name: "Front_left_plate_continuous_joint"
+    front_right_wheel_command_joint_name: "Front_right_plate_continuous_joint"
+    rear_left_wheel_command_joint_name: "Rear_left_plate_continuous_joint"
+    rear_right_wheel_command_joint_name: "Rear_right_plate_continuous_joint"
+
+    kinematics:
+      base_frame_offset:
+        x: 0.0
+        y: 0.0
+        theta: 0.0
+      wheels_radius: 0.05
+      sum_of_robot_center_projection_on_X_Y_axis: 0.19529
+
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    enable_odom_tf: true
+    reference_timeout: 10.0
+
+    pose_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.01]
+    twist_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.01]
+
+arm_controller:
+  ros__parameters:
+    joints:
+      - shoulder_yaw_joint
+      - upper_shoulder_pitch_joint
+      - arm_yaw_joint
+      - forearm_pitch_joint
+      - wrist_pitch_joint
+      - palm_yaw_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_start: true
+
+gripper_controller:
+  ros__parameters:
+    joint: left_finger_prismatic_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    goal_tolerance: 0.02
+    allow_stalling: true
+    stall_timeout: 1.0
+    stall_velocity_threshold: 0.001

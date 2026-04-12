@@ -1,0 +1,204 @@
+<?xml version="1.0"?>
+<robot name="dummy" xmlns:xacro="http://ros.org/wiki/xacro">
+  <!-- Base Link -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.2 0.2 0.1" />
+      </geometry>
+      <material name="Blue">
+        <color rgba="0 0 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.2 0.2 0.1" />
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Link 1 -->
+  <link name="link1">
+    <visual>
+      <geometry>
+        <cylinder length="0.1" radius="0.2" />
+      </geometry>
+      <material name="Black">
+        <color rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.1" radius="0.18" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.005" />
+    </inertial>
+  </link>
+
+  <!-- Joint 1 -->
+  <joint name="joint1" type="continuous">
+    <parent link="base_link"/>
+    <child link="link1"/>
+    <origin xyz="0 0.0 0" rpy="1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <!-- Link 2 -->
+  <link name="link2">
+    <visual>
+      <geometry>
+        <cylinder length="0.1" radius="0.2" />
+      </geometry>
+      <material name="Black">
+        <color rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.1" radius="0.18" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.005" />
+    </inertial>
+  </link>
+
+  <!-- Joint 2 -->
+  <joint name="joint2" type="continuous">
+    <parent link="base_link"/>
+    <child link="link2"/>
+    <origin xyz="0 -1.0 0" rpy="1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <!-- Link 3 -->
+  <link name="link3">
+    <visual>
+      <geometry>
+        <cylinder length="0.1" radius="0.2" />
+      </geometry>
+      <material name="Black">
+        <color rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.1" radius="0.18" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.005" />
+    </inertial>
+  </link>
+
+  <!-- Joint 3 -->
+  <joint name="joint3" type="continuous">
+    <parent link="base_link"/>
+    <child link="link3"/>
+    <origin xyz="0 -2.0 0" rpy="1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <!-- Link 4 -->
+  <link name="link4">
+    <visual>
+      <geometry>
+        <cylinder length="0.1" radius="0.2" />
+      </geometry>
+      <material name="Black">
+        <color rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.1" radius="0.18" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.005" />
+    </inertial>
+  </link>
+
+  <!-- Joint 4 -->
+  <joint name="joint4" type="continuous">
+    <parent link="base_link"/>
+    <child link="link4"/>
+    <origin xyz="0 -3.0 0" rpy="1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+<!-- Link 5 -->
+  <link name="link5">
+    <visual>
+      <geometry>
+        <cylinder length="0.1" radius="0.2" />
+      </geometry>
+      <material name="Black">
+        <color rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.1" radius="0.18" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.005" />
+    </inertial>
+  </link>
+
+  <!-- Joint 5 -->
+  <joint name="joint5" type="continuous">
+    <parent link="base_link"/>
+    <child link="link5"/>
+    <origin xyz="0 -4.0 0" rpy="1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+<!-- Link 6 -->
+  <link name="link6">
+    <visual>
+      <geometry>
+        <cylinder length="0.1" radius="0.2" />
+      </geometry>
+      <material name="Black">
+        <color rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.1" radius="0.18" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.005" />
+    </inertial>
+  </link>
+
+  <!-- Joint 6 -->
+  <joint name="joint6" type="continuous">
+    <parent link="base_link"/>
+    <child link="link6"/>
+    <origin xyz="0 -5.0 0" rpy="1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <!-- Include ROS2 control macros for each joint -->
+  <xacro:include filename="$(find cybergear_control)/description/ros2_control/multi_dof.ros2_control.urdf.xacro"/>
+  <xacro:joint_ros2_control name="CybergearMotorJoint1" canbus="can0" device_id="1" joint_name="joint1"/>
+  <xacro:joint_ros2_control name="CybergearMotorJoint2" canbus="can0" device_id="2" joint_name="joint2"/>
+  <xacro:joint_ros2_control name="CybergearMotorJoint3" canbus="can0" device_id="3" joint_name="joint3"/>
+
+  <xacro:joint_ros2_control name="CybergearMotorJoint4" canbus="can1" device_id="1" joint_name="joint4"/>
+  <xacro:joint_ros2_control name="CybergearMotorJoint5" canbus="can1" device_id="2" joint_name="joint5"/>
+  <xacro:joint_ros2_control name="CybergearMotorJoint6" canbus="can1" device_id="3" joint_name="joint6"/>
+
+</robot>

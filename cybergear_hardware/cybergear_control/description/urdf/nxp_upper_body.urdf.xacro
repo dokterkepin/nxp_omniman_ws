@@ -1,0 +1,333 @@
+<?xml version="1.0"?>
+<robot name="nxp_upper_body" xmlns:xacro="http://ros.org/wiki/xacro">
+     <material name="black">
+        <color rgba="0.01 0.01 0.01 1.0"/>
+    </material>
+    <material name="silver">
+        <color rgba="0.80 0.82 0.95 1.0"/>
+    </material>
+
+    <!-- Dummy link to avoid inertia on root link -->
+    <link name="base_link">
+        <visual>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+        <geometry>
+            <box size="0.001 0.001 0.001"/>
+        </geometry>
+        </visual>
+    </link>
+
+    <joint name="floating_base" type="fixed">
+        <parent link="base_link"/>
+        <child link="pelvis_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- pelvis -->
+    <link name="pelvis_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/pelvis_link.STL"/>
+            </geometry>
+            <material name="silver"/>
+        </visual>
+        <inertial>
+            <origin xyz="0.000040 -0.000169 -0.074593" rpy="0.00 0.00 0.00"/>
+            <mass value="2.340205"/>
+            <inertia ixx="0.007004" ixy="0.000002" ixz="-0.000002" iyy="0.004130" iyz="-0.000011" izz="0.005544"/>
+        </inertial>
+    </link>
+
+    <!-- torso -->
+    <joint name="torso_yaw_joint" type="revolute">
+        <parent link="pelvis_link"/>
+        <child link="torso_link"/>
+        <origin xyz="0.0 0.0 0.0" rpy="0.0 0.00 0.00"/>
+        <axis xyz="0 0 -1"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-2.617993" upper="2.617993" effort="88" velocity="32"/>
+    </joint>
+
+   <link name="torso_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/torso_cover_link.STL"/>
+            </geometry>
+            <material name="black"/>
+        </visual>
+        <inertial>
+            <origin xyz="0.006039 -0.000016 0.208248" rpy="0.00 0.00 0.00"/>
+            <mass value="7.00"/>
+            <inertia ixx="0.117778" ixy="0.000011" ixz="0.004558" iyy="0.100216" iyz="-0.000033" izz="0.064126"/>
+        </inertial>
+    </link>
+
+    <!-- head_pan -->
+    <joint name="head_pan_joint" type="revolute">
+        <parent link="torso_link"/>
+        <child link="head_pan_link"/>
+        <origin xyz="0.0 0.0 0.3800" rpy="0.00 0.00 0.00"/>
+        <axis xyz="0 0 -1"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-1.570796" upper="1.570796" effort="33.5" velocity="21"/>
+    </joint>
+
+   <link name="head_pan_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/head_pan_link.STL"/>
+            </geometry>
+            <material name="silver"/>
+        </visual>
+        <inertial>
+            <origin xyz="0.000000 0.000649 0.032066" rpy="0.00 0.00 0.00"/>
+            <mass value="0.281088"/>
+            <inertia ixx="0.000299" ixy="0.000000" ixz="0.000000" iyy="0.000189" iyz="0.000003" izz="0.000237"/>
+        </inertial>
+    </link>
+
+    <!-- head_tilt -->
+    <joint name="head_tilt_joint" type="revolute">
+        <parent link="head_pan_link"/>
+        <child link="head_tilt_link"/>
+        <origin xyz="0.0 -0.0360 0.0445" rpy="0.00 0.00 0.00"/>
+        <axis xyz="0 -1 0"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-1.570796" upper="1.570796" effort="33.5" velocity="21"/>
+    </joint>
+
+   <link name="head_tilt_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/head_tilt_link.STL"/>
+            </geometry>
+            <material name="black"/>
+        </visual>
+        <inertial>
+            <origin xyz="0.042291 0.037350 -0.000086" rpy="0.00 0.00 0.00"/>
+            <mass value="0.269678"/>
+            <inertia ixx="0.000226" ixy="-0.000002" ixz="0.000000" iyy="0.000161" iyz="0.000000" izz="0.000298"/>
+        </inertial>
+    </link>
+
+    <!-- left_shoulder_pitch -->
+    <joint name="left_shoulder_pitch_joint" type="revolute">
+        <parent link="torso_link"/>
+        <child link="left_shoulder_link"/>
+        <origin xyz="0.0 0.1165 0.2884" rpy="0.00 0.00 0.00"/>
+        <axis xyz="0 -1 0"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-1.570796" upper="1.570796" effort="33.5" velocity="21"/>
+    </joint>
+
+   <link name="left_shoulder_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/left_shoulder_link.STL"/>
+            </geometry>
+            <material name="silver"/>
+        </visual>
+        <inertial>
+            <origin xyz="-0.006285 0.047925 0.000060" rpy="0.00 0.00 0.00"/>
+            <mass value="0.411008"/>
+            <inertia ixx="0.000480" ixy="-0.000038" ixz="0.000003" iyy="0.000346" iyz="0.000000" izz="0.000473"/>
+        </inertial>
+    </link>
+
+    <!-- left_shoulder_roll-->
+    <joint name="left_shoulder_roll_joint" type="revolute">
+        <parent link="left_shoulder_link"/>
+        <child link="left_upper_arm_link"/>
+        <origin xyz="0.0323 0.0600 0.0" rpy="0.00 0.00 0.00"/>
+        <axis xyz="-1 0 0"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-0.087266" upper="3.141592" effort="33.5" velocity="21"/>
+    </joint>
+
+   <link name="left_upper_arm_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/left_upper_arm_link.STL"/>
+            </geometry>
+            <material name="silver"/>
+        </visual>
+        <inertial>
+            <origin xyz="-0.034042 -0.000069 -0.054296" rpy="0.00 0.00 0.00"/>
+            <mass value="0.296480"/>
+            <inertia ixx="0.000405" ixy="-0.000001" ixz="0.000001" iyy="0.000513" iyz="0.000000" izz="0.000308"/>
+        </inertial>
+    </link>
+
+    <!-- left_shoulder_yaw-->
+    <joint name="left_shoulder_yaw_joint" type="revolute">
+        <parent link="left_upper_arm_link"/>
+        <child link="left_elbow_link"/>
+        <origin xyz="-0.0333 0.0 -0.1040" rpy="0.00 0.00 0.00"/>
+        <axis xyz="0 0 1"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-1.570796" upper="1.570796" effort="33.5" velocity="21"/>
+    </joint>
+
+   <link name="left_elbow_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/left_elbow_link.STL"/>
+            </geometry>
+            <material name="silver"/>
+        </visual>
+        <inertial>
+            <origin xyz="0.000273 -0.004794 -0.091222" rpy="0.00 0.00 0.00"/>
+            <mass value="0.515201"/>
+            <inertia ixx="0.001007" ixy="0.000002" ixz="0.000003" iyy="0.001013" iyz="0.000076" izz="0.000374"/>
+        </inertial>
+    </link>
+
+    <!-- left_elbow-->
+    <joint name="left_elbow_joint" type="revolute">
+        <parent link="left_elbow_link"/>
+        <child link="left_lower_arm_link"/>
+        <origin xyz="0.00 0.0325 -0.1190" rpy="0.00 0.00 0.00"/>
+        <axis xyz="0 -1 0"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-1.570796" upper="0.087266" effort="33.5" velocity="21"/>
+    </joint>
+
+   <link name="left_lower_arm_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/left_lower_arm_link.STL"/>
+            </geometry>
+            <material name="black"/>
+        </visual>
+        <inertial>
+            <origin xyz="-0.000156 -0.033589 -0.063091" rpy="0.00 0.00 0.00"/>
+            <mass value="0.245557"/>
+            <inertia ixx="0.000722" ixy="0.000000" ixz="0.000003" iyy="0.000578" iyz="-0.000004" izz="0.000184"/>
+        </inertial>
+    </link>
+
+    <!-- right_shoulder_pitch-->
+    <joint name="right_shoulder_pitch_joint" type="revolute">
+        <parent link="torso_link"/>
+        <child link="right_shoulder_link"/>
+        <origin xyz="0.0 -0.1165 0.2884" rpy="0.00 0.00 0.00"/>
+        <axis xyz="0 1 0"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-1.570796" upper="1.570796" effort="33.5" velocity="21"/>
+    </joint>
+
+   <link name="right_shoulder_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/right_shoulder_link.STL"/>
+            </geometry>
+            <material name="silver"/>
+        </visual>
+        <inertial>
+            <origin xyz="-0.007161 -0.047676 0.000060" rpy="0.00 0.00 0.00"/>
+            <mass value="0.411008"/>
+            <inertia ixx="0.000477" ixy="0.000043" ixz="0.000003" iyy="0.000341" iyz="0.000000" izz="0.000465"/>
+        </inertial>
+    </link>
+
+    <!-- right_shoulder_roll-->
+    <joint name="right_shoulder_roll_joint" type="revolute">
+        <parent link="right_shoulder_link"/>
+        <child link="right_upper_arm_link"/>
+        <origin xyz="0.0323 -0.0600 0.0" rpy="0.00 0.00 0.00"/>
+        <axis xyz="-1 0 0"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-3.141592" upper="0.087266" effort="33.5" velocity="21"/>
+    </joint>
+
+   <link name="right_upper_arm_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/right_upper_arm_link.STL"/>
+            </geometry>
+            <material name="silver"/>
+        </visual>
+        <inertial>
+            <origin xyz="-0.034042 -0.000069 -0.054296" rpy="0.00 0.00 0.00"/>
+            <mass value="0.296480"/>
+            <inertia ixx="0.000405" ixy="-0.000001" ixz="0.000001" iyy="0.000513" iyz="0.000000" izz="0.000308"/>
+        </inertial>
+    </link>
+
+    <!-- right_shoulder_yaw-->
+    <joint name="right_shoulder_yaw_joint" type="revolute">
+        <parent link="right_upper_arm_link"/>
+        <child link="right_elbow_link"/>
+        <origin xyz="-0.0333 0.0 -0.1040" rpy="0.00 0.00 0.00"/>
+        <axis xyz="0 0 1"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-1.570796" upper="1.570796" effort="33.5" velocity="21"/>
+    </joint>
+
+   <link name="right_elbow_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/right_elbow_link.STL"/>
+            </geometry>
+            <material name="silver"/>
+        </visual>
+        <inertial>
+            <origin xyz="-0.000272 0.004794 -0.091205" rpy="0.00 0.00 0.00"/>
+            <mass value="0.515201"/>
+            <inertia ixx="0.001008" ixy="0.000003" ixz="0.000002" iyy="0.001012" iyz="-0.000077" izz="0.000372"/>
+        </inertial>
+    </link>
+
+    <!-- right_elbow-->
+    <joint name="right_elbow_joint" type="revolute">
+        <parent link="right_elbow_link"/>
+        <child link="right_lower_arm_link"/>
+        <origin xyz="0.00 -0.0325 -0.1190" rpy="0.00 0.00 0.00"/>
+        <axis xyz="0 1 0"/>
+        <dynamics damping="0" friction="0"/>
+        <limit lower="-1.570796" upper="0.087266" effort="33.5" velocity="21"/>
+    </joint>
+
+   <link name="right_lower_arm_link">
+        <visual>
+            <origin xyz="0.00 0.00 0.00" rpy="0.00 0.00 0.00"/>
+            <geometry>
+                <mesh filename="package://cybergear_control/meshes/visual/right_lower_arm_link.STL"/>
+            </geometry>
+            <material name="black"/>
+        </visual>
+        <inertial>
+            <origin xyz="0.000725 0.033489 -0.063091" rpy="0.00 0.00 0.00"/>
+            <mass value="0.245557"/>
+            <inertia ixx="0.000722" ixy="0.000000" ixz="-0.000012" iyy="0.000579" iyz="-0.000005" izz="0.000185"/>
+        </inertial>
+    </link>
+
+  <!-- Include ROS2 control macros for each joint -->
+  <xacro:include filename="$(find cybergear_control)/description/ros2_control/nxp_upper_body.ros2_control.urdf.xacro"/>
+
+  <xacro:robstride_joint_ros2_control name="CybergearRightShoulderPitch" canbus="can0" device_id="1" joint_name="right_shoulder_pitch_joint"/>
+  <xacro:robstride_joint_ros2_control name="CybergearRightShoulderRoll" canbus="can0" device_id="2" joint_name="right_shoulder_roll_joint"/>
+  <xacro:robstride_joint_ros2_control name="CybergearRightShoulderYaw" canbus="can0" device_id="3" joint_name="right_shoulder_yaw_joint"/>
+  <xacro:robstride_joint_ros2_control name="CybergearRightElbow" canbus="can0" device_id="4" joint_name="right_elbow_joint"/>
+  <xacro:robstride_joint_ros2_control name="CybergearTorsoYaw" canbus="can0" device_id="5" joint_name="torso_yaw_joint"/>
+
+  <xacro:robstride_joint_ros2_control name="CybergearLeftShoulderPitch" canbus="can1" device_id="1" joint_name="left_shoulder_pitch_joint"/>
+  <xacro:robstride_joint_ros2_control name="CybergearLeftShoulderRoll" canbus="can1" device_id="2" joint_name="left_shoulder_roll_joint"/>
+  <xacro:robstride_joint_ros2_control name="CybergearLeftShoulderYaw" canbus="can1" device_id="3" joint_name="left_shoulder_yaw_joint"/>
+  <xacro:robstride_joint_ros2_control name="CybergearLeftElbow" canbus="can1" device_id="4" joint_name="left_elbow_joint"/>
+  <xacro:robstride_joint_ros2_control name="CybergearHeadPan" canbus="can1" device_id="5" joint_name="head_pan_joint"/>
+  <xacro:robstride_joint_ros2_control name="CybergearHeadTilt" canbus="can1" device_id="6" joint_name="head_tilt_joint"/>
+
+</robot>

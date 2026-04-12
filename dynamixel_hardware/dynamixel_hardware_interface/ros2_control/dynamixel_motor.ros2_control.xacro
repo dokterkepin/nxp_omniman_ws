@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:macro name="dynamixel_ros2_control" params="name serial_device device_id joint_name use_prismatic:=0 revolute_max:=0.0 revolute_min:=0.0 prismatic_max:=0.0 prismatic_min:=0.0 driver_mode:=0">
+        <ros2_control name="${name}" type="system">
+            <hardware>
+                <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
+                <param name="port_name">${serial_device}</param>
+                <param name="baud_rate">1000000</param>
+                <param name="error_timeout_sec">0.2</param>
+                <param name="disable_torque_at_init">true</param>
+                <param name="dynamixel_model_folder">/param/dxl_model</param>
+                <param name="number_of_joints">1</param>
+                <param name="number_of_transmissions">1</param>
+                <param name="ros_update_freq">200</param>
+                <param name="dynamixel_state_pub_msg_name">dynamixel_hardware_interface/dxl_state</param>
+                <param name="get_dynamixel_data_srv_name">dynamixel_hardware_interface/get_dxl_data</param>
+                <param name="set_dynamixel_data_srv_name">dynamixel_hardware_interface/set_dxl_data</param>
+                <param name="reboot_dxl_srv_name">dynamixel_hardware_interface/reboot_dxl</param>
+                <param name="set_dxl_torque_srv_name">dynamixel_hardware_interface/set_dxl_torque</param>
+                
+                <xacro:if value="${use_prismatic}">
+                    <param name="use_revolute_to_prismatic_gripper">1</param>
+                    <param name="revolute_to_prismatic_dxl">dxl_${device_id}</param>
+                    <param name="revolute_max">${revolute_max}</param>
+                    <param name="revolute_min">${revolute_min}</param>
+                    <param name="revolute_to_prismatic_joint">${joint_name}</param>
+                    <param name="prismatic_max">${prismatic_max}</param>
+                    <param name="prismatic_min">${prismatic_min}</param>
+                </xacro:if>
+            </hardware>
+            
+            <joint name="${joint_name}">
+                <command_interface name="position"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+                <state_interface name="effort"/>
+            </joint>
+            
+            <gpio name="dxl_${device_id}">
+                <param name="type">dxl</param>
+                <param name="ID">${device_id}</param>
+                <command_interface name="Goal Position"/>
+                <state_interface name="Present Position"/>
+                <state_interface name="Present Velocity"/>
+                <state_interface name="Present Current"/>
+                <state_interface name="Torque Enable"/>
+                <state_interface name="Present Input Voltage"/>
+                <param name="Position P Gain">100</param>
+                <param name="Position I Gain">0</param>
+                <param name="Position D Gain">50</param>
+                <param name="Profile Velocity">200</param>
+                <param name="Profile Acceleration">50</param>
+                <param name="Drive Mode">${driver_mode}</param>
+                <param name="Return Delay Time">2</param>
+                <param name="Current Limit">100</param>
+            </gpio>
+            
+            <transmission name="${joint_name}_transmission">
+                <plugin>transmission_interface/SimpleTransmission</plugin>
+                <actuator name="${joint_name}_motor" role="${joint_name}_motor" />
+                <joint name="${joint_name}" role="${joint_name}">
+                    <mechanical_reduction>1</mechanical_reduction>
+                </joint>
+            </transmission>
+        </ros2_control>
+    </xacro:macro>
+</robot>

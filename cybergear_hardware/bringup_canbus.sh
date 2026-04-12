@@ -1,0 +1,7 @@
+ip link set can0 type can bitrate 1000000
+ip link set can0 txqueuelen 1000
+ip link set can0 up
+
+ip link set can1 type can bitrate 1000000
+ip link set can1 txqueuelen 1000
+ip link set can1 up
