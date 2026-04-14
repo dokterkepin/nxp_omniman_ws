@@ -55,7 +55,7 @@ install(
 
 if(BUILD_TESTING)
   install(
-    DIRECTORY launch description config meshes
+    DIRECTORY launch description config
     DESTINATION share/${PROJECT_NAME}
   )
 
