@@ -22,6 +22,7 @@ def generate_launch_description():
     moveit_config = MoveItConfigsBuilder(
         "nxp_omniman", package_name="omniman_moveit_config"
     ).to_moveit_configs()
+
     robot_controllers = PathJoinSubstitution(
         [pkg_path, "config", "controllers.yaml"]
     )
@@ -30,21 +31,6 @@ def generate_launch_description():
         "use_sim",
         default_value="false",
         description="Use Isaac Sim mock hardware instead of real motors",
-    )
-    canbus_base_arg = DeclareLaunchArgument(
-        "canbus_base",
-        default_value="can0",
-        description="CAN bus interface for mecanum wheels",
-    )
-    canbus_arm_arg = DeclareLaunchArgument(
-        "canbus_arm",
-        default_value="can1",
-        description="CAN bus interface for arm CyberGear motors",
-    )
-    serial_port_arg = DeclareLaunchArgument(
-        "serial_port",
-        default_value="/dev/ttyUSB0",
-        description="Serial port for Dynamixel gripper",
     )
 
     robot_description_content = Command(
@@ -56,12 +42,6 @@ def generate_launch_description():
             ),
             " use_sim:=",
             LaunchConfiguration("use_sim"),
-            " canbus_base:=",
-            LaunchConfiguration("canbus_base"),
-            " canbus_arm:=",
-            LaunchConfiguration("canbus_arm"),
-            " serial_port:=",
-            LaunchConfiguration("serial_port"),
         ]
     )
     robot_description = {"robot_description": robot_description_content}
@@ -160,9 +140,6 @@ def generate_launch_description():
     return LaunchDescription(
         [
             use_sim_arg,
-            canbus_base_arg,
-            canbus_arm_arg,
-            serial_port_arg,
             control_node,
             robot_state_publisher_node,
             joint_state_broadcaster_spawner,
