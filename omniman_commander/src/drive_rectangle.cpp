@@ -1,10 +1,8 @@
-// Autonomous distance driver for the mecanum base.
+// Rectangle-trajectory driver for the mecanum base.
 //
-// Motion targets are scripted directly in main() — no /drive_goal topic.
-// Each call to driveBody(dx, dy) blocks until the base has moved (dx, dy)
-// meters in the robot body frame (relative to the pose at the call site),
-// closing the loop on /mecanum_drive_controller/odometry and publishing
-// TwistStamped to /cmd_vel.
+// Loops a rectangle in the body frame using pure translation (no yaw):
+//   +x (side_x) -> +y (side_y) -> -x (side_x) -> -y (side_y), repeat.
+// Edges are strafed, so the robot's heading stays constant throughout.
 
 #include <atomic>
 #include <chrono>
@@ -26,15 +24,17 @@ using namespace std::chrono_literals;
 class MecanumDriver : public rclcpp::Node
 {
 public:
-  MecanumDriver() : rclcpp::Node("drive_distance")
+  MecanumDriver() : rclcpp::Node("drive_rectangle")
   {
     max_linear_vel_ = declare_parameter<double>("max_linear_vel", 0.25);
-    max_angular_vel_ = declare_parameter<double>("max_angular_vel", 0.8);
     kp_ = declare_parameter<double>("kp", 1.2);
-    kp_yaw_ = declare_parameter<double>("kp_yaw", 1.5);
     position_tolerance_ = declare_parameter<double>("position_tolerance", 0.02);
-    yaw_tolerance_ = declare_parameter<double>("yaw_tolerance", 0.02);  // ~1.1 deg
     control_rate_hz_ = declare_parameter<double>("control_rate_hz", 50.0);
+
+    side_x_ = declare_parameter<double>("side_x", 0.5);
+    side_y_ = declare_parameter<double>("side_y", 0.5);
+    laps_ = declare_parameter<int>("laps", 100);
+    dwell_s_ = declare_parameter<double>("dwell_s", 0.5);
 
     cmd_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>("/cmd_vel", 10);
 
@@ -43,7 +43,6 @@ public:
       std::bind(&MecanumDriver::onOdom, this, _1));
   }
 
-  // Block until odometry is being received.
   bool waitForOdom(std::chrono::seconds timeout = 5s)
   {
     const auto deadline = std::chrono::steady_clock::now() + timeout;
@@ -58,7 +57,6 @@ public:
     return false;
   }
 
-  // Blocking: move (dx, dy) meters in body frame. Returns true on success.
   bool driveBody(double dx, double dy)
   {
     Pose2D start;
@@ -72,7 +70,7 @@ public:
     }
 
     RCLCPP_INFO(get_logger(),
-      "driveBody: dx=%.3f m, dy=%.3f m (start yaw=%.3f rad)", dx, dy, start.yaw);
+      "driveBody: dx=%.3f m, dy=%.3f m", dx, dy);
 
     const double c = std::cos(-start.yaw);
     const double s = std::sin(-start.yaw);
@@ -97,7 +95,7 @@ public:
 
       if (err_norm < position_tolerance_) {
         publishStop();
-        RCLCPP_INFO(get_logger(), "reached (residual %.3f m)", err_norm);
+        RCLCPP_INFO(get_logger(), "edge done (residual %.3f m)", err_norm);
         return true;
       }
 
@@ -111,7 +109,7 @@ public:
       }
 
       geometry_msgs::msg::TwistStamped cmd;
-      cmd.header.stamp = now_ros();
+      cmd.header.stamp = rclcpp::Node::now();
       cmd.header.frame_id = "base_link";
       cmd.twist.linear.x = vx;
       cmd.twist.linear.y = vy;
@@ -122,69 +120,19 @@ public:
     return false;
   }
 
-  // Blocking: rotate by dtheta radians (positive = CCW, right-hand rule).
-  bool rotateBody(double dtheta)
-  {
-    Pose2D start;
-    {
-      std::lock_guard<std::mutex> lk(mu_);
-      if (!current_) {
-        RCLCPP_ERROR(get_logger(), "rotateBody called before odometry available.");
-        return false;
-      }
-      start = *current_;
-    }
-
-    const double target_yaw = start.yaw + dtheta;
-    RCLCPP_INFO(get_logger(),
-      "rotateBody: dtheta=%.3f rad (%.1f deg), target yaw=%.3f",
-      dtheta, dtheta * 180.0 / M_PI, target_yaw);
-
-    rclcpp::Rate rate(control_rate_hz_);
-    while (rclcpp::ok()) {
-      Pose2D now;
-      {
-        std::lock_guard<std::mutex> lk(mu_);
-        if (!current_) continue;
-        now = *current_;
-      }
-
-      const double err = wrapAngle(target_yaw - now.yaw);
-      if (std::abs(err) < yaw_tolerance_) {
-        publishStop();
-        RCLCPP_INFO(get_logger(), "yaw reached (residual %.3f rad)", err);
-        return true;
-      }
-
-      double wz = kp_yaw_ * err;
-      if (std::abs(wz) > max_angular_vel_) {
-        wz = std::copysign(max_angular_vel_, wz);
-      }
-
-      geometry_msgs::msg::TwistStamped cmd;
-      cmd.header.stamp = now_ros();
-      cmd.header.frame_id = "base_link";
-      cmd.twist.angular.z = wz;
-      cmd_pub_->publish(cmd);
-      rate.sleep();
-    }
-    publishStop();
-    return false;
-  }
-
-  static double wrapAngle(double a)
-  {
-    while (a > M_PI) a -= 2.0 * M_PI;
-    while (a < -M_PI) a += 2.0 * M_PI;
-    return a;
-  }
-
   void publishStop()
   {
     geometry_msgs::msg::TwistStamped t;
-    t.header.stamp = now_ros();
+    t.header.stamp = rclcpp::Node::now();
     t.header.frame_id = "base_link";
     cmd_pub_->publish(t);
+  }
+
+  double side_x() const { return side_x_; }
+  double side_y() const { return side_y_; }
+  int laps() const { return laps_; }
+  std::chrono::milliseconds dwell() const {
+    return std::chrono::milliseconds(static_cast<int>(dwell_s_ * 1000.0));
   }
 
 private:
@@ -198,8 +146,6 @@ private:
     return yaw;
   }
 
-  rclcpp::Time now_ros() { return now(); }
-
   void onOdom(const nav_msgs::msg::Odometry::SharedPtr msg)
   {
     std::lock_guard<std::mutex> lk(mu_);
@@ -210,12 +156,13 @@ private:
   }
 
   double max_linear_vel_;
-  double max_angular_vel_;
   double kp_;
-  double kp_yaw_;
   double position_tolerance_;
-  double yaw_tolerance_;
   double control_rate_hz_;
+  double side_x_;
+  double side_y_;
+  int laps_;
+  double dwell_s_;
 
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_pub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -230,8 +177,6 @@ int main(int argc, char ** argv)
   auto node = std::make_shared<MecanumDriver>();
   auto logger = node->get_logger();
 
-  // Spin the node on a background thread so odometry callbacks run while
-  // driveBody() blocks on the main thread (same pattern as commander2.cpp).
   rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(node);
   std::thread spinner([&executor]() { executor.spin(); });
@@ -243,33 +188,29 @@ int main(int argc, char ** argv)
     return 1;
   }
 
-  // -------- motion script --------
-  // Edit this block to change/append targets. Each call blocks until reached.
-  // (dx, dy) in meters, in the robot body frame at the moment of the call.
+  const double sx = node->side_x();
+  const double sy = node->side_y();
+  const int laps = node->laps();
+  const auto dwell = node->dwell();
 
-  RCLCPP_INFO(logger, "=== leg 1: forward 0.5 m ===");
-  node->driveBody(0.5, 0.0);
-  std::this_thread::sleep_for(1s);
+  RCLCPP_INFO(logger,
+    "Rectangle: side_x=%.2f m, side_y=%.2f m, laps=%d, dwell=%ld ms",
+    sx, sy, laps, static_cast<long>(dwell.count()));
 
-  RCLCPP_INFO(logger, "=== leg 2: strafe left 0.5 m ===");
-  node->driveBody(0.0, 0.5);
-  std::this_thread::sleep_for(1s);
+  for (int i = 0; i < laps && rclcpp::ok(); ++i) {
+    RCLCPP_INFO(logger, "=== lap %d/%d ===", i + 1, laps);
 
-  RCLCPP_INFO(logger, "=== leg 3: rotate +90 deg (CCW) ===");
-  node->rotateBody(M_PI / 2.0);
-  std::this_thread::sleep_for(1s);
+    if (!node->driveBody( sx,  0.0)) break;   // forward
+    std::this_thread::sleep_for(dwell);
+    if (!node->driveBody(0.0,  sy)) break;    // strafe left
+    std::this_thread::sleep_for(dwell);
+    if (!node->driveBody(-sx,  0.0)) break;   // backward
+    std::this_thread::sleep_for(dwell);
+    if (!node->driveBody(0.0, -sy)) break;    // strafe right
+    std::this_thread::sleep_for(dwell);
+  }
 
-  RCLCPP_INFO(logger, "=== leg 4: back-right diagonal ===");
-  node->driveBody(-0.5, -0.5);
-  std::this_thread::sleep_for(1s);
-
-  RCLCPP_INFO(logger, "=== leg 5: rotate back -180 deg (CW) ===");
-  node->rotateBody(-M_PI);
-  std::this_thread::sleep_for(1s);
-
-  RCLCPP_INFO(logger, "script complete");
-  // -------------------------------
-
+  RCLCPP_INFO(logger, "Rectangle loop complete.");
   node->publishStop();
   rclcpp::shutdown();
   spinner.join();

@@ -26,8 +26,16 @@ add_executable(commander2 src/commander2.cpp)
 add_executable(position src/position.cpp)
 add_executable(quaternion_test src/quaternion_test.cpp)
 add_executable(drive_distance src/drive_distance.cpp)
+add_executable(drive_rectangle src/drive_rectangle.cpp)
 
 ament_target_dependencies(drive_distance
+  rclcpp
+  geometry_msgs
+  nav_msgs
+  tf2
+)
+
+ament_target_dependencies(drive_rectangle
   rclcpp
   geometry_msgs
   nav_msgs
@@ -86,6 +94,7 @@ install(TARGETS
   position
   quaternion_test
   drive_distance
+  drive_rectangle
   DESTINATION lib/${PROJECT_NAME}
 )
 
