@@ -36,7 +36,7 @@ def generate_launch_description():
 
     use_joy_arg = DeclareLaunchArgument(
         "use_joy",
-        default_value="true",
+        default_value="false",
         description="Start joy + teleop_twist_joy. Set false when driving "
                     "autonomously to avoid competing /cmd_vel publishers.",
     )
