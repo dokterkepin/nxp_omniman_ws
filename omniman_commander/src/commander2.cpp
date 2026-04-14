@@ -22,8 +22,6 @@ int main(int argc, char* argv[])
   using moveit::planning_interface::MoveGroupInterface;
   auto move_group_interface = MoveGroupInterface(node, "arm");
   auto gripper_group_interface = MoveGroupInterface(node, "gripper");
-  move_group_interface.setPlanningPipelineId("pilz_industrial_motion_planner");
-  move_group_interface.setPlannerId("PTP");
   
   RCLCPP_INFO(logger, "Planning Pipeline: %s", move_group_interface.getPlanningPipelineId().c_str());
   RCLCPP_INFO(logger, "Planner ID: %s", move_group_interface.getPlannerId().c_str());
@@ -78,8 +76,8 @@ int main(int argc, char* argv[])
     // Target 1
     {
       geometry_msgs::msg::Pose target;
-      target.position.x = 0.1919;  target.position.y = -0.0436;  target.position.z = 0.0646;
-      target.orientation.x = 0.0846; target.orientation.y = 0.09961; target.orientation.z = -0.0179; target.orientation.w = 0.0172;
+      target.position.x = 0.2738;  target.position.y = 0.1550;  target.position.z = 0.0522;
+      target.orientation.x = 0.6158; target.orientation.y = 0.7598; target.orientation.z = 0.0881; target.orientation.w = 0.1889;
       move_group_interface.setPoseTarget(target);
 
       moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -104,8 +102,8 @@ int main(int argc, char* argv[])
     // Target 2
     {
       geometry_msgs::msg::Pose target;
-      target.position.x = 0.1919;  target.position.y = 0.0436;  target.position.z = 0.0646;
-      target.orientation.x = 0.0846; target.orientation.y = 0.09961; target.orientation.z = -0.0179; target.orientation.w = 0.0172;
+      target.position.x = 0.3501;  target.position.y = -0.0039;  target.position.z = 0.0864;
+      target.orientation.x = 0.0044; target.orientation.y = 0.9747; target.orientation.z = 0.0011; target.orientation.w = 0.2234;
       move_group_interface.setPoseTarget(target);
 
       moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -130,8 +128,8 @@ int main(int argc, char* argv[])
     // Target 3
     {
       geometry_msgs::msg::Pose target;
-      target.position.x = 0.1752;  target.position.y = 0.1319;  target.position.z = 0.0668;
-      target.orientation.x = 0.7522; target.orientation.y = 0.6584; target.orientation.z = 0.0063; target.orientation.w = 0.0254;
+      target.position.x = 0.2684;  target.position.y = -0.1553;  target.position.z = 0.1971;
+      target.orientation.x = 0.4472; target.orientation.y = 0.8187; target.orientation.z = 0.1835; target.orientation.w = 0.3100;
       move_group_interface.setPoseTarget(target);
 
       moveit::planning_interface::MoveGroupInterface::Plan plan;
