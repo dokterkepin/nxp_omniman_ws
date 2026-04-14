@@ -3,6 +3,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     RegisterEventHandler,
 )
+from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import (
     Command,
@@ -31,6 +32,13 @@ def generate_launch_description():
         "use_sim",
         default_value="false",
         description="Use Isaac Sim mock hardware instead of real motors",
+    )
+
+    use_joy_arg = DeclareLaunchArgument(
+        "use_joy",
+        default_value="true",
+        description="Start joy + teleop_twist_joy. Set false when driving "
+                    "autonomously to avoid competing /cmd_vel publishers.",
     )
 
     robot_description_content = Command(
@@ -117,6 +125,7 @@ def generate_launch_description():
         package="joy",
         executable="joy_node",
         parameters=[joystick_config],
+        condition=IfCondition(LaunchConfiguration("use_joy")),
     )
 
     teleop_node = Node(
@@ -124,6 +133,7 @@ def generate_launch_description():
         executable="teleop_node",
         parameters=[joystick_config],
         remappings=[("/cmd_vel", "/cmd_vel")],
+        condition=IfCondition(LaunchConfiguration("use_joy")),
     )
 
     move_group_node = Node(
@@ -140,6 +150,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             use_sim_arg,
+            use_joy_arg,
             control_node,
             robot_state_publisher_node,
             joint_state_broadcaster_spawner,

@@ -18,12 +18,21 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2_eigen REQUIRED)
+find_package(nav_msgs REQUIRED)
 
 
 add_executable(commander src/commander.cpp)
 add_executable(commander2 src/commander2.cpp)
 add_executable(position src/position.cpp)
 add_executable(quaternion_test src/quaternion_test.cpp)
+add_executable(drive_distance src/drive_distance.cpp)
+
+ament_target_dependencies(drive_distance
+  rclcpp
+  geometry_msgs
+  nav_msgs
+  tf2
+)
 
 ament_target_dependencies(commander
   rclcpp
@@ -76,6 +85,7 @@ install(TARGETS
   commander2
   position
   quaternion_test
+  drive_distance
   DESTINATION lib/${PROJECT_NAME}
 )
 
