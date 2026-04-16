@@ -78,8 +78,8 @@ int main(int argc, char* argv[])
     // Target 1
     {
       geometry_msgs::msg::Pose target;
-      target.position.x = 0.2822;  target.position.y =  0.0437;  target.position.z = 0.2802;
-      target.orientation.x = -0.0964; target.orientation.y = 0.6612; target.orientation.z = 0.3022; target.orientation.w = 0.6798;
+      target.position.x = -0.2612;  target.position.y = -0.0041;  target.position.z = 0.2358;
+      target.orientation.x = -0.0012; target.orientation.y = -0.8612; target.orientation.z = 0.0009; target.orientation.w = 0.5083;
       move_group_interface.setPoseTarget(target);
 
       moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -104,8 +104,8 @@ int main(int argc, char* argv[])
     // Target 2
     {
       geometry_msgs::msg::Pose target;
-      target.position.x = 0.2446;  target.position.y =  0.0092;  target.position.z = 0.0338;
-      target.orientation.x = -0.0042; target.orientation.y = 0.9988; target.orientation.z = 0.0040; target.orientation.w = 0.0491;
+      target.position.x = 0.0590;  target.position.y = -0.3424;  target.position.z = 0.2358;
+      target.orientation.x = -0.5835; target.orientation.y = 0.6333; target.orientation.z = -0.3456; target.orientation.w = -0.3727;
       move_group_interface.setPoseTarget(target);
 
       moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -147,8 +147,8 @@ int main(int argc, char* argv[])
     // Target 3
     {
       geometry_msgs::msg::Pose target;
-      target.position.x = -0.1567; target.position.y =  0.0428;  target.position.z = 0.2615;
-      target.orientation.x = -0.6778; target.orientation.y = -0.0718; target.orientation.z = 0.7177; target.orientation.w = -0.1425;
+      target.position.x = 0.3963; target.position.y = -0.0039;  target.position.z = 0.0874;
+      target.orientation.x = 0.0006; target.orientation.y = 0.9187; target.orientation.z = 0.0004; target.orientation.w = 0.3950;
       move_group_interface.setPoseTarget(target);
 
       moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -173,8 +173,8 @@ int main(int argc, char* argv[])
     // Target 4
     {
       geometry_msgs::msg::Pose target;
-      target.position.x = 0.0590; target.position.y =  0.3907;  target.position.z = 0.1211;
-      target.orientation.x = -0.7109; target.orientation.y = 0.3036; target.orientation.z = 0.0523; target.orientation.w = 0.6322;
+      target.position.x = -0.0494; target.position.y = 0.2982;  target.position.z = 0.1443;
+      target.orientation.x = 0.7728; target.orientation.y = -0.4982; target.orientation.z = -0.3308; target.orientation.w = -0.2124;
       move_group_interface.setPoseTarget(target);
 
       moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -213,9 +213,9 @@ int main(int argc, char* argv[])
     }
     std::this_thread::sleep_for(std::chrono::seconds(4));
 
-    // Return to home
+    // Return to ready
     {
-      move_group_interface.setNamedTarget("home");
+      move_group_interface.setNamedTarget("ready");
       moveit::planning_interface::MoveGroupInterface::Plan plan;
       if (static_cast<bool>(move_group_interface.plan(plan))) {
         draw_title("return home");
