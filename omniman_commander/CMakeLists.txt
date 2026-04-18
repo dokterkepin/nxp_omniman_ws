@@ -83,18 +83,25 @@ ament_target_dependencies(quaternion_test
   tf2_ros
 )
 
-install(DIRECTORY 
+install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}/
 )
 
-install(TARGETS 
+install(TARGETS
   commander
   commander2
   position
   quaternion_test
   drive_distance
   drive_rectangle
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  scripts/line_follower_pid.py
+  scripts/line_detection_test.py
+  scripts/mission_runner.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
