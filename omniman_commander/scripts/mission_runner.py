@@ -7,13 +7,14 @@
 # Step kinds:
 #   STRAIGHT  — drive along base_link +x (or -x if distance<0) until odom
 #               distance reached. Signed distance: + = forward, - = reverse.
-#               Optional follow_line (forward only). Optional yaw_hold.
+#               Optional follow_line (forward only).
 #   STRAFE    — pure lateral motion (+y=left, -y=right), no line PID, no
 #               forward component. All four mecanum wheels engage.
 #   TURN      — rotate base to (start_yaw + dtheta)
-#   COLOR     — drive forward at coast_speed (or step-specified search_vx/vy)
-#               until the target color is detected, then stop. No homing PID —
-#               just a trigger. Do approach/dwell/retreat with STRAIGHT steps.
+#   COLOR     — hold still until the HSV detector flips the color-found flag,
+#               then advance. No search motion — assume the preceding TURN/
+#               STRAFE already points the camera at the swatch. Do approach/
+#               dwell/retreat with STRAIGHT steps.
 #   DWELL     — publish zero twist for N seconds
 #
 # Edit build_mission() below to change the course.
@@ -114,10 +115,6 @@ class MissionRunner(Node):
         # multiplier on every TURN dtheta. Set to -1.0 if odom and cmd_vel yaw
         # conventions disagree (i.e. "LEFT" rotates the robot right in reality).
         self.declare_parameter("turn_sign", 1.0)
-        # small PID gain used to hold heading during STRAIGHT / STRAFE / COLOR
-        # when step["yaw_hold"] is True. Much smaller than yaw_kp because we
-        # are correcting drift, not commanding a turn.
-        self.declare_parameter("yaw_hold_kp", 1.0)
 
         # vision
         self.declare_parameter("roi_top_frac", 0.55)
@@ -173,7 +170,6 @@ class MissionRunner(Node):
         self.yaw_kp = float(g("yaw_kp").value)
         self.yaw_tol = float(g("yaw_tolerance_rad").value)
         self.turn_sign = float(g("turn_sign").value)
-        self.yaw_hold_kp = float(g("yaw_hold_kp").value)
         self.roi_top = float(g("roi_top_frac").value)
         self.roi_bot = float(g("roi_bot_frac").value)
         self.black_thresh = int(g("black_thresh").value)
@@ -200,12 +196,6 @@ class MissionRunner(Node):
         self._pose = None                # (x, y, yaw)
         self._img_received = False
         self._debug_frame = None
-
-        # Absolute desired yaw that accumulates across TURN steps. Holds the
-        # INTENDED heading — not whatever the robot actually ended up at after
-        # a turn. Yaw-hold uses this so any residual turn error gets corrected
-        # by the next STRAIGHT / COLOR / STRAFE step.
-        self._desired_yaw = None
 
         self.bridge = CvBridge()
 
@@ -242,82 +232,60 @@ class MissionRunner(Node):
     # ------------------------------------------------------------------
     def build_mission(self):
         # ================================================================
-        # MISSION TUNABLES  —  edit these to reshape the course.
-        #   distances in meters, angles in degrees (converted below).
-        #   +angle = LEFT / CCW per ROS REP-103.
-        #   To globally flip rotation direction: launch with turn_sign:=-1.0
+        # MISSION DEFINITION — tune values directly in the step dicts below.
         #
-        # Each destination now follows the same shape:
-        #   pre-move  (STRAIGHT/TURN/STRAFE — whatever gets us pointing at it)
-        #   FIND      (COLOR: drive until target detected, no homing PID)
-        #   APPROACH  (STRAIGHT +APPROACH_M — close the last gap after detect)
-        #   DWELL     (stop and wait)
-        #   RETREAT   (STRAIGHT -RETREAT_M — back off so next pre-move is clean)
+        # Conventions:
+        #   distance        meters. STRAIGHT: + = forward, - = reverse.
+        #                           STRAFE:   + = LEFT (+y), - = RIGHT (-y).
+        #   dtheta          radians (deg(...) helper). + = LEFT / CCW per REP-103.
+        #   follow_line     True = line-follow PID, False = open-loop drive.
+        #
+        # Per-step SPEED overrides (all optional; omit to use node defaults):
+        #   STRAIGHT  "speed"          — m/s along vx   (default forward_speed)
+        #             "coast_speed"    — m/s when line lost (default coast_speed)
+        #   STRAFE    "speed"          — m/s along vy   (default forward_speed)
+        #   TURN      "angular_speed"  — rad/s cap on wz (default max_angular_speed)
+        #   COLOR     — no motion tunables; holds still until detected.
+        #
+        # Destination shape:
+        #   pre-move -> COLOR (detect) -> STRAIGHT + (approach) -> DWELL ->
+        #   STRAIGHT - (retreat)
         # ================================================================
         deg = math.radians
-
-        # dwell time at every destination (seconds)
-        DWELL_S             = self.dwell_seconds_p   # or hard-code e.g. 5.0
-
-        # shared for every destination: forward after detection, then backward
-        # the same distance after dwell. Retreat step passes -APPROACH_M.
-        APPROACH_M          = 0.5
-        FIND_VX             = 0.03    # forward search speed during COLOR step
-
-        # ---- Leg 1: start -> yellow (east) ----
-        L1_FOLLOW_LINE      = False   # False = open-loop, True = line-follow PID
-        L1_TURN_DEG         = +90.0   # +LEFT to face yellow
-
-        # ---- Leg 2: yellow -> blue (south) ----
-        L2_UTURN_A_DEG      = -90.0   # U-turn after yellow
-        # Signed distance: + = LEFT (+y), - = RIGHT (-y) per ROS REP-103.
-        # e.g. -0.40 -> strafe right 0.40 m.
-        L2_STRAFE_M         = -0.40
-        L2_STRAFE_SPEED     = 0.05    # m/s during the strafe
-
-        # ---- Leg 3: blue -> green (west) ----
-        L3_UTURN_A_DEG      = -90.0
-        L3_STRAIGHT_M       = 0.40    # drive back to the intersection
-        L3_FOLLOW_LINE      = True    # False = open-loop, True = line-follow PID
-
-        # ================================================================
-        # Step list — rarely needs editing; change values above instead.
-        # Signed distance on STRAIGHT: + = forward, - = reverse.
-        # ================================================================
         return [
-            # Leg 1: start -> yellow.
+            # Leg 1: start -> yellow (west).
             {"name": "L1_south",        "kind": STEP_STRAIGHT, "distance": 0.5,
-             "follow_line": L1_FOLLOW_LINE, "yaw_hold": True},
-            {"name": "L1_face_east",    "kind": STEP_TURN,     "dtheta": deg(L1_TURN_DEG)},
-            {"name": "L1_find_yellow",  "kind": STEP_COLOR,    "target": "yellow",
-             "search_vx": FIND_VX,     "search_vy": 0.0,       "yaw_hold": True},
+             "speed": 0.1,            "follow_line": False},
+            {"name": "L1_face_west",    "kind": STEP_TURN,     "dtheta": deg(+90.0),
+             "angular_speed": 0.4},
+            {"name": "L1_find_yellow",  "kind": STEP_COLOR,    "target": "yellow"},
             {"name": "L1_approach",     "kind": STEP_STRAIGHT, "distance": 0.6,
-             "follow_line": True,      "yaw_hold": True},
-            {"name": "L1_dwell",        "kind": STEP_DWELL,    "seconds": DWELL_S},
-            {"name": "L1_retreat",      "kind": STEP_STRAIGHT, "distance": -APPROACH_M,
-             "follow_line": True,     "yaw_hold": True},
+             "speed": 0.1,            "follow_line": True},
+            {"name": "L1_dwell",        "kind": STEP_DWELL,    "seconds": self.dwell_seconds_p},
+            {"name": "L1_retreat",      "kind": STEP_STRAIGHT, "distance": -0.5,
+             "speed": 0.1,            "follow_line": True},
 
-            # Leg 2: yellow -> blue.
-            {"name": "L2_uturn",        "kind": STEP_TURN,     "dtheta": deg(L2_UTURN_A_DEG)},
-            {"name": "L2_strafe",       "kind": STEP_STRAFE,   "distance": L2_STRAFE_M,
-             "speed": L2_STRAFE_SPEED, "yaw_hold": True},
-            {"name": "L2_find_blue",    "kind": STEP_COLOR,    "target": "blue",
-             "search_vx": FIND_VX,     "search_vy": 0.0,       "yaw_hold": True},
+            # Leg 2: yellow -> blue (north).
+            {"name": "L2_face_south",   "kind": STEP_TURN,     "dtheta": deg(-90.0),
+             "angular_speed": 0.4},
+            {"name": "L2_strafe",       "kind": STEP_STRAFE,   "distance": -0.60,
+             "speed": 0.1},
+            {"name": "L2_find_blue",    "kind": STEP_COLOR,    "target": "blue"},
             {"name": "L2_approach",     "kind": STEP_STRAIGHT, "distance": 0.5,
-             "follow_line": True,      "yaw_hold": True},
-            {"name": "L2_dwell",        "kind": STEP_DWELL,    "seconds": DWELL_S},
+             "speed": 0.1,            "follow_line": True},
+            {"name": "L2_dwell",        "kind": STEP_DWELL,    "seconds": self.dwell_seconds_p},
             {"name": "L2_retreat",      "kind": STEP_STRAIGHT, "distance": -0.5,
-             "follow_line": True,     "yaw_hold": True},
+             "speed": 0.1,            "follow_line": True},
 
-            # Leg 3: blue -> green.
-            {"name": "L3_uturn_a",      "kind": STEP_TURN,     "dtheta": deg(L3_UTURN_A_DEG)},
-            {"name": "L3_north",        "kind": STEP_STRAIGHT, "distance": L3_STRAIGHT_M,
-             "follow_line": L3_FOLLOW_LINE, "yaw_hold": True},
-            {"name": "L3_find_green",   "kind": STEP_COLOR,    "target": "green",
-             "search_vx": FIND_VX,     "search_vy": 0.0,       "yaw_hold": True},
+            # Leg 3: blue -> green (east).
+            {"name": "L3_face_east",      "kind": STEP_TURN,     "dtheta": deg(-90.0),
+             "angular_speed": 0.4},
+            {"name": "L3_east",        "kind": STEP_STRAIGHT, "distance": 0.40,
+             "speed": 0.1,            "follow_line": True},
+            {"name": "L3_find_green",   "kind": STEP_COLOR,    "target": "green"},
             {"name": "L3_approach",     "kind": STEP_STRAIGHT, "distance": 0.6,
-             "follow_line": True,      "yaw_hold": True},
-            {"name": "L3_dwell",        "kind": STEP_DWELL,    "seconds": DWELL_S},
+             "speed": 0.1,            "follow_line": True},
+            {"name": "L3_dwell",        "kind": STEP_DWELL,    "seconds": self.dwell_seconds_p},
         ]
 
     # ------------------------------------------------------------------
@@ -333,6 +301,7 @@ class MissionRunner(Node):
         except Exception as e:
             self.get_logger().warn(f"cv_bridge failed: {e}")
             return
+        self._last_cv_frame = cv
 
         h, w = cv.shape[:2]
         y1 = clamp(int(h * self.roi_top), 0, h)
@@ -343,7 +312,20 @@ class MissionRunner(Node):
 
         hsv_full = cv2.cvtColor(cv, cv2.COLOR_BGR2HSV)
 
-        # line mask in ROI
+        # ----------------------------------------------------------------
+        # LINE DETECTION — grayscale intensity thresholding.
+        # Not color (HSV) and not contour-based. Pipeline per frame:
+        #   1. BGR -> grayscale
+        #   2. Inverse binary threshold: pixels with gray < black_thresh
+        #      become 255 (white = "line"), everything else 0.
+        #   3. Erode(1) then dilate(2) with a 3x3 kernel — removes salt-noise
+        #      specks, then re-thickens the line so moments are stable.
+        # Centroids below come from cv2.moments on the binary mask (image
+        # moments of a 0/255 blob), NOT cv2.findContours. Area gating uses
+        # cv2.countNonZero (actual pixel count) because moments m00 on a
+        # 0/255 mask is 255*pixel_count, which makes direct comparison
+        # against a pixel threshold wrong by a factor of 255.
+        # ----------------------------------------------------------------
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         _, black = cv2.threshold(gray, self.black_thresh, 255, cv2.THRESH_BINARY_INV)
         kernel = np.ones((3, 3), np.uint8)
@@ -548,21 +530,8 @@ class MissionRunner(Node):
             return
 
         step = self.mission[self.step_idx]
-        kind = step["kind"]
         try:
-            if kind == STEP_STRAIGHT:
-                done = self._run_straight(step)
-            elif kind == STEP_STRAFE:
-                done = self._run_strafe(step)
-            elif kind == STEP_TURN:
-                done = self._run_turn(step)
-            elif kind == STEP_COLOR:
-                done = self._run_color(step)
-            elif kind == STEP_DWELL:
-                done = self._run_dwell(step)
-            else:
-                self.get_logger().error(f"unknown step kind: {kind}")
-                done = True
+            done = self._dispatch_tick(step)
         except Exception as e:
             self.get_logger().error(f"step '{step['name']}' raised: {e}")
             self._publish_stop()
@@ -593,10 +562,6 @@ class MissionRunner(Node):
             self._enter_step()
 
     def _enter_step(self):
-        # Seed absolute heading reference from the first pose we see.
-        if self._desired_yaw is None and self._pose is not None:
-            self._desired_yaw = self._pose[2]
-
         self.step_state = {
             "start_t": time.monotonic(),
             "last_t": None,
@@ -607,23 +572,24 @@ class MissionRunner(Node):
         if self.step_idx >= len(self.mission):
             return
         step = self.mission[self.step_idx]
+        self._dispatch_enter(step)
+        self._publish_state(f"{self.step_idx}:{step['name']}:{step['kind']}")
+
+    def _dispatch_enter(self, step):
+        # Per-kind entry hook. Subclasses override to add new step kinds;
+        # call super()._dispatch_enter(step) first to keep base kinds working.
         kind = step["kind"]
         name = step["name"]
         pose = self._pose
-
         if kind == STEP_TURN:
             dtheta_eff = self.turn_sign * step["dtheta"]
-            # Advance the ABSOLUTE desired yaw by the commanded dtheta. Any
-            # residual error from the previous turn carries forward and will
-            # be corrected here (TURN aims at desired_yaw directly, not at
-            # current_yaw + dtheta).
-            self._desired_yaw = wrap_angle(self._desired_yaw + dtheta_eff)
-            self.step_state["target_yaw"] = self._desired_yaw
+            target = wrap_angle(pose[2] + dtheta_eff)
+            self.step_state["target_yaw"] = target
             self.get_logger().info(
                 f"[{self.step_idx}] -> '{name}' TURN dtheta={math.degrees(dtheta_eff):+.1f}deg "
                 f"(sign={self.turn_sign:+.0f}) "
                 f"| yaw {math.degrees(pose[2]):+.1f}deg -> "
-                f"desired {math.degrees(self._desired_yaw):+.1f}deg")
+                f"target {math.degrees(target):+.1f}deg")
         elif kind == STEP_STRAIGHT:
             signed = float(step["distance"])
             direction = "fwd" if signed >= 0.0 else "rev"
@@ -631,7 +597,6 @@ class MissionRunner(Node):
                 f"[{self.step_idx}] -> '{name}' STRAIGHT {direction} "
                 f"{abs(signed):.2f}m follow_line={step.get('follow_line', True)}")
         elif kind == STEP_STRAFE:
-            # Sign of distance encodes direction: + = LEFT (+y), - = RIGHT (-y).
             signed = float(step["distance"])
             direction = "left" if signed >= 0.0 else "right"
             speed = float(step.get("speed", self.forward_speed))
@@ -641,12 +606,27 @@ class MissionRunner(Node):
         elif kind == STEP_COLOR:
             self._active_color = step["target"]
             self.get_logger().info(
-                f"[{self.step_idx}] -> '{name}' COLOR target={step['target']} "
-                f"(drive until detected)")
+                f"[{self.step_idx}] -> '{name}' COLOR target={step['target']}")
         elif kind == STEP_DWELL:
             self.get_logger().info(
                 f"[{self.step_idx}] -> '{name}' DWELL {step['seconds']:.1f}s")
-        self._publish_state(f"{self.step_idx}:{name}:{kind}")
+
+    def _dispatch_tick(self, step) -> bool:
+        # Per-kind tick hook. Subclasses override to add new step kinds;
+        # call super()._dispatch_tick(step) as the fallback for unhandled kinds.
+        kind = step["kind"]
+        if kind == STEP_STRAIGHT:
+            return self._run_straight(step)
+        if kind == STEP_STRAFE:
+            return self._run_strafe(step)
+        if kind == STEP_TURN:
+            return self._run_turn(step)
+        if kind == STEP_COLOR:
+            return self._run_color(step)
+        if kind == STEP_DWELL:
+            return self._run_dwell(step)
+        self.get_logger().error(f"unknown step kind: {kind}")
+        return True
 
     # ------------------------------------------------------------------
     # Per-step tick logic
@@ -658,19 +638,6 @@ class MissionRunner(Node):
         if last is None:
             return 1.0 / self.rate_hz
         return max(1e-3, now - last)
-
-    def _yaw_hold_wz(self, step):
-        # Heading stabilizer. When step["yaw_hold"] is True, returns a wz
-        # correction that pulls yaw back to the ABSOLUTE desired heading
-        # (_desired_yaw), which accumulates across TURN steps by their
-        # commanded dtheta — not by whatever the turn actually achieved.
-        # That way any residual turn error gets corrected here.
-        if not step.get("yaw_hold", False):
-            return 0.0
-        if self._desired_yaw is None or self._pose is None:
-            return 0.0
-        err = wrap_angle(self._desired_yaw - self._pose[2])
-        return clamp(self.yaw_hold_kp * err, -self.max_ang, self.max_ang)
 
     def _run_straight(self, step):
         # Signed distance: + = forward (+x), - = reverse (-x). Line PID runs
@@ -685,14 +652,18 @@ class MissionRunner(Node):
         if traveled >= abs(signed):
             return True
 
-        hold_wz = self._yaw_hold_wz(step)
         reverse = signed < 0.0
-        base_vx = -self.forward_speed if reverse else self.forward_speed
-        coast_vx = -self.coast_speed if reverse else self.coast_speed
+        # Per-step speed override: step["speed"] sets both the active drive
+        # speed and (when the line is lost and we coast) the coast speed.
+        # Defaults fall back to the node-level forward_speed / coast_speed.
+        speed = float(step.get("speed", self.forward_speed))
+        coast_speed = float(step.get("coast_speed", self.coast_speed))
+        base_vx = -speed if reverse else speed
+        coast_vx = -coast_speed if reverse else coast_speed
 
         # open-loop: no line tracking, just drive.
         if not step.get("follow_line", True):
-            self._publish(vx=base_vx, wz=hold_wz)
+            self._publish(vx=base_vx)
             return False
 
         # Lane-keep:
@@ -717,10 +688,10 @@ class MissionRunner(Node):
                        -self.max_lat, self.max_lat)
         else:
             self.step_state["prev_err"] = 0.0
-            self._publish(vx=coast_vx, wz=hold_wz)
+            self._publish(vx=coast_vx)
             return False
 
-        self._publish(vx=base_vx, vy=vy, wz=hold_wz)
+        self._publish(vx=base_vx, vy=vy)
         return False
 
     def _run_strafe(self, step):
@@ -738,11 +709,10 @@ class MissionRunner(Node):
         speed = float(step.get("speed", self.forward_speed))
         # Sign of distance sets lateral direction: + -> +y (LEFT), - -> -y (RIGHT).
         vy = speed if signed >= 0.0 else -speed
-        self._publish(vy=vy, wz=self._yaw_hold_wz(step))
+        self._publish(vy=vy)
         return False
 
     def _run_turn(self, step):
-        del step
         target = self.step_state["target_yaw"]
         err = wrap_angle(target - self._pose[2])
         if abs(err) < self.yaw_tol:
@@ -750,37 +720,26 @@ class MissionRunner(Node):
                 f"    turn done | final_yaw={math.degrees(self._pose[2]):+.1f}deg "
                 f"(residual {math.degrees(err):+.2f}deg)")
             return True
-        wz = clamp(self.yaw_kp * err, -self.max_ang, self.max_ang)
+        # Per-step angular speed cap: step["angular_speed"] in rad/s. Falls
+        # back to the node-level max_angular_speed.
+        max_wz = float(step.get("angular_speed", self.max_ang))
+        wz = clamp(self.yaw_kp * err, -max_wz, max_wz)
         self._publish(wz=wz)
         return False
 
     def _run_color(self, step):
-        # Detect-and-trigger: drive open-loop (search_vx/vy) until the target
-        # color is visible, then stop. No homing PID, no stop_frac. Use a
-        # following STRAIGHT step for the final approach distance.
-        start_pose = self.step_state["start_pose"]
-        if start_pose is not None:
-            traveled = math.hypot(self._pose[0] - start_pose[0],
-                                  self._pose[1] - start_pose[1])
-            if traveled > self.step_max_dist:
-                self.get_logger().error(
-                    f"color step: traveled {traveled:.2f}m > "
-                    f"{self.step_max_dist:.2f}m cap")
-                self._active_color = None
-                return True
-
+        # Detect-and-trigger. The step holds the robot still until the HSV
+        # detector in _on_image flips self._color_found True, then advances.
+        # Assumes the preceding TURN/STRAFE already points the camera at the
+        # swatch, so the color is visible on entry.
         if self._color_found:
             self.get_logger().info(
                 f"    color '{step['target']}' DETECTED "
-                f"(frac={self._color_frac:.2f}) — stopping")
+                f"(frac={self._color_frac:.2f})")
             self._active_color = None
             return True
 
-        self._publish(
-            vx=float(step.get("search_vx", self.coast_speed)),
-            vy=float(step.get("search_vy", 0.0)),
-            wz=self._yaw_hold_wz(step),
-        )
+        self._publish_stop()
         return False
 
     def _log_progress(self, step, elapsed):
@@ -792,15 +751,11 @@ class MissionRunner(Node):
                 traveled = math.hypot(self._pose[0] - sp[0], self._pose[1] - sp[1])
                 signed = float(step["distance"])
                 direction = "fwd" if signed >= 0.0 else "rev"
-                hold_wz = self._yaw_hold_wz(step)
-                ref_yaw = self._desired_yaw if self._desired_yaw is not None else self._pose[2]
-                yaw_err = wrap_angle(ref_yaw - self._pose[2])
                 self.get_logger().info(
                     f"  [{self.step_idx}] '{name}' STRAIGHT {direction} "
                     f"t={elapsed:.1f}s traveled={traveled:.2f}/{abs(signed):.2f}m "
                     f"lane={self._lane_mode} err={self._line_err:+.2f} "
-                    f"yaw={math.degrees(self._pose[2]):+.1f}->{math.degrees(ref_yaw):+.1f} "
-                    f"(err={math.degrees(yaw_err):+.1f}deg wz={hold_wz:+.3f})")
+                    f"yaw={math.degrees(self._pose[2]):+.1f}deg")
         elif kind == STEP_STRAFE:
             sp = self.step_state.get("start_pose")
             if sp is not None and self._pose is not None:

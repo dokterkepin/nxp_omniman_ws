@@ -102,6 +102,7 @@ install(PROGRAMS
   scripts/line_follower_pid.py
   scripts/line_detection_test.py
   scripts/mission_runner.py
+  scripts/traffic_mission.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
