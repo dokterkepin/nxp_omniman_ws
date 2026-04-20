@@ -497,7 +497,7 @@ void CybergearActuator::receive() {
         try {
             can_id = receiver_->receive(feedback.data.data(), interval_ns_);
         } catch (const std::exception& ex) {
-            RCLCPP_WARN_THROTTLE(get_logger(), *clock_, 1000, "Error receiving CAN message: %s - %s", can_interface_.c_str(), ex.what());
+            RCLCPP_DEBUG_THROTTLE(get_logger(), *clock_, 1000, "Error receiving CAN message: %s - %s", can_interface_.c_str(), ex.what());
             continue;
         }
         uint32_t id = can_id.identifier();
