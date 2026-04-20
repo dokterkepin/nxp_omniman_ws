@@ -19,27 +19,22 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(OpenCV REQUIRED)
 
 
 add_executable(commander src/commander.cpp)
 add_executable(commander2 src/commander2.cpp)
 add_executable(position src/position.cpp)
 add_executable(quaternion_test src/quaternion_test.cpp)
-add_executable(drive_distance src/drive_distance.cpp)
-add_executable(drive_rectangle src/drive_rectangle.cpp)
+add_executable(fira_mission_yolo_cpp src/fira_mission_yolo.cpp)
 
-ament_target_dependencies(drive_distance
+ament_target_dependencies(fira_mission_yolo_cpp
   rclcpp
+  moveit_ros_planning_interface
+  moveit_visual_tools
   geometry_msgs
-  nav_msgs
-  tf2
-)
-
-ament_target_dependencies(drive_rectangle
-  rclcpp
-  geometry_msgs
-  nav_msgs
-  tf2
 )
 
 ament_target_dependencies(commander
@@ -93,16 +88,20 @@ install(TARGETS
   commander2
   position
   quaternion_test
-  drive_distance
-  drive_rectangle
+  fira_mission_yolo_cpp
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(PROGRAMS
-  scripts/line_follower_pid.py
-  scripts/line_detection_test.py
   scripts/mission_runner.py
   scripts/traffic_mission.py
+  scripts/yolo_target_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(FILES
+  scripts/ground_best.pt
+  scripts/wood_best.pt
   DESTINATION lib/${PROJECT_NAME}
 )
 
