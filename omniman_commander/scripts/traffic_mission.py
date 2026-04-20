@@ -206,6 +206,15 @@ class TrafficMissionRunner(MissionRunner):
             {"name": "POST_DETECT_FWD", "kind": STEP_STRAIGHT,
              "distance": post_fwd, "speed": 0.08, "follow_line": False},
             {"name": "SPLICE",          "kind": STEP_BUILD_LEGS},
+            # Homing: after BUILD_LEGS splices the spokes in front of this
+            # step, SPLICE's successor (here) runs once all spokes have
+            # finished and the robot is back at the hub. Mirror the prefix
+            # drive (TO_PANEL + POST_DETECT_FWD) in reverse to return to
+            # the original start pose.
+            {"name": "GO_HOME_UNWIND",  "kind": STEP_STRAIGHT,
+             "distance": -post_fwd, "speed": 0.08, "follow_line": False},
+            {"name": "GO_HOME_START",   "kind": STEP_STRAIGHT,
+             "distance": -approach, "speed": 0.08, "follow_line": False},
         ]
 
     # ------------------------------------------------------------------

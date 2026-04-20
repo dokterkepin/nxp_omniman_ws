@@ -141,7 +141,7 @@ class MissionRunner(Node):
 
         # mission-level
         self.declare_parameter("to_intersection_m", 0.40)
-        self.declare_parameter("dwell_seconds", 5.0)
+        self.declare_parameter("dwell_seconds", 3.0)
 
         # safety
         self.declare_parameter("step_timeout_s", 90.0)

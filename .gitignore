@@ -36,4 +36,5 @@ build
 *.log
 .claude
 **/pycache/
+**/__pycache__/
 *.pyc
