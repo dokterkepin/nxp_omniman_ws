@@ -25,6 +25,7 @@ find_package(OpenCV REQUIRED)
 
 
 add_executable(commander src/commander.cpp)
+add_executable(commander1 src/commander1.cpp)
 add_executable(commander2 src/commander2.cpp)
 add_executable(position src/position.cpp)
 add_executable(quaternion_test src/quaternion_test.cpp)
@@ -38,6 +39,18 @@ ament_target_dependencies(fira_mission_yolo_cpp
 )
 
 ament_target_dependencies(commander
+  rclcpp
+  moveit_ros_planning_interface
+  moveit_visual_tools
+  geometry_msgs
+  example_interfaces
+  std_msgs
+  moveit_task_constructor_core
+  tf2_msgs
+  tf2_ros
+)
+
+ament_target_dependencies(commander1
   rclcpp
   moveit_ros_planning_interface
   moveit_visual_tools
@@ -85,6 +98,7 @@ install(DIRECTORY
 
 install(TARGETS
   commander
+  commander1
   commander2
   position
   quaternion_test
@@ -100,7 +114,6 @@ install(PROGRAMS
 )
 
 install(FILES
-  scripts/ground_best.pt
   scripts/wood_best.pt
   DESTINATION lib/${PROJECT_NAME}
 )
