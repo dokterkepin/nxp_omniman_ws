@@ -10,13 +10,7 @@
     <!--CHAINS: When a chain is specified, all the links along the chain (including endpoints) are included in the group. Additionally, all the joints that are parents to included links are also included. This means that joints along the chain and the parent joint of the base link are included in the group-->
     <!--SUBGROUPS: Groups can also be formed by referencing to already defined group names-->
     <group name="arm">
-        <joint name="shoulder_yaw_joint"/>
-        <joint name="upper_shoulder_pitch_joint"/>
-        <joint name="arm_yaw_joint"/>
-        <joint name="forearm_pitch_joint"/>
-        <joint name="wrist_pitch_joint"/>
-        <joint name="palm_yaw_joint"/>
-        <joint name="ee_joint"/>
+        <chain base_link="base_link" tip_link="ee_link"/>
     </group>
     <group name="gripper">
         <joint name="left_finger_prismatic_joint"/>
