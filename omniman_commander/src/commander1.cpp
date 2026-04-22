@@ -176,7 +176,7 @@ int main(int argc, char* argv[])
   Commander1 commander(logger_ptr, move_group_interface, gripper_group_interface, visual_tools, params);
 
   geometry_msgs::msg::Pose target_pose;
-  target_pose.position.x = current_pose.position.x + 0.03;
+  target_pose.position.x = current_pose.position.x + 0.01;
   target_pose.position.y = current_pose.position.y;
   target_pose.position.z = current_pose.position.z;
   target_pose.orientation.x = current_pose.orientation.x;
