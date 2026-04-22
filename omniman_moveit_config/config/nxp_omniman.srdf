@@ -56,8 +56,8 @@
     </group_state>
     <group_state name="north" group="arm">
         <joint name="arm_yaw_joint" value="0"/>
-        <joint name="forearm_pitch_joint" value="-1.0472"/>
-        <joint name="palm_yaw_joint" value="3.1300"/>
+        <joint name="forearm_pitch_joint" value="0.7853"/>
+        <joint name="palm_yaw_joint" value="0"/>
         <joint name="shoulder_yaw_joint" value="0"/>
         <joint name="upper_shoulder_pitch_joint" value="-0.6457"/>
         <joint name="wrist_pitch_joint" value="1.6800"/>
