@@ -122,7 +122,7 @@ class TrafficMissionRunner(MissionRunner):
     # ------------------------------------------------------------------
     def build_mission(self):
         approach = getattr(self, "traffic_approach", 0.6)
-        post_fwd = getattr(self, "post_detect", 0.3)
+        post_fwd = getattr(self, "post_detect", 0.2)
         dwell_s = self.dwell_seconds_p
 
         self._spokes = {
@@ -155,20 +155,20 @@ class TrafficMissionRunner(MissionRunner):
                 {"name": "blue_strafe_out", "kind": STEP_STRAFE,
                  "distance": -0.40, "speed": 0.08},
                 {"name": "blue_out",        "kind": STEP_STRAIGHT,
-                 "distance": 0.50, "speed": 0.10, "follow_line": True},
+                 "distance": 0.40, "speed": 0.10, "follow_line": True},
                 {"name": "blue_verify",     "kind": STEP_VERIFY_COLOR,
                  "target": "blue", "timeout_s": 2.5,
                  "fail_flag": "skip_blue"},
                 {"name": "blue_approach",   "kind": STEP_STRAIGHT,
-                 "distance": 0.35, "speed": 0.06, "follow_line": True,
+                 "distance": 0.10, "speed": 0.06, "follow_line": True,
                  "skip_if": "skip_blue"},
                 {"name": "blue_dwell",      "kind": STEP_DWELL,
                  "seconds": dwell_s, "skip_if": "skip_blue"},
                 {"name": "blue_retreat",    "kind": STEP_STRAIGHT,
-                 "distance": -0.35, "speed": 0.06, "follow_line": True,
+                 "distance": -0.40, "speed": 0.06, "follow_line": True,
                  "skip_if": "skip_blue"},
                 {"name": "blue_back",       "kind": STEP_STRAIGHT,
-                 "distance": -0.50, "speed": 0.10, "follow_line": True},
+                 "distance": -0.10, "speed": 0.10, "follow_line": True},
                 {"name": "blue_strafe_back","kind": STEP_STRAFE,
                  "distance": +0.40, "speed": 0.08},
             ],
