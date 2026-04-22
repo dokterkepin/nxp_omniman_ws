@@ -183,6 +183,11 @@ int main(int argc, char* argv[])
   target_pose.orientation.y = current_pose.orientation.y;
   target_pose.orientation.z = current_pose.orientation.z;
   target_pose.orientation.w = current_pose.orientation.w;
+  // Sync the internal start state with the real-world state before planning,
+  // as per MoveIt best practice: prevents MoveIt from using the end of a stale
+  // previous plan as the start state, which creates "jumps" the planner can't resolve.
+  move_group_interface.setStartStateToCurrentState();
+
   RCLCPP_INFO(logger, "Target pose: pos=(%.4f, %.4f, %.4f) quat=(%.4f, %.4f, %.4f, %.4f)",
     target_pose.position.x, target_pose.position.y, target_pose.position.z,
     target_pose.orientation.x, target_pose.orientation.y,

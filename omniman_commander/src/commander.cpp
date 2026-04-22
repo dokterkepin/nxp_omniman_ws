@@ -24,11 +24,9 @@ int main(int argc, char* argv[])
   auto gripper_group_interface = MoveGroupInterface(node, "gripper");
   move_group_interface.setPlanningPipelineId("pilz_industrial_motion_planner");
   move_group_interface.setPlannerId("PTP");
-  
+
   RCLCPP_INFO(logger, "Planning Pipeline: %s", move_group_interface.getPlanningPipelineId().c_str());
   RCLCPP_INFO(logger, "Planner ID: %s", move_group_interface.getPlannerId().c_str());
-  RCLCPP_INFO(logger, "Gripper Planning Pipeline: %s", gripper_group_interface.getPlanningPipelineId().c_str());
-
 
   auto moveit_visual_tools = moveit_visual_tools::MoveItVisualTools{
     node, "base_link", rviz_visual_tools::RVIZ_MARKER_TOPIC,
@@ -72,168 +70,85 @@ int main(int argc, char* argv[])
     RCLCPP_INFO(logger, "Floor collision object added");
   }
 
-  for (int i = 0; i < 100; ++i) {
-    RCLCPP_INFO(logger, "=== Iteration %d/100 ===", i + 1);
+  // Sync the internal start state with the real-world state before planning.
+  // Prevents MoveIt from using a stale "end of previous plan" as the start state.
+  move_group_interface.setStartStateToCurrentState();
 
-    // Target 1
-    {
-      geometry_msgs::msg::Pose target;
-      target.position.x = -0.2612;  target.position.y = -0.0041;  target.position.z = 0.2358;
-      target.orientation.x = -0.0012; target.orientation.y = -0.8612; target.orientation.z = 0.0009; target.orientation.w = 0.5083;
-      move_group_interface.setPoseTarget(target);
+  // Get the current pose (position + quaternion) of the end effector
+  auto current_pose = move_group_interface.getCurrentPose("ee_link").pose;
+  RCLCPP_INFO(logger, "Current pose: pos=(%.4f, %.4f, %.4f) quat=(%.4f, %.4f, %.4f, %.4f)",
+    current_pose.position.x, current_pose.position.y, current_pose.position.z,
+    current_pose.orientation.x, current_pose.orientation.y,
+    current_pose.orientation.z, current_pose.orientation.w);
 
-      moveit::planning_interface::MoveGroupInterface::Plan plan;
-      auto const ok = static_cast<bool>(move_group_interface.plan(plan));
-      if (ok) {
-        draw_trajectory_tool_path(plan.trajectory_);
-        moveit_visual_tools.trigger();
-        draw_title("Executing Target 1");
-        moveit_visual_tools.trigger();
-        if (static_cast<bool>(move_group_interface.execute(plan)))
-          RCLCPP_INFO(logger, "Target 1 executed");
-        else
-          RCLCPP_ERROR(logger, "[iter %d] Target 1 execute failed", i + 1);
-      } else {
-        draw_title("Target 1 Plan Failed!");
-        moveit_visual_tools.trigger();
-        RCLCPP_ERROR(logger, "[iter %d] Target 1 plan failed", i + 1);
-      }
+  // Build target pose from the current pose (same orientation, slight position offset)
+  geometry_msgs::msg::Pose target_pose;
+  target_pose.position.x = current_pose.position.x + 0.03;
+  target_pose.position.y = current_pose.position.y;
+  target_pose.position.z = current_pose.position.z;
+  target_pose.orientation = current_pose.orientation;
+
+  RCLCPP_INFO(logger, "Target pose: pos=(%.4f, %.4f, %.4f) quat=(%.4f, %.4f, %.4f, %.4f)",
+    target_pose.position.x, target_pose.position.y, target_pose.position.z,
+    target_pose.orientation.x, target_pose.orientation.y,
+    target_pose.orientation.z, target_pose.orientation.w);
+
+  // Clear any previous targets/constraints before planning a new motion
+  move_group_interface.clearPoseTargets();
+  move_group_interface.clearPathConstraints();
+
+  // Follow the MoveIt best-practice pattern from the tutorial:
+  //   move_group.setStartStateToCurrentState();
+  //   move_group.setPoseTarget(target_pose);
+  move_group_interface.setStartStateToCurrentState();
+  move_group_interface.setPoseTarget(target_pose, "ee_link");
+
+  // Direct IK check — tests the KDL solver on the target pose in isolation,
+  // before planning is even attempted. If this fails, the target is unreachable by IK.
+  {
+    auto test_state = *move_group_interface.getCurrentState();
+    auto const* jmg = test_state.getJointModelGroup("arm");
+    bool ik_ok = test_state.setFromIK(jmg, target_pose, "ee_link", 0.1);
+    RCLCPP_INFO(logger, "Direct IK test (100ms timeout): %s", ik_ok ? "SUCCESS" : "FAILED");
+  }
+
+  // Plan
+  moveit::planning_interface::MoveGroupInterface::Plan plan;
+  auto plan_result = move_group_interface.plan(plan);
+  if (plan_result == moveit::core::MoveItErrorCode::SUCCESS) {
+    draw_trajectory_tool_path(plan.trajectory_);
+    moveit_visual_tools.trigger();
+    draw_title("Executing Target");
+    moveit_visual_tools.trigger();
+    auto exec_result = move_group_interface.execute(plan);
+    if (exec_result == moveit::core::MoveItErrorCode::SUCCESS) {
+      RCLCPP_INFO(logger, "Target executed successfully");
+    } else {
+      RCLCPP_ERROR(logger, "Target execute failed with error code: %d (%s)",
+        static_cast<int>(exec_result.val),
+        moveit::core::error_code_to_string(exec_result).c_str());
     }
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+  } else {
+    draw_title("Plan Failed!");
+    moveit_visual_tools.trigger();
+    RCLCPP_ERROR(logger, "Plan failed with error code: %d (%s)",
+      static_cast<int>(plan_result.val),
+      moveit::core::error_code_to_string(plan_result).c_str());
 
-    // Target 2
-    {
-      geometry_msgs::msg::Pose target;
-      target.position.x = 0.0590;  target.position.y = -0.3424;  target.position.z = 0.2358;
-      target.orientation.x = -0.5835; target.orientation.y = 0.6333; target.orientation.z = -0.3456; target.orientation.w = -0.3727;
-      move_group_interface.setPoseTarget(target);
-
-      moveit::planning_interface::MoveGroupInterface::Plan plan;
-      auto const ok = static_cast<bool>(move_group_interface.plan(plan));
-      if (ok) {
-        draw_trajectory_tool_path(plan.trajectory_);
-        moveit_visual_tools.trigger();
-        draw_title("Executing Target 2");
-        moveit_visual_tools.trigger();
-        if (static_cast<bool>(move_group_interface.execute(plan)))
-          RCLCPP_INFO(logger, "Target 2 executed");
-        else
-          RCLCPP_ERROR(logger, "[iter %d] Target 2 execute failed", i + 1);
-      } else {
-        draw_title("Target 2 Plan Failed!");
-        moveit_visual_tools.trigger();
-        RCLCPP_ERROR(logger, "[iter %d] Target 2 plan failed", i + 1);
-      }
+    // Log diagnostics that help identify the failure
+    auto joints = move_group_interface.getCurrentJointValues();
+    auto names = move_group_interface.getJointNames();
+    RCLCPP_ERROR(logger, "Current joint values at failure:");
+    for (size_t i = 0; i < joints.size() && i < names.size(); ++i) {
+      RCLCPP_ERROR(logger, "  %s = %.4f rad", names[i].c_str(), joints[i]);
     }
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-
-    // Close gripper
-    {
-      gripper_group_interface.setNamedTarget("close");
-      moveit::planning_interface::MoveGroupInterface::Plan plan;
-      if (static_cast<bool>(gripper_group_interface.plan(plan))) {
-        draw_title("Closing Gripper");
-        moveit_visual_tools.trigger();
-        if (static_cast<bool>(gripper_group_interface.execute(plan)))
-          RCLCPP_INFO(logger, "Gripper closed");
-        else
-          RCLCPP_ERROR(logger, "[iter %d] Gripper close execute failed", i + 1);
-      } else {
-        RCLCPP_ERROR(logger, "[iter %d] Gripper close plan failed", i + 1);
-      }
-    }
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-
-    // Target 3
-    {
-      geometry_msgs::msg::Pose target;
-      target.position.x = 0.3963; target.position.y = -0.0039;  target.position.z = 0.0874;
-      target.orientation.x = 0.0006; target.orientation.y = 0.9187; target.orientation.z = 0.0004; target.orientation.w = 0.3950;
-      move_group_interface.setPoseTarget(target);
-
-      moveit::planning_interface::MoveGroupInterface::Plan plan;
-      auto const ok = static_cast<bool>(move_group_interface.plan(plan));
-      if (ok) {
-        draw_trajectory_tool_path(plan.trajectory_);
-        moveit_visual_tools.trigger();
-        draw_title("Executing Target 3");
-        moveit_visual_tools.trigger();
-        if (static_cast<bool>(move_group_interface.execute(plan)))
-          RCLCPP_INFO(logger, "Target 3 executed");
-        else
-          RCLCPP_ERROR(logger, "[iter %d] Target 3 execute failed", i + 1);
-      } else {
-        draw_title("Target 3 Plan Failed!");
-        moveit_visual_tools.trigger();
-        RCLCPP_ERROR(logger, "[iter %d] Target 3 plan failed", i + 1);
-      }
-    }
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-
-    // Target 4
-    {
-      geometry_msgs::msg::Pose target;
-      target.position.x = -0.0494; target.position.y = 0.2982;  target.position.z = 0.1443;
-      target.orientation.x = 0.7728; target.orientation.y = -0.4982; target.orientation.z = -0.3308; target.orientation.w = -0.2124;
-      move_group_interface.setPoseTarget(target);
-
-      moveit::planning_interface::MoveGroupInterface::Plan plan;
-      auto const ok = static_cast<bool>(move_group_interface.plan(plan));
-      if (ok) {
-        draw_trajectory_tool_path(plan.trajectory_);
-        moveit_visual_tools.trigger();
-        draw_title("Executing Target 4");
-        moveit_visual_tools.trigger();
-        if (static_cast<bool>(move_group_interface.execute(plan)))
-          RCLCPP_INFO(logger, "Target 4 executed");
-        else
-          RCLCPP_ERROR(logger, "[iter %d] Target 4 execute failed", i + 1);
-      } else {
-        draw_title("Target 4 Plan Failed!");
-        moveit_visual_tools.trigger();
-        RCLCPP_ERROR(logger, "[iter %d] Target 4 plan failed", i + 1);
-      }
-    }
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-
-    // Open gripper
-    {
-      gripper_group_interface.setNamedTarget("open");
-      moveit::planning_interface::MoveGroupInterface::Plan plan;
-      if (static_cast<bool>(gripper_group_interface.plan(plan))) {
-        draw_title("Opening Gripper");
-        moveit_visual_tools.trigger();
-        if (static_cast<bool>(gripper_group_interface.execute(plan)))
-          RCLCPP_INFO(logger, "Gripper opened");
-        else
-          RCLCPP_ERROR(logger, "[iter %d] Gripper open execute failed", i + 1);
-      } else {
-        RCLCPP_ERROR(logger, "[iter %d] Gripper open plan failed", i + 1);
-      }
-    }
-    std::this_thread::sleep_for(std::chrono::seconds(4));
-
-    // Return to ready
-    {
-      move_group_interface.setNamedTarget("ready");
-      moveit::planning_interface::MoveGroupInterface::Plan plan;
-      if (static_cast<bool>(move_group_interface.plan(plan))) {
-        draw_title("return home");
-        moveit_visual_tools.trigger();
-        if (static_cast<bool>(move_group_interface.execute(plan)))
-          RCLCPP_INFO(logger, "Returned to home");
-        else
-          RCLCPP_ERROR(logger, "[iter %d] Return to home execute failed", i + 1);
-      } else {
-        RCLCPP_ERROR(logger, "[iter %d] Return to home plan failed", i + 1);
-      }
-    }
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-
+    RCLCPP_ERROR(logger, "Target pose was: pos=(%.4f, %.4f, %.4f) quat=(%.4f, %.4f, %.4f, %.4f)",
+      target_pose.position.x, target_pose.position.y, target_pose.position.z,
+      target_pose.orientation.x, target_pose.orientation.y,
+      target_pose.orientation.z, target_pose.orientation.w);
   }
 
   rclcpp::shutdown();
   spinner.join();
   return 0;
-   
-} 
+}
