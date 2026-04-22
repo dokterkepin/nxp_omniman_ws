@@ -36,6 +36,7 @@ public:
     text_pose_.translation().z() = 1.0;
 
     joint_model_group_ = arm_move_group_->getRobotModel()->getJointModelGroup("arm");
+    
   }
 
   void clear_target_n_constraints() {
@@ -43,7 +44,8 @@ public:
     arm_move_group_->clearPathConstraints();
   }
 
-  bool move_ptp(const geometry_msgs::msg::Pose& target_pose, const std::string& text) {
+  bool move_ptp(const geometry_msgs::msg::Pose& target_pose, const std::string& text,
+                const moveit::core::LinkModel* ee_link) {
       std::cout << std::string(125, '*') << std::endl;
       RCLCPP_INFO(*logger_, "Move absolute to `%s`", text.c_str());
 
@@ -76,7 +78,7 @@ public:
 
       is_execution_success_ = false;
       if (is_plan_success_) {
-          visual_tools_->publishTrajectoryLine(plan_.trajectory_, joint_model_group_);
+          visual_tools_->publishTrajectoryLine(plan_.trajectory_, ee_link, joint_model_group_);
           visual_tools_->trigger();
 
           // Use execute instead of move to ensure we use the validated plan
@@ -176,9 +178,9 @@ int main(int argc, char* argv[])
   Commander1 commander(logger_ptr, move_group_interface, gripper_group_interface, visual_tools, params);
 
   geometry_msgs::msg::Pose target_pose;
-  target_pose.position.x = current_pose.position.x + 0.01;
+  target_pose.position.x = current_pose.position.x;
   target_pose.position.y = current_pose.position.y;
-  target_pose.position.z = current_pose.position.z;
+  target_pose.position.z = current_pose.position.z - 0.05;
   target_pose.orientation.x = current_pose.orientation.x;
   target_pose.orientation.y = current_pose.orientation.y;
   target_pose.orientation.z = current_pose.orientation.z;
@@ -192,7 +194,8 @@ int main(int argc, char* argv[])
     target_pose.position.x, target_pose.position.y, target_pose.position.z,
     target_pose.orientation.x, target_pose.orientation.y,
     target_pose.orientation.z, target_pose.orientation.w);
-  commander.move_ptp(target_pose, "CurrentPose");
+  auto const ee_link = move_group_interface.getRobotModel()->getLinkModel("ee_link");
+  commander.move_ptp(target_pose, "CurrentPose", ee_link);
 
   rclcpp::shutdown();
   spinner.join();
