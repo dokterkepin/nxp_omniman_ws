@@ -1421,7 +1421,7 @@
             <parent link="wrist_link" />
             <child link="palm_link" />
             <origin xyz="0.000 -0.019 0.064" rpy="0 0 0" />
-            <axis xyz="0 0 -1" />
+            <axis xyz="0 0 1" />
             <limit effort="10" velocity="1.0" lower="-3.14" upper="3.14" />
         </joint>
 
