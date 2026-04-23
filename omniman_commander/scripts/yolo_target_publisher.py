@@ -21,10 +21,13 @@ class YoloTargetPublisher(Node):
         self.sub_image = self.create_subscription(
             Image, '/image_raw', self.image_callback, qos_profile_sensor_data)
 
-        self.pub_target_f = self.create_publisher(Point, '/yolo_target_f', 10)
-        self.pub_target_i = self.create_publisher(Point, '/yolo_target_i', 10)
-        self.pub_error_f = self.create_publisher(Point, '/yolo_error_f', 10)
-        self.pub_error_i = self.create_publisher(Point, '/yolo_error_i', 10)
+        self.pub_target = {}
+        self.pub_error = {}
+        for letter in ('F', 'I', 'R', 'A'):
+            self.pub_target[letter] = self.create_publisher(
+                Point, f'/yolo_target_{letter.lower()}', 10)
+            self.pub_error[letter] = self.create_publisher(
+                Point, f'/yolo_error_{letter.lower()}', 10)
 
         self.get_logger().info('YOLO target publisher started, waiting for /image_raw ...')
 
@@ -75,14 +78,10 @@ class YoloTargetPublisher(Node):
                 err.y = cy - frame_cy
                 err.z = 0.0
 
-                if label == 'F':
-                    self.pub_target_f.publish(pt)
-                    self.pub_error_f.publish(err)
-                    self.get_logger().info(f'F detected at ({cx:.1f}, {cy:.1f}) err=({err.x:+.1f}, {err.y:+.1f})')
-                elif label == 'I':
-                    self.pub_target_i.publish(pt)
-                    self.pub_error_i.publish(err)
-                    self.get_logger().info(f'I detected at ({cx:.1f}, {cy:.1f}) err=({err.x:+.1f}, {err.y:+.1f})')
+                if label in self.pub_target:
+                    self.pub_target[label].publish(pt)
+                    self.pub_error[label].publish(err)
+                    self.get_logger().info(f'{label} detected at ({cx:.1f}, {cy:.1f}) err=({err.x:+.1f}, {err.y:+.1f})')
 
         # Always refresh the display and pump the GUI event loop,
         # even when nothing is detected — otherwise the window freezes.

@@ -5,6 +5,7 @@
 #include <thread>
 #include <algorithm>
 #include <iostream>
+#include <vector>
 
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
@@ -22,13 +23,20 @@ static constexpr double P_GAIN            = 1e-4;   // meters per pixel of error
 static constexpr double STEP_Z            = -0.14;  // meters to descend after align
 static constexpr double PIXEL_THRESHOLD   = 15.0;   // alignment done when |err| < this
 static constexpr int    MAX_ALIGN_ITERS   = 30;     // safety cap
-static constexpr auto   ERROR_WAIT_TIMEOUT = 3s;    // wait at most this for a fresh error
-static const std::string ERROR_TOPIC      = "/yolo_error_f";
+static constexpr auto   ERROR_WAIT_TIMEOUT = 3s;    // wait at most this for a fresh error (mid-align)
+static constexpr auto   DETECTION_TIMEOUT  = 5s;    // wait at most this for FIRST detection per letter; skip if exceeded
+static const std::string ERROR_TOPIC_PREFIX = "/yolo_error_";   // per-letter topic = prefix + lowercase(letter)
+
+// ---- Sequential FIRA mission configuration ----
+static const std::vector<std::string> LETTERS = {"F", "I", "R", "A"};
+static const std::string SEARCH_POSE = "north";  // searched-for-target pose (shared across letters)
+static const std::string WEST_POSE   = "west";   // waypoint between letters
+// Place poses: SRDF named targets with the same name as each letter ("F", "I", "R", "A")
 
 // Physical offset from ee_link to the camera optical axis.
 // Applied as an XY move after alignment (camera-centered) to put the gripper over the target.
 // Flip signs if the gripper ends up on the wrong side of the target.
-static constexpr double CAMERA_OFFSET_X   = 0.05;   // meters
+static constexpr double CAMERA_OFFSET_X   = 0.045;   // meters
 static constexpr double CAMERA_OFFSET_Y   = 0.0;    // meters
 
 // Maps pixel error -> robot XY step direction.
@@ -178,8 +186,73 @@ public:
     const moveit::core::LinkModel* ee_link)
     : node_(node), logger_(logger), commander_(&commander), ee_link_(ee_link)
   {
+    // Subscription is created per-letter inside process_letter().
+  }
+
+  void run() {
+    for (const auto& letter : LETTERS) {
+      RCLCPP_INFO(*logger_, "========================= LETTER `%s` =========================", letter.c_str());
+      if (!process_letter(letter)) {
+        RCLCPP_ERROR(*logger_, "FiraMission: failed at letter `%s`. Aborting.", letter.c_str());
+        return;
+      }
+      RCLCPP_INFO(*logger_, "Letter `%s` complete.", letter.c_str());
+    }
+    RCLCPP_INFO(*logger_, "FiraMission: all %zu letters placed. Mission complete.", LETTERS.size());
+  }
+
+private:
+  bool process_letter(const std::string& letter) {
+    // STATE 1 — SEARCH: move arm to shared search pose.
+    RCLCPP_INFO(*logger_, "[%s] STATE: SEARCH -> moving to `%s`", letter.c_str(), SEARCH_POSE.c_str());
+    if (!commander_->move_arm_to_named(SEARCH_POSE)) return false;
+
+    // STATE 2 — ALIGN: subscribe to this letter's error topic and converge.
+    // If YOLO never detects this letter within DETECTION_TIMEOUT, SKIP (don't abort mission) —
+    // camera frame may be poor and we should continue with the next letter.
+    const std::string topic = ERROR_TOPIC_PREFIX + to_lower(letter);
+    subscribe_error(topic);
+    RCLCPP_INFO(*logger_, "[%s] STATE: ALIGN -> waiting for first `%s` message...", letter.c_str(), topic.c_str());
+    if (!wait_fresh_error(DETECTION_TIMEOUT)) {
+      RCLCPP_WARN(*logger_, "[%s] Not detected on `%s` within %lds. Skipping letter.",
+                  letter.c_str(), topic.c_str(),
+                  std::chrono::duration_cast<std::chrono::seconds>(DETECTION_TIMEOUT).count());
+      return true;   // "skip" — continue with next letter
+    }
+    if (!align()) return false;
+
+    // STATE 3 — PICK: open → descend (-Z) → camera offset (+X) → close.
+    // Descend first, THEN do the forward offset at the lower altitude (often gives
+    // better reach than forward-first), and close the gripper only after the ee is
+    // at the final pick pose.
+    RCLCPP_INFO(*logger_, "[%s] STATE: PICK (open -> descend -> offset -> close)", letter.c_str());
+    if (!commander_->move_gripper("open")) return false;
+    if (!descend()) return false;
+    if (!apply_camera_offset()) return false;
+    if (!commander_->move_gripper("close")) return false;
+
+    // STATE 5 — TRANSIT: move to west pose before the place pose.
+    RCLCPP_INFO(*logger_, "[%s] STATE: TRANSIT -> moving to `%s`", letter.c_str(), WEST_POSE.c_str());
+    if (!commander_->move_arm_to_named(WEST_POSE)) return false;
+
+    // STATE 6 — PLACE: move to letter's place pose, then open to release.
+    RCLCPP_INFO(*logger_, "[%s] STATE: PLACE -> moving to named target `%s`", letter.c_str(), letter.c_str());
+    if (!commander_->move_arm_to_named(letter)) return false;
+    if (!commander_->move_gripper("open")) return false;
+
+    return true;
+  }
+
+  void subscribe_error(const std::string& topic) {
+    error_sub_.reset();
+    {
+      std::lock_guard<std::mutex> lock(error_mu_);
+      latest_err_x_ = 0.0;
+      latest_err_y_ = 0.0;
+      error_fresh_ = false;
+    }
     error_sub_ = node_->create_subscription<geometry_msgs::msg::Point>(
-      ERROR_TOPIC, 10,
+      topic, 10,
       [this](geometry_msgs::msg::Point::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(error_mu_);
         latest_err_x_ = msg->x;
@@ -189,19 +262,11 @@ public:
       });
   }
 
-  void run() {
-    RCLCPP_INFO(*logger_, "FiraMission: waiting for first `%s` message...", ERROR_TOPIC.c_str());
-    if (!wait_fresh_error(30s)) {
-      RCLCPP_ERROR(*logger_, "No error received within 30s. Aborting.");
-      return;
-    }
-
-    if (!align()) return;
-    if (!descend()) return;            // descend first — often opens up more forward reach
-    if (!apply_camera_offset()) return;
-    if (!gripper_sequence()) return;
-
-    RCLCPP_INFO(*logger_, "FiraMission: finished successfully.");
+  static std::string to_lower(const std::string& s) {
+    std::string out = s;
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return out;
   }
 
 private:
@@ -349,13 +414,6 @@ private:
     arm.setStartStateToCurrentState();
 
     return commander_->move_ptp(target_pose, "Descend", ee_link_);
-  }
-
-  bool gripper_sequence() {
-    if (!commander_->move_gripper("open")) return false;
-    std::this_thread::sleep_for(300ms);
-    if (!commander_->move_gripper("close")) return false;
-    return true;
   }
 
   rclcpp::Node::SharedPtr node_;
