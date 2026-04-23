@@ -61,8 +61,8 @@ ARM_JOINT_ORDER = [
 # Joint values copied from omniman_moveit_config/config/nxp_omniman.srdf
 # group_state blocks. Keep in the joint order above.
 ARM_POSES = {
-    "pid":     [0.0,  0.1745, 0.0, -1.0472, 1.6929, 3.1415],
-    "traffic": [0.0, -1.6929, 0.0, -0.1745, 0.3490, 3.1415],
+    "pid":     [0.0,  0.1745, 0.0, -1.0472, 1.6929, 0],
+    "traffic": [0.0, -1.6929, 0.0, -0.1745, 0.3490, 0],
 }
 
 
