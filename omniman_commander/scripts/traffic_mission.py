@@ -196,6 +196,8 @@ class TrafficMissionRunner(MissionRunner):
         }
 
         return [
+            {"name": "ARM_PID_INIT",    "kind": STEP_ARM_POSE,
+             "pose": "pid"},
             {"name": "TO_PANEL",        "kind": STEP_STRAIGHT,
              "distance": approach, "speed": 0.08, "follow_line": False},
             {"name": "ARM_TRAFFIC",     "kind": STEP_ARM_POSE,
