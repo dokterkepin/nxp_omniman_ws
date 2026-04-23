@@ -41,7 +41,7 @@
     <group_state name="pid" group="arm">
         <joint name="arm_yaw_joint" value="0"/>
         <joint name="forearm_pitch_joint" value="-1.0472"/>
-        <joint name="palm_yaw_joint" value="3.1415"/>
+        <joint name="palm_yaw_joint" value="0"/>
         <joint name="shoulder_yaw_joint" value="0"/>
         <joint name="upper_shoulder_pitch_joint" value="0.1745"/>
         <joint name="wrist_pitch_joint" value="1.6929"/>
@@ -49,7 +49,7 @@
     <group_state name="traffic" group="arm">
         <joint name="arm_yaw_joint" value="0"/>
         <joint name="forearm_pitch_joint" value="-0.1745"/>
-        <joint name="palm_yaw_joint" value="3.1415"/>
+        <joint name="palm_yaw_joint" value="0"/>
         <joint name="shoulder_yaw_joint" value="0"/>
         <joint name="upper_shoulder_pitch_joint" value="-1.6929"/>
         <joint name="wrist_pitch_joint" value="0.3490"/>
