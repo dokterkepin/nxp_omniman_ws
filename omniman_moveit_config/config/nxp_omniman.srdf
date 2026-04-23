@@ -74,7 +74,7 @@
         <joint name="left_finger_prismatic_joint" value="0.019"/>
     </group_state>
     <group_state name="close" group="gripper">
-        <joint name="left_finger_prismatic_joint" value="0.0085"/>
+        <joint name="left_finger_prismatic_joint" value="0.001"/>
     </group_state>
     <!--END EFFECTOR: Purpose: Represent information about an end effector.-->
     <end_effector name="ee" parent_link="ee_link" group="arm"/>
