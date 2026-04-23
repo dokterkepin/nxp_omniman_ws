@@ -21,6 +21,9 @@ using moveit::planning_interface::MoveGroupInterface;
 static constexpr double STEP_XY           = 0.01;   // MAX step per alignment iteration (meters)
 static constexpr double P_GAIN            = 1e-4;   // meters per pixel of error (P control: small err -> small step)
 static constexpr double STEP_Z            = -0.14;  // meters to descend after align
+static constexpr double GO_UP_Z           = 0.05;   // meters to lift ee after pick/place (relative +Z)
+static constexpr double RETRACT_Y         = 0.02;   // meters to pull back along +Y (backward from east side) after release, before lifting
+static constexpr auto   POST_ACTION_DELAY = 500ms;  // pause after close/release before moving
 static constexpr double PIXEL_THRESHOLD   = 15.0;   // alignment done when |err| < this
 static constexpr int    MAX_ALIGN_ITERS   = 30;     // safety cap
 static constexpr auto   ERROR_WAIT_TIMEOUT = 3s;    // wait at most this for a fresh error (mid-align)
@@ -30,7 +33,7 @@ static const std::string ERROR_TOPIC_PREFIX = "/yolo_error_";   // per-letter to
 // ---- Sequential FIRA mission configuration ----
 static const std::vector<std::string> LETTERS = {"F", "I", "R", "A"};
 static const std::string SEARCH_POSE = "north";  // searched-for-target pose (shared across letters)
-static const std::string WEST_POSE   = "west";   // waypoint between letters
+static const std::string EAST_POSE   = "east";   // waypoint between pick and place
 // Place poses: SRDF named targets with the same name as each letter ("F", "I", "R", "A")
 
 // Physical offset from ee_link to the camera optical axis.
@@ -222,23 +225,38 @@ private:
     if (!align()) return false;
 
     // STATE 3 — PICK: open → descend (-Z) → camera offset (+X) → close.
-    // Descend first, THEN do the forward offset at the lower altitude (often gives
-    // better reach than forward-first), and close the gripper only after the ee is
-    // at the final pick pose.
     RCLCPP_INFO(*logger_, "[%s] STATE: PICK (open -> descend -> offset -> close)", letter.c_str());
     if (!commander_->move_gripper("open")) return false;
     if (!descend()) return false;
     if (!apply_camera_offset()) return false;
     if (!commander_->move_gripper("close")) return false;
 
-    // STATE 5 — TRANSIT: move to west pose before the place pose.
-    RCLCPP_INFO(*logger_, "[%s] STATE: TRANSIT -> moving to `%s`", letter.c_str(), WEST_POSE.c_str());
-    if (!commander_->move_arm_to_named(WEST_POSE)) return false;
+    // STATE 4 — POST-PICK: delay, then lift +Z to clear the object.
+    RCLCPP_INFO(*logger_, "[%s] STATE: POST-PICK (delay -> go up)", letter.c_str());
+    std::this_thread::sleep_for(POST_ACTION_DELAY);
+    if (!go_up()) return false;
+
+    // STATE 5 — TRANSIT: via north, then east, on the way to the place pose.
+    RCLCPP_INFO(*logger_, "[%s] STATE: TRANSIT -> `%s` -> `%s`", letter.c_str(),
+                SEARCH_POSE.c_str(), EAST_POSE.c_str());
+    if (!commander_->move_arm_to_named(SEARCH_POSE)) return false;
+    if (!commander_->move_arm_to_named(EAST_POSE)) return false;
 
     // STATE 6 — PLACE: move to letter's place pose, then open to release.
     RCLCPP_INFO(*logger_, "[%s] STATE: PLACE -> moving to named target `%s`", letter.c_str(), letter.c_str());
     if (!commander_->move_arm_to_named(letter)) return false;
     if (!commander_->move_gripper("open")) return false;
+
+    // STATE 7 — POST-PLACE: delay → retract (-X) → delay → lift (+Z) → back to east.
+    // Retract before lifting because the place pose leaves the arm outstretched;
+    // a straight +Z lift from that configuration often has no IK solution.
+    RCLCPP_INFO(*logger_, "[%s] STATE: POST-PLACE (delay -> retract -> go up -> back to `%s`)",
+                letter.c_str(), EAST_POSE.c_str());
+    std::this_thread::sleep_for(POST_ACTION_DELAY);
+    if (!retract()) return false;
+    std::this_thread::sleep_for(POST_ACTION_DELAY);
+    if (!go_up()) return false;
+    if (!commander_->move_arm_to_named(EAST_POSE)) return false;
 
     return true;
   }
@@ -414,6 +432,46 @@ private:
     arm.setStartStateToCurrentState();
 
     return commander_->move_ptp(target_pose, "Descend", ee_link_);
+  }
+
+  bool go_up() {
+    auto& arm = commander_->arm_move_group();
+    auto current_pose = arm.getCurrentPose("ee_link").pose;
+
+    geometry_msgs::msg::Pose target_pose;
+    target_pose.position.x = current_pose.position.x;
+    target_pose.position.y = current_pose.position.y;
+    target_pose.position.z = current_pose.position.z + GO_UP_Z;
+    target_pose.orientation.x = current_pose.orientation.x;
+    target_pose.orientation.y = current_pose.orientation.y;
+    target_pose.orientation.z = current_pose.orientation.z;
+    target_pose.orientation.w = current_pose.orientation.w;
+
+    commander_->clear_target_n_constraints();
+    arm.setStartStateToCurrentState();
+
+    return commander_->move_ptp(target_pose, "GoUp", ee_link_);
+  }
+
+  bool retract() {
+    // Retract "backward" — since we approach place poses from the east side of the robot,
+    // backward is +Y (not -X).
+    auto& arm = commander_->arm_move_group();
+    auto current_pose = arm.getCurrentPose("ee_link").pose;
+
+    geometry_msgs::msg::Pose target_pose;
+    target_pose.position.x = current_pose.position.x;
+    target_pose.position.y = current_pose.position.y + RETRACT_Y;
+    target_pose.position.z = current_pose.position.z;
+    target_pose.orientation.x = current_pose.orientation.x;
+    target_pose.orientation.y = current_pose.orientation.y;
+    target_pose.orientation.z = current_pose.orientation.z;
+    target_pose.orientation.w = current_pose.orientation.w;
+
+    commander_->clear_target_n_constraints();
+    arm.setStartStateToCurrentState();
+
+    return commander_->move_ptp(target_pose, "Retract", ee_link_);
   }
 
   rclcpp::Node::SharedPtr node_;

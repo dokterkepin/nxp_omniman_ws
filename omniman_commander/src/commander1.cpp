@@ -179,8 +179,8 @@ int main(int argc, char* argv[])
 
   geometry_msgs::msg::Pose target_pose;
   target_pose.position.x = current_pose.position.x;
-  target_pose.position.y = current_pose.position.y;
-  target_pose.position.z = current_pose.position.z - 0.05;
+  target_pose.position.y = current_pose.position.y + 0.02;
+  target_pose.position.z = current_pose.position.z;
   target_pose.orientation.x = current_pose.orientation.x;
   target_pose.orientation.y = current_pose.orientation.y;
   target_pose.orientation.z = current_pose.orientation.z;
