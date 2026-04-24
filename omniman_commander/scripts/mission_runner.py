@@ -35,19 +35,20 @@ from std_msgs.msg import String
 
 
 # HSV ranges, OpenCV convention: H 0-180, S 0-255, V 0-255.
-# Arena swatch reference values (measured under bright LEDs):
-#   yellow #D0B03A -> HSV(24, 184, 208)
-#   blue   #2F4F75 -> HSV(106, 153, 117)
-#   green  #306957 -> HSV(80, 138, 105)
+# Arena swatch reference values (measured across bright + shaded regions):
+#   yellow #DEAD33 -> HSV(21, 196, 222)   (shaded #B18225 -> HSV(20, 202, 177))
+#   blue   #474868 -> HSV(119,  81, 104)  (shaded #32364C -> HSV(115,  87,  76))
+#   green  #73C66E -> HSV(58,  113, 198)  (shaded #417642 -> HSV(60,  114, 118))
 #
 # Night/low-light tuning: lower the V floor (darker) and S floor (desaturated
 # under weak light) so the swatch still registers. Upper bounds stay at 255.
 # If false positives creep in, raise S floor back up first (V floor is the
-# one that actually captures dark-but-still-blue pixels).
+# one that actually captures dark-but-still-blue pixels). Blue is a
+# low-saturation navy here, so keep its S floor low.
 COLOR_HSV = {
-    "yellow": [((14,  50,  60), (34, 255, 255))],
-    "blue":   [((88,  40,  30), (128, 255, 255))],
-    "green":  [((60,  40,  30), (98, 255, 255))],
+    "yellow": [((10,  80, 100), (32, 255, 255))],
+    "blue":   [((100, 30,  40), (135, 180, 180))],
+    "green":  [((45,  50,  60), (75, 255, 255))],
 }
 
 

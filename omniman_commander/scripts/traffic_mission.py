@@ -61,8 +61,9 @@ ARM_JOINT_ORDER = [
 # Joint values copied from omniman_moveit_config/config/nxp_omniman.srdf
 # group_state blocks. Keep in the joint order above.
 ARM_POSES = {
-    "pid":     [0.0,  0.1745, 0.0, -1.0472, 1.6929, 0],
-    "traffic": [0.0, -1.6929, 0.0, -0.1745, 0.3490, 0],
+    #              sh_yaw  sh_pitch  arm_yaw  forearm   wrist   palm
+    "pid":     [    0.0,    0.1745,   0.0,   -1.0472,  1.6929, 0],
+    "traffic": [    0.0,   -1.6929,   0.0,   -0.1745,  0.1617, 0],
 }
 
 
@@ -128,14 +129,14 @@ class TrafficMissionRunner(MissionRunner):
         self._spokes = {
             "yellow": [
                 {"name": "yellow_turn_out", "kind": STEP_TURN,
-                 "dtheta": math.radians(+90.0), "angular_speed": 0.2},
+                 "dtheta": math.radians(+100.0), "angular_speed": 0.2},
                 {"name": "yellow_out",      "kind": STEP_STRAIGHT,
                  "distance": 0.40, "speed": 0.10, "follow_line": True},
                 {"name": "yellow_verify",   "kind": STEP_VERIFY_COLOR,
                  "target": "yellow", "timeout_s": 2.5,
                  "fail_flag": "skip_yellow"},
                 {"name": "yellow_approach", "kind": STEP_STRAIGHT,
-                 "distance": 0.2, "speed": 0.06, "follow_line": True,
+                 "distance": 0.20, "speed": 0.06, "follow_line": True,
                  "skip_if": "skip_yellow"},
                 {"name": "yellow_dwell",    "kind": STEP_DWELL,
                  "seconds": dwell_s, "skip_if": "skip_yellow"},

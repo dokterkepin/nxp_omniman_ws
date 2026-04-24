@@ -21,9 +21,9 @@ using moveit::planning_interface::MoveGroupInterface;
 static constexpr double STEP_XY           = 0.01;   // MAX step per alignment iteration (meters)
 static constexpr double P_GAIN            = 1e-4;   // meters per pixel of error (P control: small err -> small step)
 static constexpr double STEP_Z            = -0.14;  // meters to descend after align
-static constexpr double GO_UP_Z           = 0.05;   // meters to lift ee after pick/place (relative +Z)
+static constexpr double GO_UP_Z           = 0.1;   // meters to lift ee after pick/place (relative +Z)
 static constexpr double RETRACT_Y         = 0.02;   // meters to pull back along +Y (backward from east side) after release, before lifting
-static constexpr auto   POST_ACTION_DELAY = 500ms;  // pause after close/release before moving
+static constexpr auto   POST_ACTION_DELAY = 2000ms;  // pause after close/release before moving
 static constexpr double PIXEL_THRESHOLD   = 15.0;   // alignment done when |err| < this
 static constexpr int    MAX_ALIGN_ITERS   = 30;     // safety cap
 static constexpr auto   ERROR_WAIT_TIMEOUT = 3s;    // wait at most this for a fresh error (mid-align)
@@ -39,7 +39,7 @@ static const std::string EAST_POSE   = "east";   // waypoint between pick and pl
 // Physical offset from ee_link to the camera optical axis.
 // Applied as an XY move after alignment (camera-centered) to put the gripper over the target.
 // Flip signs if the gripper ends up on the wrong side of the target.
-static constexpr double CAMERA_OFFSET_X   = 0.045;   // meters
+static constexpr double CAMERA_OFFSET_X   = 0.05;   // meters
 static constexpr double CAMERA_OFFSET_Y   = 0.0;    // meters
 
 // Maps pixel error -> robot XY step direction.
@@ -193,72 +193,134 @@ public:
   }
 
   void run() {
-    for (const auto& letter : LETTERS) {
-      RCLCPP_INFO(*logger_, "========================= LETTER `%s` =========================", letter.c_str());
-      if (!process_letter(letter)) {
-        RCLCPP_ERROR(*logger_, "FiraMission: failed at letter `%s`. Aborting.", letter.c_str());
-        return;
+    // Multi-pass orchestration:
+    //   - Placed     → letter done, remove from pending.
+    //   - Failed     → retry immediately (up to MAX_ATTEMPTS attempts per pass), IK may work on retry.
+    //   - NoDetection→ skip to next letter NOW, but keep in pending for the next pass.
+    //                   This lets the system come back to a letter that was briefly invisible due to
+    //                   YOLO noise, after giving the frame time to recover.
+    //
+    // Mission never aborts: after MAX_PASSES passes, any still-pending letters are reported skipped.
+    static constexpr int MAX_ATTEMPTS = 2;
+    static constexpr int MAX_PASSES   = 3;
+
+    std::vector<std::string> pending(LETTERS.begin(), LETTERS.end());
+    int placed_count = 0;
+
+    for (int pass = 1; pass <= MAX_PASSES && !pending.empty() && rclcpp::ok(); ++pass) {
+      RCLCPP_INFO(*logger_, "######################### PASS %d/%d (%zu pending) #########################",
+                  pass, MAX_PASSES, pending.size());
+
+      std::vector<std::string> still_pending;
+      for (const auto& letter : pending) {
+        RCLCPP_INFO(*logger_, "========================= LETTER `%s` =========================", letter.c_str());
+
+        bool placed = false;
+        bool detection_miss = false;
+
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS && rclcpp::ok(); ++attempt) {
+          RCLCPP_INFO(*logger_, "[%s] Pass %d Attempt %d/%d", letter.c_str(), pass, attempt, MAX_ATTEMPTS);
+
+          // On retries within a pass, reset to east first.
+          if (attempt > 1) {
+            if (!commander_->move_arm_to_named(EAST_POSE)) {
+              RCLCPP_WARN(*logger_, "[%s] Could not reach home pose `%s` before retry. Proceeding anyway.",
+                          letter.c_str(), EAST_POSE.c_str());
+            }
+          }
+
+          auto result = process_letter(letter);
+          if (result == LetterResult::Placed) {
+            placed = true;
+            break;
+          }
+          if (result == LetterResult::NoDetection) {
+            // Don't retry immediately — defer for a later pass when YOLO may see the letter again.
+            detection_miss = true;
+            break;
+          }
+          // result == Failed — retry in next attempt of this pass.
+          RCLCPP_WARN(*logger_, "[%s] Attempt %d/%d failed (IK/plan). Will retry.",
+                      letter.c_str(), attempt, MAX_ATTEMPTS);
+        }
+
+        if (placed) {
+          RCLCPP_INFO(*logger_, "Letter `%s` complete.", letter.c_str());
+          ++placed_count;
+        } else {
+          const char* reason = detection_miss ? "no-detection" : "IK/plan failure";
+          RCLCPP_WARN(*logger_, "Letter `%s` deferred (%s) — will re-try next pass.", letter.c_str(), reason);
+          still_pending.push_back(letter);
+        }
       }
-      RCLCPP_INFO(*logger_, "Letter `%s` complete.", letter.c_str());
+
+      pending = still_pending;
     }
-    RCLCPP_INFO(*logger_, "FiraMission: all %zu letters placed. Mission complete.", LETTERS.size());
+
+    RCLCPP_INFO(*logger_, "FiraMission complete. placed=%d skipped=%zu of %zu letters.",
+                placed_count, pending.size(), LETTERS.size());
+    for (const auto& s : pending) {
+      RCLCPP_WARN(*logger_, "  Skipped letter: %s", s.c_str());
+    }
   }
 
 private:
-  bool process_letter(const std::string& letter) {
+  enum class LetterResult {
+    Placed,        // success
+    NoDetection,   // YOLO didn't publish within DETECTION_TIMEOUT — defer, don't retry immediately
+    Failed         // IK / planning / execution failure — worth retrying right away
+  };
+
+  LetterResult process_letter(const std::string& letter) {
     // STATE 1 — SEARCH: move arm to shared search pose.
     RCLCPP_INFO(*logger_, "[%s] STATE: SEARCH -> moving to `%s`", letter.c_str(), SEARCH_POSE.c_str());
-    if (!commander_->move_arm_to_named(SEARCH_POSE)) return false;
+    if (!commander_->move_arm_to_named(SEARCH_POSE)) return LetterResult::Failed;
 
     // STATE 2 — ALIGN: subscribe to this letter's error topic and converge.
-    // If YOLO never detects this letter within DETECTION_TIMEOUT, SKIP (don't abort mission) —
-    // camera frame may be poor and we should continue with the next letter.
     const std::string topic = ERROR_TOPIC_PREFIX + to_lower(letter);
     subscribe_error(topic);
     RCLCPP_INFO(*logger_, "[%s] STATE: ALIGN -> waiting for first `%s` message...", letter.c_str(), topic.c_str());
     if (!wait_fresh_error(DETECTION_TIMEOUT)) {
-      RCLCPP_WARN(*logger_, "[%s] Not detected on `%s` within %lds. Skipping letter.",
+      RCLCPP_WARN(*logger_, "[%s] Not detected on `%s` within %lds. Deferring letter for retry pass.",
                   letter.c_str(), topic.c_str(),
                   std::chrono::duration_cast<std::chrono::seconds>(DETECTION_TIMEOUT).count());
-      return true;   // "skip" — continue with next letter
+      return LetterResult::NoDetection;
     }
-    if (!align()) return false;
+    if (!align()) return LetterResult::Failed;
 
     // STATE 3 — PICK: open → descend (-Z) → camera offset (+X) → close.
     RCLCPP_INFO(*logger_, "[%s] STATE: PICK (open -> descend -> offset -> close)", letter.c_str());
-    if (!commander_->move_gripper("open")) return false;
-    if (!descend()) return false;
-    if (!apply_camera_offset()) return false;
-    if (!commander_->move_gripper("close")) return false;
+    if (!commander_->move_gripper("open")) return LetterResult::Failed;
+    if (!descend()) return LetterResult::Failed;
+    if (!apply_camera_offset()) return LetterResult::Failed;
+    if (!commander_->move_gripper("close")) return LetterResult::Failed;
 
     // STATE 4 — POST-PICK: delay, then lift +Z to clear the object.
     RCLCPP_INFO(*logger_, "[%s] STATE: POST-PICK (delay -> go up)", letter.c_str());
     std::this_thread::sleep_for(POST_ACTION_DELAY);
-    if (!go_up()) return false;
+    if (!go_up()) return LetterResult::Failed;
 
     // STATE 5 — TRANSIT: via north, then east, on the way to the place pose.
     RCLCPP_INFO(*logger_, "[%s] STATE: TRANSIT -> `%s` -> `%s`", letter.c_str(),
                 SEARCH_POSE.c_str(), EAST_POSE.c_str());
-    if (!commander_->move_arm_to_named(SEARCH_POSE)) return false;
-    if (!commander_->move_arm_to_named(EAST_POSE)) return false;
+    if (!commander_->move_arm_to_named(SEARCH_POSE)) return LetterResult::Failed;
+    if (!commander_->move_arm_to_named(EAST_POSE)) return LetterResult::Failed;
 
     // STATE 6 — PLACE: move to letter's place pose, then open to release.
     RCLCPP_INFO(*logger_, "[%s] STATE: PLACE -> moving to named target `%s`", letter.c_str(), letter.c_str());
-    if (!commander_->move_arm_to_named(letter)) return false;
-    if (!commander_->move_gripper("open")) return false;
+    if (!commander_->move_arm_to_named(letter)) return LetterResult::Failed;
+    if (!commander_->move_gripper("open")) return LetterResult::Failed;
 
-    // STATE 7 — POST-PLACE: delay → retract (-X) → delay → lift (+Z) → back to east.
-    // Retract before lifting because the place pose leaves the arm outstretched;
-    // a straight +Z lift from that configuration often has no IK solution.
+    // STATE 7 — POST-PLACE: delay → retract → delay → lift → back to east.
     RCLCPP_INFO(*logger_, "[%s] STATE: POST-PLACE (delay -> retract -> go up -> back to `%s`)",
                 letter.c_str(), EAST_POSE.c_str());
     std::this_thread::sleep_for(POST_ACTION_DELAY);
-    if (!retract()) return false;
+    if (!retract()) return LetterResult::Failed;
     std::this_thread::sleep_for(POST_ACTION_DELAY);
-    if (!go_up()) return false;
-    if (!commander_->move_arm_to_named(EAST_POSE)) return false;
+    if (!go_up()) return LetterResult::Failed;
+    if (!commander_->move_arm_to_named(EAST_POSE)) return LetterResult::Failed;
 
-    return true;
+    return LetterResult::Placed;
   }
 
   void subscribe_error(const std::string& topic) {
