@@ -23,7 +23,7 @@ static constexpr double P_GAIN            = 1e-4;   // meters per pixel of error
 static constexpr double STEP_Z            = -0.14;  // meters to descend after align
 static constexpr double GO_UP_Z           = 0.1;   // meters to lift ee after pick/place (relative +Z)
 static constexpr double RETRACT_Y         = 0.02;   // meters to pull back along +Y (backward from east side) after release, before lifting
-static constexpr auto   POST_ACTION_DELAY = 2000ms;  // pause after close/release before moving
+static constexpr auto   POST_ACTION_DELAY = 500ms;   // pause after close/release before moving
 static constexpr double PIXEL_THRESHOLD   = 15.0;   // alignment done when |err| < this
 static constexpr int    MAX_ALIGN_ITERS   = 30;     // safety cap
 static constexpr auto   ERROR_WAIT_TIMEOUT = 3s;    // wait at most this for a fresh error (mid-align)
@@ -39,7 +39,7 @@ static const std::string EAST_POSE   = "east";   // waypoint between pick and pl
 // Physical offset from ee_link to the camera optical axis.
 // Applied as an XY move after alignment (camera-centered) to put the gripper over the target.
 // Flip signs if the gripper ends up on the wrong side of the target.
-static constexpr double CAMERA_OFFSET_X   = 0.05;   // meters
+static constexpr double CAMERA_OFFSET_X   = 0.04;   // meters
 static constexpr double CAMERA_OFFSET_Y   = 0.0;    // meters
 
 // Maps pixel error -> robot XY step direction.
@@ -49,8 +49,8 @@ static constexpr double SIGN_ERR_Y_TO_DX  = -1.0;   // err_y > 0 (target below i
 // ---------------------------------------------------
 
 struct CommanderParams {
-  double arm_max_velocity_scaling_factor = 0.1;
-  double arm_max_acceleration_scaling_factor = 0.1;
+  double arm_max_velocity_scaling_factor = 0.3;
+  double arm_max_acceleration_scaling_factor = 0.3;
   std::string end_effector_link = "ee_link";
 };
 
@@ -149,6 +149,8 @@ public:
 
   bool move_gripper(const std::string& named_target) {
     RCLCPP_INFO(*logger_, "Gripper -> `%s`", named_target.c_str());
+    gripper_move_group_->clearPoseTargets();
+    gripper_move_group_->setStartStateToCurrentState();
     gripper_move_group_->setNamedTarget(named_target);
     MoveGroupInterface::Plan gplan;
     auto plan_result = gripper_move_group_->plan(gplan);
@@ -206,6 +208,11 @@ public:
 
     std::vector<std::string> pending(LETTERS.begin(), LETTERS.end());
     int placed_count = 0;
+
+    RCLCPP_INFO(*logger_, "Mission start: opening gripper.");
+    if (!commander_->move_gripper("open")) {
+      RCLCPP_WARN(*logger_, "Initial gripper open failed. Continuing anyway.");
+    }
 
     for (int pass = 1; pass <= MAX_PASSES && !pending.empty() && rclcpp::ok(); ++pass) {
       RCLCPP_INFO(*logger_, "######################### PASS %d/%d (%zu pending) #########################",
