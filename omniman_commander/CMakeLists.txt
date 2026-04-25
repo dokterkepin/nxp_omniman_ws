@@ -30,12 +30,30 @@ add_executable(commander2 src/commander2.cpp)
 add_executable(position src/position.cpp)
 add_executable(quaternion_test src/quaternion_test.cpp)
 add_executable(fira_mission_yolo_cpp src/fira_mission_yolo.cpp)
+add_executable(robosot_fira_mission_cpp src/robosot_fira_mission.cpp)
+add_executable(robosot_arm_server_cpp src/robosot_arm_server.cpp)
 
 ament_target_dependencies(fira_mission_yolo_cpp
   rclcpp
   moveit_ros_planning_interface
   moveit_visual_tools
   geometry_msgs
+)
+
+ament_target_dependencies(robosot_fira_mission_cpp
+  rclcpp
+  moveit_ros_planning_interface
+  moveit_visual_tools
+  geometry_msgs
+  nav_msgs
+)
+
+ament_target_dependencies(robosot_arm_server_cpp
+  rclcpp
+  moveit_ros_planning_interface
+  moveit_visual_tools
+  geometry_msgs
+  std_msgs
 )
 
 ament_target_dependencies(commander
@@ -103,6 +121,8 @@ install(TARGETS
   position
   quaternion_test
   fira_mission_yolo_cpp
+  robosot_fira_mission_cpp
+  robosot_arm_server_cpp
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -110,6 +130,7 @@ install(PROGRAMS
   scripts/mission_runner.py
   scripts/traffic_mission.py
   scripts/yolo_target_publisher.py
+  scripts/robosot_pickplace_mission.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
