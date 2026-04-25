@@ -39,7 +39,7 @@ static const std::string EAST_POSE   = "east";   // waypoint between pick and pl
 // Physical offset from ee_link to the camera optical axis.
 // Applied as an XY move after alignment (camera-centered) to put the gripper over the target.
 // Flip signs if the gripper ends up on the wrong side of the target.
-static constexpr double CAMERA_OFFSET_X   = 0.04;   // meters
+static constexpr double CAMERA_OFFSET_X   = 0.05;   // meters
 static constexpr double CAMERA_OFFSET_Y   = 0.0;    // meters
 
 // Maps pixel error -> robot XY step direction.
@@ -49,8 +49,8 @@ static constexpr double SIGN_ERR_Y_TO_DX  = -1.0;   // err_y > 0 (target below i
 // ---------------------------------------------------
 
 struct CommanderParams {
-  double arm_max_velocity_scaling_factor = 0.3;
-  double arm_max_acceleration_scaling_factor = 0.3;
+  double arm_max_velocity_scaling_factor = 0.15;
+  double arm_max_acceleration_scaling_factor = 0.15;
   std::string end_effector_link = "ee_link";
 };
 
@@ -148,22 +148,34 @@ public:
   }
 
   bool move_gripper(const std::string& named_target) {
-    RCLCPP_INFO(*logger_, "Gripper -> `%s`", named_target.c_str());
-    gripper_move_group_->clearPoseTargets();
-    gripper_move_group_->setStartStateToCurrentState();
-    gripper_move_group_->setNamedTarget(named_target);
-    MoveGroupInterface::Plan gplan;
-    auto plan_result = gripper_move_group_->plan(gplan);
-    if (plan_result != moveit::core::MoveItErrorCode::SUCCESS) {
-      RCLCPP_ERROR(*logger_, "Gripper plan failed for `%s`", named_target.c_str());
-      return false;
+    constexpr int kMaxAttempts = 3;
+    constexpr auto kRetryDelay = 200ms;
+    for (int attempt = 1; attempt <= kMaxAttempts && rclcpp::ok(); ++attempt) {
+      RCLCPP_INFO(*logger_, "Gripper -> `%s` (attempt %d/%d)",
+                  named_target.c_str(), attempt, kMaxAttempts);
+      gripper_move_group_->clearPoseTargets();
+      gripper_move_group_->setStartStateToCurrentState();
+      gripper_move_group_->setNamedTarget(named_target);
+      MoveGroupInterface::Plan gplan;
+      auto plan_result = gripper_move_group_->plan(gplan);
+      if (plan_result != moveit::core::MoveItErrorCode::SUCCESS) {
+        RCLCPP_WARN(*logger_, "Gripper plan failed for `%s` (attempt %d/%d)",
+                    named_target.c_str(), attempt, kMaxAttempts);
+        std::this_thread::sleep_for(kRetryDelay);
+        continue;
+      }
+      auto exec_result = gripper_move_group_->execute(gplan);
+      if (exec_result == moveit::core::MoveItErrorCode::SUCCESS) {
+        return true;
+      }
+      RCLCPP_WARN(*logger_, "Gripper execute failed for `%s` (attempt %d/%d): %d",
+                  named_target.c_str(), attempt, kMaxAttempts,
+                  static_cast<int>(exec_result.val));
+      std::this_thread::sleep_for(kRetryDelay);
     }
-    auto exec_result = gripper_move_group_->execute(gplan);
-    if (exec_result != moveit::core::MoveItErrorCode::SUCCESS) {
-      RCLCPP_ERROR(*logger_, "Gripper execute failed for `%s`", named_target.c_str());
-      return false;
-    }
-    return true;
+    RCLCPP_ERROR(*logger_, "Gripper `%s` gave up after %d attempts.",
+                 named_target.c_str(), kMaxAttempts);
+    return false;
   }
 
   MoveGroupInterface& arm_move_group() { return *arm_move_group_; }
@@ -296,6 +308,10 @@ private:
     if (!align()) return LetterResult::Failed;
 
     // STATE 3 — PICK: open → descend (-Z) → camera offset (+X) → close.
+    // Descend MUST happen before the offset: at high Z the arm can't reach the offset
+    // target (not enough horizontal reach). Descending first re-shapes the elbow so the
+    // lateral move is reachable. Offset sub-steps include retries for transient
+    // CONTROL_FAILED at low Z.
     RCLCPP_INFO(*logger_, "[%s] STATE: PICK (open -> descend -> offset -> close)", letter.c_str());
     if (!commander_->move_gripper("open")) return LetterResult::Failed;
     if (!descend()) return LetterResult::Failed;
@@ -470,14 +486,29 @@ private:
                   sub_iter, step_x, step_y, sub_target.position.x, sub_target.position.y,
                   remaining_x - step_x, remaining_y - step_y);
 
-      commander_->clear_target_n_constraints();
-      arm.setStartStateToCurrentState();
-
-      if (!commander_->move_ptp(sub_target, "CameraOffset", ee_link_)) {
-        RCLCPP_WARN(*logger_, "CameraOffset sub-step failed after %d successful sub-iters.", sub_iter);
+      constexpr int kMaxAttempts = 3;
+      constexpr auto kRetryDelay = 250ms;
+      bool sub_ok = false;
+      for (int attempt = 1; attempt <= kMaxAttempts && rclcpp::ok(); ++attempt) {
+        commander_->clear_target_n_constraints();
+        arm.setStartStateToCurrentState();
+        if (commander_->move_ptp(sub_target, "CameraOffset", ee_link_)) {
+          sub_ok = true;
+          break;
+        }
+        RCLCPP_WARN(*logger_, "CameraOffset sub-iter %d attempt %d/%d failed; retrying.",
+                    sub_iter, attempt, kMaxAttempts);
+        std::this_thread::sleep_for(kRetryDelay);
+      }
+      if (!sub_ok) {
+        RCLCPP_WARN(*logger_, "CameraOffset sub-step gave up after %d successful sub-iters.", sub_iter);
         return false;
       }
 
+      // Brief settle so joint state catches up before the next sub-step starts.
+      // Without this the next trajectory's start state can mismatch the controller's
+      // current state -> CONTROL_FAILED in ~50 ms.
+      std::this_thread::sleep_for(150ms);
       ++sub_iter;
     }
 

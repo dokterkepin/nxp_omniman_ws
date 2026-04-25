@@ -103,6 +103,22 @@
         <joint name="upper_shoulder_pitch_joint" value="-1.5708"/>
         <joint name="wrist_pitch_joint" value="0.6981"/>
     </group_state>
+    <group_state name="left" group="arm">
+        <joint name="arm_yaw_joint" value="0.03491"/>
+        <joint name="forearm_pitch_joint" value="-0.24435"/>
+        <joint name="palm_yaw_joint" value="0.36652"/>
+        <joint name="shoulder_yaw_joint" value="-1.93732"/>
+        <joint name="upper_shoulder_pitch_joint" value="-1.29154"/>
+        <joint name="wrist_pitch_joint" value="1.64061"/>
+    </group_state>
+    <group_state name="right" group="arm">
+        <joint name="arm_yaw_joint" value="0.00000"/>
+        <joint name="forearm_pitch_joint" value="-0.55851"/>
+        <joint name="palm_yaw_joint" value="-0.33161"/>
+        <joint name="shoulder_yaw_joint" value="1.90241"/>
+        <joint name="upper_shoulder_pitch_joint" value="-1.20428"/>
+        <joint name="wrist_pitch_joint" value="1.37881"/>
+    </group_state>
 
     <group_state name="open" group="gripper">
         <joint name="left_finger_prismatic_joint" value="0.019"/>
