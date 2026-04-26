@@ -131,6 +131,7 @@ install(PROGRAMS
   scripts/traffic_mission.py
   scripts/yolo_target_publisher.py
   scripts/robosot_pickplace_mission.py
+  scripts/camera_viewer.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

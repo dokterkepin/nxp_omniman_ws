@@ -42,8 +42,8 @@ STEP_BUILD   = "BUILD_LEGS"       # splice the pick/place legs after a successfu
 
 
 # ---- Mission constants (tune to arena) ------------------------------------
-INIT_PRE_BACKWARD_M  = 0.3
-INIT_STRAFE_RIGHT_M  = 0.5
+INIT_PRE_BACKWARD_M  = 0.5
+INIT_STRAFE_RIGHT_M  = 0.8   # strafe LEFT magnitude (sign applied at use site)
 INIT_BACKWARD_M      = 0.3
 
 LETTERS              = ["F", "I", "R", "A"]
@@ -146,13 +146,16 @@ class RobosotMission(MissionRunner):
         # by BUILD_LEGS step after each scan resolves to a letter.
         steps = [
             # ---- PHASE 1: start → HOME ----
-            {"name": "PHASE1_open",     "kind": STEP_ARM_CMD, "cmd": "gripper:open"},
-            {"name": "PHASE1_arm_left", "kind": STEP_ARM_CMD, "cmd": "named:left"},
-            {"name": "PHASE1_back1",    "kind": STEP_STRAIGHT,
+            # Sequence: arm:north → backward → arm:left → strafe LEFT → backward.
+            {"name": "PHASE1_open",      "kind": STEP_ARM_CMD, "cmd": "gripper:open"},
+            {"name": "PHASE1_arm_north", "kind": STEP_ARM_CMD, "cmd": "named:north"},
+            {"name": "PHASE1_back1",     "kind": STEP_STRAIGHT,
              "distance": -INIT_PRE_BACKWARD_M, "speed": 0.08, "follow_line": False},
-            {"name": "PHASE1_strafe",   "kind": STEP_STRAFE,
-             "distance": -INIT_STRAFE_RIGHT_M, "speed": 0.08},
-            {"name": "PHASE1_back2",    "kind": STEP_STRAIGHT,
+            {"name": "PHASE1_arm_left",  "kind": STEP_ARM_CMD, "cmd": "named:left"},
+            # +y = LEFT in REP-103.
+            {"name": "PHASE1_strafe",    "kind": STEP_STRAFE,
+             "distance": +INIT_STRAFE_RIGHT_M, "speed": 0.08},
+            {"name": "PHASE1_back2",     "kind": STEP_STRAIGHT,
              "distance": -INIT_BACKWARD_M, "speed": 0.08, "follow_line": False},
 
             # ---- PHASE 2: visit yellow → blue → green ----

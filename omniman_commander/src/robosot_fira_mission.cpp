@@ -79,9 +79,9 @@ static constexpr double NAV_RATE_HZ        = 20.0;
 // Mission geometry
 // =====================================================================
 // Initial movement from start to HOME (robot faces opposite direction).
-// Sequence: backward 0.3 → strafe right 0.5 → backward 0.3 → HOME.
-static constexpr double INIT_PRE_BACKWARD_M = 0.3;
-static constexpr double INIT_STRAFE_RIGHT_M = 0.5;
+// Sequence: arm:north → backward → arm:left → strafe LEFT → backward.
+static constexpr double INIT_PRE_BACKWARD_M = 0.5;
+static constexpr double INIT_STRAFE_RIGHT_M = 0.8;   // strafe LEFT magnitude (sign applied at call site)
 static constexpr double INIT_BACKWARD_M     = 0.3;
 
 // Goods-area spokes (distances from HOME, same as traffic_mission).
@@ -406,19 +406,23 @@ public:
     int placed_count = 0;
 
     // ---- PHASE 1: initial navigation to HOME ----
+    // Sequence: arm:north → backward → arm:left → strafe LEFT → backward.
     RCLCPP_INFO(*logger_, "======== PHASE 1: Navigate to HOME ========");
     if (!commander_->move_gripper("open")) {
       RCLCPP_WARN(*logger_, "Initial gripper open failed. Continuing.");
     }
+    if (!commander_->move_arm_to_named(SEARCH_POSE)) {
+      RCLCPP_ERROR(*logger_, "Failed to move arm to '%s'. Aborting.", SEARCH_POSE.c_str());
+      return;
+    }
+    nav_->drive_straight(-INIT_PRE_BACKWARD_M);
+
     if (!commander_->move_arm_to_named(ARM_LEFT_POSE)) {
       RCLCPP_ERROR(*logger_, "Failed to move arm to '%s'. Aborting.", ARM_LEFT_POSE.c_str());
       return;
     }
-
-    // Drive backward first to clear the start area, then strafe right to
-    // reach home Y, then drive backward again to reach home X.
-    nav_->drive_straight(-INIT_PRE_BACKWARD_M);
-    nav_->strafe(-INIT_STRAFE_RIGHT_M);
+    // +y = LEFT in REP-103.
+    nav_->strafe(+INIT_STRAFE_RIGHT_M);
     nav_->drive_straight(-INIT_BACKWARD_M);
     RCLCPP_INFO(*logger_, "======== HOME reached ========");
 
