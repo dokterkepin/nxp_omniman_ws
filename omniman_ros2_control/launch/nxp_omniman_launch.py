@@ -147,6 +147,11 @@ def generate_launch_description():
         ],
     )
 
+    usb_cam = Node(
+        package="usb_cam",
+        executable="usb_cam_node_exe",
+    )
+
     return LaunchDescription(
         [
             use_sim_arg,
@@ -160,5 +165,6 @@ def generate_launch_description():
             joy_node,
             teleop_node,
             move_group_node,
+            usb_cam,
         ]
     )
