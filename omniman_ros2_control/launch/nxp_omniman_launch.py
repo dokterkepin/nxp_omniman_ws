@@ -150,6 +150,11 @@ def generate_launch_description():
     usb_cam = Node(
         package="usb_cam",
         executable="usb_cam_node_exe",
+        parameters=[{
+            'video_device': '/dev/video0',
+            'focus_auto': 0,
+            'focus_absolute': 30,
+        }]
     )
 
     return LaunchDescription(
