@@ -35,6 +35,34 @@
             </inertial>
         </link>
 
+        <!-- ==================== Lidar ==================== -->
+        <link name="lidar_link">
+            <visual>
+                <geometry>
+                    <mesh filename="package://omniman_description/meshes/visual/Lidar/Lidar_link.STL" />
+                </geometry>
+                <material name="grey" />
+            </visual>
+            <collision>
+                <geometry>
+                    <mesh filename="package://omniman_description/meshes/visual/Lidar/Lidar_link.STL" />
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.446536" />
+                <origin xyz="-0.000565 -0.000015 0.019299" rpy="0 0 0" />
+                <inertia ixx="0.000213" ixy="0.000000" ixz="-0.000006"
+                         iyy="0.000203" iyz="0.000000"
+                         izz="0.000297" />
+            </inertial>
+        </link>
+
+        <joint name="lidar_fixed_joint" type="fixed">
+            <parent link="base_link" />
+            <child link="lidar_link" />
+            <origin xyz="-0.042 0.000 0.075" rpy="0 0 0" />
+        </joint>
+
         <!-- ==================== Front_left Wheel ==================== -->
 
         <joint name="Front_left_couple_fixed_joint" type="fixed">

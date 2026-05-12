@@ -1,0 +1,28 @@
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0
+    two_d_mode: true
+    publish_tf: true
+
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom
+    map_frame: map
+
+    # Wheel odometry input
+    odom0: /mecanum_drive_controller/odometry
+    odom0_config: [true,  true,  false,
+                   false, false, true,
+                   true,  true,  false,
+                   false, false, true,
+                   false, false, false]
+    odom0_differential: false
+
+    # Laser odometry input
+    odom1: /odom_rf2o
+    odom1_config: [true,  true,  false,
+                   false, false, true,
+                   true,  true,  false,
+                   false, false, true,
+                   false, false, false]
+    odom1_differential: true

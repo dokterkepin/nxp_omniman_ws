@@ -33,6 +33,7 @@
         </inertial>
     </link>
 
+    <!-- ==================== Lidar ==================== -->
     <link name="lidar_link">
         <visual>
             <geometry>

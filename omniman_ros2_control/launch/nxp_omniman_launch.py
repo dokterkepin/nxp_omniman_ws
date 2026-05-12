@@ -54,6 +54,8 @@ def generate_launch_description():
     )
     robot_description = {"robot_description": robot_description_content}
 
+    sim_time = {"use_sim_time": LaunchConfiguration("use_sim")}
+
     joystick_config = PathJoinSubstitution(
         [pkg_path, "config", "joystick.yaml"]
     )
@@ -61,7 +63,7 @@ def generate_launch_description():
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[robot_description, robot_controllers],
+        parameters=[robot_description, robot_controllers, sim_time],
         output="both",
         remappings=[
             ("/mecanum_drive_controller/reference", "/cmd_vel"),
@@ -72,7 +74,7 @@ def generate_launch_description():
         package="robot_state_publisher",
         executable="robot_state_publisher",
         output="both",
-        parameters=[robot_description],
+        parameters=[robot_description, sim_time],
     )
 
     joint_state_broadcaster_spawner = Node(
@@ -170,6 +172,6 @@ def generate_launch_description():
             joy_node,
             teleop_node,
             move_group_node,
-            usb_cam,
+            # usb_cam,
         ]
     )
