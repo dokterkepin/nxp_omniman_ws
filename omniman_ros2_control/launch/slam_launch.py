@@ -39,6 +39,7 @@ def generate_launch_description():
             "publish_tf": False,
             "base_frame_id": "base_footprint",
             "odom_frame_id": "odom",
+            "init_pose_from_topic": "",
             "freq": 20.0,
         }, sim_time],
     )
