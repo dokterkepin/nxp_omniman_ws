@@ -222,7 +222,6 @@ velocity_smoother:
     odom_topic: "/odometry/filtered"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
-    use_stamped: true
 
 global_costmap:
   global_costmap:
