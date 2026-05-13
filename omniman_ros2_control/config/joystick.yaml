@@ -12,14 +12,14 @@ teleop_twist_joy_node:
       y: 1.0
 
     axis_angular:
-      yaw: 2         # right stick left/right → rotation
+      yaw: 3         # right stick left/right → rotation
     scale_angular:
       yaw: 1.0       # max angular speed (rad/s)
     scale_angular_turbo:
       yaw: 2.0
 
-    enable_button: 6        # LB — hold to move
-    enable_turbo_button: 7  # RB — hold for turbo
+    enable_button: 4        # LB — hold to move
+    enable_turbo_button: 5  # RB — hold for turbo
 
     # Official mecanum_drive_controller expects TwistStamped
     publish_stamped_twist: true
