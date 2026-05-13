@@ -12,6 +12,7 @@ install (DIRECTORY
   config
   description
   launch
+  maps
   DESTINATION share/${PROJECT_NAME}
 )
 
