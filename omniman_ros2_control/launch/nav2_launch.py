@@ -156,6 +156,15 @@ def generate_launch_description():
         }],
     )
 
+    # --- Twist → TwistStamped relay for mecanum controller ---
+
+    twist_relay = Node(
+        package="omniman_ros2_control",
+        executable="twist_to_twist_stamped.py",
+        name="twist_to_twist_stamped",
+        output="screen",
+    )
+
     # --- RViz ---
 
     rviz_config = PathJoinSubstitution(
@@ -182,5 +191,6 @@ def generate_launch_description():
         bt_navigator,
         waypoint_follower,
         lifecycle_manager,
+        twist_relay,
         rviz_node,
     ])
