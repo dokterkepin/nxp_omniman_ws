@@ -58,7 +58,7 @@
     <joint name="lidar_fixed_joint" type="fixed">
         <parent link="base_link" />
         <child link="lidar_link" />
-        <origin xyz="-0.042 0.000 0.078" rpy="0 0 0" />
+        <origin xyz="-0.042 0.000 0.080" rpy="0 0 0" />
     </joint>
     <!-- ==================== Front_left Wheel ==================== -->
 
