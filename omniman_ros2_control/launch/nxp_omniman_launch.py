@@ -66,7 +66,7 @@ def generate_launch_description():
         parameters=[robot_description, robot_controllers, sim_time],
         output="both",
         remappings=[
-            ("/mecanum_drive_controller/reference", "/cmd_vel"),
+            ("/mecanum_drive_controller/reference", "/cmd_vel_stamped"),
             ("/mecanum_drive_controller/reference_unstamped", "/cmd_vel"),
         ],
     )
@@ -135,7 +135,7 @@ def generate_launch_description():
         package="teleop_twist_joy",
         executable="teleop_node",
         parameters=[joystick_config],
-        remappings=[("/cmd_vel", "/cmd_vel")],
+        remappings=[("/cmd_vel", "/cmd_vel_stamped")],
         condition=IfCondition(LaunchConfiguration("use_joy")),
     )
 
