@@ -6,7 +6,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    pkg_path = FindPackageShare("omniman_ros2_control")
+    pkg_path = FindPackageShare("omniman_navigation")
 
     use_sim_arg = DeclareLaunchArgument(
         "use_sim",
@@ -26,6 +26,22 @@ def generate_launch_description():
 
     rviz_config = PathJoinSubstitution(
         [pkg_path, "config", "slam_toolbox_config.rviz"]
+    )
+
+    rplidar_node = Node(
+        package="rplidar_ros",
+        executable="rplidar_node",
+        name="rplidar_node",
+        parameters=[{
+            'channel_type': 'serial',
+            'serial_port': '/dev/rplidar',
+            'serial_baudrate': 256000,
+            'frame_id': 'lidar_link',
+            'inverted': False,
+            'angle_compensate': True,
+            'scan_mode': 'Sensitivity',
+        }],
+        output="screen",
     )
 
     rf2o_node = Node(
@@ -71,6 +87,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         use_sim_arg,
+        rplidar_node,
         rf2o_node,
         ekf_node,
         slam_toolbox_node,

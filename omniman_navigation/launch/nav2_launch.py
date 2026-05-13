@@ -9,7 +9,7 @@ from nav2_common.launch import RewrittenYaml
 
 
 def generate_launch_description():
-    pkg_path = FindPackageShare("omniman_ros2_control")
+    pkg_path = FindPackageShare("omniman_navigation")
     nav2_bringup = FindPackageShare("nav2_bringup")
 
     ekf_config = PathJoinSubstitution(
@@ -159,7 +159,7 @@ def generate_launch_description():
     # --- Twist → TwistStamped relay for mecanum controller ---
 
     twist_relay = Node(
-        package="omniman_ros2_control",
+        package="omniman_navigation",
         executable="twist_to_twist_stamped.py",
         name="twist_to_twist_stamped",
         output="screen",
