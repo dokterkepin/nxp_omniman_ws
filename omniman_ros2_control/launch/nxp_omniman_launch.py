@@ -149,6 +149,22 @@ def generate_launch_description():
         ],
     )
 
+    rplidar_node = Node(
+        package="rplidar_ros",
+        executable="rplidar_node",
+        name="rplidar_node",
+        parameters=[{
+            'channel_type': 'serial',
+            'serial_port': '/dev/ttyUSB1',
+            'serial_baudrate': 256000,
+            'frame_id': 'lidar_link',
+            'inverted': False,
+            'angle_compensate': True,
+            'scan_mode': 'Sensitivity',
+        }],
+        output="screen",
+    )
+
     usb_cam = Node(
         package="usb_cam",
         executable="usb_cam_node_exe",
@@ -172,6 +188,7 @@ def generate_launch_description():
             joy_node,
             teleop_node,
             move_group_node,
+            rplidar_node,
             # usb_cam,
         ]
     )
