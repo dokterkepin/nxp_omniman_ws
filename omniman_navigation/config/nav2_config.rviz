@@ -5,12 +5,9 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /TF1
-        - /TF1/Frames1
         - /TF1/Tree1
-        - /RobotModel2
       Splitter Ratio: 0.5833333134651184
-    Tree Height: 923
+    Tree Height: 912
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -57,20 +54,298 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /robot_description
-      Enabled: false
+      Enabled: true
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
-        Link Tree Style: ""
+        Front_left_couple_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_left_plate_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_left_roller_link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_left_roller_link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_left_roller_link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_left_roller_link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_left_roller_link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_left_roller_link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_left_roller_link7:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_left_roller_link_8:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_left_roller_link_9:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_couple_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_plate_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_roller_link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_roller_link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_roller_link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_roller_link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_roller_link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_roller_link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_roller_link7:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_roller_link8:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Front_right_roller_link9:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Link Tree Style: Links in Alphabetic Order
+        Rear_left_couple_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_left_plate_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_left_roller_link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_left_roller_link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_left_roller_link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_left_roller_link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_left_roller_link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_left_roller_link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_left_roller_link7:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_left_roller_link8:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_left_roller_link9:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_couple_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_plate_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_roller_link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_roller_link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_roller_link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_roller_link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_roller_link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_roller_link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_roller_link7:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_roller_link8:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Rear_right_roller_link9:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        base_footprint:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        ee_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        forearm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        left_finger_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        lidar_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        palm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_finger_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        shoulder_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        upper_shoulder_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wrist_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
       Mass Properties:
         Inertia: false
         Mass: false
       Name: RobotModel
       TF Prefix: ""
       Update Interval: 0
-      Value: false
+      Value: true
       Visual Enabled: true
     - Class: rviz_default_plugins/TF
       Enabled: true
@@ -701,310 +976,6 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /waypoints
       Value: true
-    - Alpha: 1
-      Class: rviz_default_plugins/RobotModel
-      Collision Enabled: false
-      Description File: ""
-      Description Source: Topic
-      Description Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /robot_description
-      Enabled: true
-      Links:
-        All Links Enabled: true
-        Expand Joint Details: false
-        Expand Link Details: false
-        Expand Tree: false
-        Front_left_couple_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_left_plate_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_left_roller_link1:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_left_roller_link2:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_left_roller_link3:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_left_roller_link4:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_left_roller_link5:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_left_roller_link6:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_left_roller_link7:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_left_roller_link_8:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_left_roller_link_9:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_couple_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_plate_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_roller_link1:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_roller_link2:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_roller_link3:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_roller_link4:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_roller_link5:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_roller_link6:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_roller_link7:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_roller_link8:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Front_right_roller_link9:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Link Tree Style: Links in Alphabetic Order
-        Rear_left_couple_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_left_plate_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_left_roller_link1:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_left_roller_link2:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_left_roller_link3:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_left_roller_link4:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_left_roller_link5:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_left_roller_link6:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_left_roller_link7:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_left_roller_link8:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_left_roller_link9:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_couple_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_plate_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_roller_link1:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_roller_link2:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_roller_link3:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_roller_link4:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_roller_link5:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_roller_link6:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_roller_link7:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_roller_link8:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        Rear_right_roller_link9:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        ee_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        forearm_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        left_finger_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        lidar_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        palm_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        right_finger_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        shoulder_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        upper_shoulder_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wrist_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-      Mass Properties:
-        Inertia: false
-        Mass: false
-      Name: RobotModel
-      TF Prefix: ""
-      Update Interval: 0
-      Value: true
-      Visual Enabled: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -1042,7 +1013,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: 1.6091996431350708
+      Angle: -1.5757999420166016
       Class: rviz_default_plugins/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -1052,11 +1023,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 123.90399932861328
+      Scale: 285.3005676269531
       Target Frame: <Fixed Frame>
       Value: TopDownOrtho (rviz_default_plugins)
-      X: 0
-      Y: 0
+      X: 0.5197635889053345
+      Y: -1.0587801933288574
     Saved: ~
 Window Geometry:
   Displays:
@@ -1066,7 +1037,7 @@ Window Geometry:
   Hide Right Dock: true
   Navigation 2:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd000000040000000000000208000007c4fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000008200fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000052000003e90000011e00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb00000018004e0061007600690067006100740069006f006e002000320100000444000003d20000018f00fffffffb0000001e005200650061006c00730065006e0073006500430061006d00650072006100000002c6000000c10000003400ffffff000000010000010f0000034afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000034a000000e000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004420000003efc0100000002fb0000000800540069006d00650100000000000004420000000000000000fb0000000800540069006d0065010000000000000450000000000000000000000869000007c400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000032b000007c4fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000008200fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000052000003de0000011e00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb00000018004e0061007600690067006100740069006f006e002000320100000439000003dd0000018f00fffffffb0000001e005200650061006c00730065006e0073006500430061006d00650072006100000002c6000000c10000003400ffffff000000010000010f0000034afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000034a000000e000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004420000003efc0100000002fb0000000800540069006d00650100000000000004420000000000000000fb0000000800540069006d0065010000000000000450000000000000000000000bc6000007c400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   RealsenseCamera:
     collapsed: false
   Selection:
@@ -1075,6 +1046,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 2682
-  X: 1152
+  Width: 3834
+  X: 0
   Y: 24

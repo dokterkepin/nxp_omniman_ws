@@ -15,7 +15,7 @@
     <xacro:property name="serial_port" default="/dev/dynamixel"/>
 
 
-    <xacro:nxp_omniman />
+    <xacro:nxp_omniman use_sim="${use_sim}" />
     <!-- ============================================================
          Isaac Sim mock hardware (TopicBasedSystem)
          Set use_sim:=true to activate this block.

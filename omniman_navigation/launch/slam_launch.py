@@ -1,5 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import UnlessCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -42,6 +43,7 @@ def generate_launch_description():
             'scan_mode': 'Sensitivity',
         }],
         output="screen",
+        condition=UnlessCondition(LaunchConfiguration("use_sim")),
     )
 
     rf2o_node = Node(

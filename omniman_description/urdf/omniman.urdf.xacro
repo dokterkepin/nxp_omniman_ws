@@ -5,7 +5,7 @@
         <color rgba="0.5 0.5 0.5 1.0" />
     </material>
 
-    <xacro:macro name="nxp_omniman" >
+    <xacro:macro name="nxp_omniman" params="use_sim:=false">
         <link name="base_footprint" />
 
         <joint name="base_footprint_joint" type="fixed">
@@ -60,7 +60,12 @@
         <joint name="lidar_fixed_joint" type="fixed">
             <parent link="base_link" />
             <child link="lidar_link" />
-            <origin xyz="-0.042 0.000 0.078" rpy="0 0 3.14159" />
+            <xacro:if value="${use_sim}">
+                <origin xyz="-0.042 0.000 0.078" rpy="0 0 0" />
+            </xacro:if>
+            <xacro:unless value="${use_sim}">
+                <origin xyz="-0.042 0.000 0.078" rpy="0 0 3.14159" />
+            </xacro:unless>
         </joint>
 
         <!-- ==================== Front_left Wheel ==================== -->

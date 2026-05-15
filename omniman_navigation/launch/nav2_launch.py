@@ -168,7 +168,7 @@ def generate_launch_description():
     # --- RViz ---
 
     rviz_config = PathJoinSubstitution(
-        [nav2_bringup, "rviz", "nav2_default_view.rviz"]
+        [pkg_path, "config", "nav2_config.rviz"]
     )
 
     rviz_node = Node(
