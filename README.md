@@ -18,7 +18,6 @@ for SLAM and navigation.
   - [SLAM (Mapping)](#slam-mapping)
   - [Nav2 (Autonomous Navigation)](#nav2-autonomous-navigation)
 - [Simulation (Isaac Sim)](#simulation-isaac-sim)
-  - [Why `use_sim` Matters](#why-use_sim-matters)
 - [Package Overview](#package-overview)
 - [Multi-Machine Setup](#multi-machine-setup)
 
