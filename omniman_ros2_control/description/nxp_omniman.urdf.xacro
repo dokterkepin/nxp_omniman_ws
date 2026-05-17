@@ -152,7 +152,8 @@
                                       use_prismatic="1"
                                       revolute_max="0.0" revolute_min="-2.5"
                                       prismatic_max="0.019" prismatic_min="-0.013"
-                                      current_limit="100"/>
+                                      current_limit="100"
+                                      position_i_gain="100"/>
 
     </xacro:unless>
 </robot>

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="dynamixel_ros2_control" params="name serial_device device_id joint_name use_prismatic:=0 revolute_max:=0.0 revolute_min:=0.0 prismatic_max:=0.0 prismatic_min:=0.0 driver_mode:=0 current_limit:=300 profile_velocity:=0 profile_acceleration:=0">
+    <xacro:macro name="dynamixel_ros2_control" params="name serial_device device_id joint_name use_prismatic:=0 revolute_max:=0.0 revolute_min:=0.0 prismatic_max:=0.0 prismatic_min:=0.0 driver_mode:=0 current_limit:=300 profile_velocity:=0 profile_acceleration:=0 position_p_gain:=800 position_i_gain:=0 position_d_gain:=100">
         <ros2_control name="${name}" type="system">
             <hardware>
                 <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
@@ -45,9 +45,9 @@
                 <state_interface name="Present Current"/>
                 <state_interface name="Torque Enable"/>
                 <state_interface name="Present Input Voltage"/>
-                <param name="Position P Gain">800</param>
-                <param name="Position I Gain">100</param>
-                <param name="Position D Gain">100</param>
+                <param name="Position P Gain">${position_p_gain}</param>
+                <param name="Position I Gain">${position_i_gain}</param>
+                <param name="Position D Gain">${position_d_gain}</param>
                 <param name="Profile Velocity">${profile_velocity}</param>
                 <param name="Profile Acceleration">${profile_acceleration}</param>
                 <param name="Drive Mode">${driver_mode}</param>
