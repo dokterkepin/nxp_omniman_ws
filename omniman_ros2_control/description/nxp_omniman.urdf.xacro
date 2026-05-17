@@ -143,13 +143,16 @@
         <xacro:robstride_ros2_control name="ForearmPitch" canbus="${canbus_arm}" device_id="8" joint_name="forearm_pitch_joint" axis_direction="1"/>
 
         <!-- ========== Wrist + Gripper (Dynamixel on serial_port) ========== -->
-        <xacro:dynamixel_ros2_control name="WristPitch" serial_device="${serial_port}" device_id="9" joint_name="wrist_pitch_joint"/>
-        <xacro:dynamixel_ros2_control name="PalmYaw" serial_device="${serial_port}" device_id="10" joint_name="palm_yaw_joint"/>
+        <xacro:dynamixel_ros2_control name="WristPitch" serial_device="${serial_port}" device_id="9" joint_name="wrist_pitch_joint"
+                                      current_limit="450"/>
+        <xacro:dynamixel_ros2_control name="PalmYaw" serial_device="${serial_port}" device_id="10" joint_name="palm_yaw_joint"
+                                      current_limit="300"/>
         <xacro:dynamixel_ros2_control name="LeftFingerPrismatic" serial_device="${serial_port}" device_id="11"
                                       joint_name="left_finger_prismatic_joint"
                                       use_prismatic="1"
                                       revolute_max="0.0" revolute_min="-2.5"
-                                      prismatic_max="0.019" prismatic_min="-0.013"/>
+                                      prismatic_max="0.019" prismatic_min="-0.013"
+                                      current_limit="100"/>
 
     </xacro:unless>
 </robot>

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="dynamixel_ros2_control" params="name serial_device device_id joint_name use_prismatic:=0 revolute_max:=0.0 revolute_min:=0.0 prismatic_max:=0.0 prismatic_min:=0.0 driver_mode:=0">
+    <xacro:macro name="dynamixel_ros2_control" params="name serial_device device_id joint_name use_prismatic:=0 revolute_max:=0.0 revolute_min:=0.0 prismatic_max:=0.0 prismatic_min:=0.0 driver_mode:=0 current_limit:=300 profile_velocity:=0 profile_acceleration:=0">
         <ros2_control name="${name}" type="system">
             <hardware>
                 <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
@@ -48,11 +48,11 @@
                 <param name="Position P Gain">800</param>
                 <param name="Position I Gain">100</param>
                 <param name="Position D Gain">100</param>
-                <param name="Profile Velocity">0</param>
-                <param name="Profile Acceleration">0</param>
+                <param name="Profile Velocity">${profile_velocity}</param>
+                <param name="Profile Acceleration">${profile_acceleration}</param>
                 <param name="Drive Mode">${driver_mode}</param>
                 <param name="Return Delay Time">2</param>
-                <param name="Current Limit">300</param>
+                <param name="Current Limit">${current_limit}</param>
             </gpio>
             
             <transmission name="${joint_name}_transmission">
