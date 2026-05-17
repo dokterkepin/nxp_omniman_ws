@@ -48,11 +48,11 @@
                 <param name="Position P Gain">800</param>
                 <param name="Position I Gain">100</param>
                 <param name="Position D Gain">100</param>
-                <param name="Profile Velocity">200</param>
-                <param name="Profile Acceleration">50</param>
+                <param name="Profile Velocity">0</param>
+                <param name="Profile Acceleration">0</param>
                 <param name="Drive Mode">${driver_mode}</param>
                 <param name="Return Delay Time">2</param>
-                <param name="Current Limit">100</param>
+                <param name="Current Limit">300</param>
             </gpio>
             
             <transmission name="${joint_name}_transmission">
