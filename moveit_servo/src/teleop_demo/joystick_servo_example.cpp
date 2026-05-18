@@ -119,15 +119,6 @@ enum Button
 std::map<Axis, double> AXIS_DEFAULTS = { { LEFT_TRIGGER, 1.0 }, { RIGHT_TRIGGER, 1.0 } };
 std::map<Button, double> BUTTON_DEFAULTS;
 
-const double DEADZONE = 0.15;
-
-double applyDeadzone(double value)
-{
-  if (std::abs(value) < DEADZONE)
-    return 0.0;
-  return value;
-}
-
 // To change controls or setup a new controller, all you should to do is change the above enums and the follow 2
 // functions
 /** \brief // This converts a joystick axes and buttons array to a TwistStamped or JointJog message
@@ -157,17 +148,17 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
   }
 
   // Right stick = position (where the end-effector goes)
-  twist->twist.linear.z = applyDeadzone(axes[RIGHT_STICK_Y]);  // up/down
-  twist->twist.linear.y = applyDeadzone(axes[RIGHT_STICK_X]);  // left/right
+  twist->twist.linear.z = axes[RIGHT_STICK_Y];  // up/down
+  twist->twist.linear.y = axes[RIGHT_STICK_X];  // left/right
 
   // Triggers = forward/back (X)
   double lin_x_left = -0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
   double lin_x_right = 0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-  twist->twist.linear.x = applyDeadzone(lin_x_left + lin_x_right);
+  twist->twist.linear.x = lin_x_left + lin_x_right;
 
   // Left stick = orientation (how the gripper rotates)
-  twist->twist.angular.y = applyDeadzone(axes[LEFT_STICK_Y]);  // pitch
-  twist->twist.angular.x = applyDeadzone(axes[LEFT_STICK_X]);  // roll
+  twist->twist.angular.y = axes[LEFT_STICK_Y];  // pitch
+  twist->twist.angular.x = axes[LEFT_STICK_X];  // roll
 
   // Bumpers = yaw
   double yaw_positive = buttons[RIGHT_BUMPER];

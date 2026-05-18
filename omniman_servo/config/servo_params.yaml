@@ -7,10 +7,10 @@ use_gazebo: false
 ## Properties of incoming commands
 command_in_type: "unitless"  # [-1:1] range, as from joystick
 scale:
-  # Start slow — increase once movements feel predictable
-  linear: 0.1    # m/s max linear velocity
-  rotational: 0.2  # rad/s max angular velocity
-  joint: 3.0    # max joint velocity scale (needs to be high enough for Dynamixel deadband)
+  # Conservative for real hardware — increase gradually after testing
+  linear: 0.2    # m/s max linear velocity
+  rotational: 0.4  # rad/s max angular velocity
+  joint: 5.0    # max joint velocity scale (needs to be high enough for Dynamixel deadband)
 
 ## Properties of outgoing commands
 publish_period: 0.02  # 50 Hz (matches well with 500 Hz controller update rate)
