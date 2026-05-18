@@ -132,20 +132,20 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
                      std::unique_ptr<geometry_msgs::msg::TwistStamped>& twist,
                      std::unique_ptr<control_msgs::msg::JointJog>& joint)
 {
-  // Joint jog priority: D-pad + diamond buttons = direct joint control
-  if (buttons[A] || buttons[B] || buttons[X] || buttons[Y] || axes[D_PAD_X] || axes[D_PAD_Y])
-  {
-    joint->joint_names.push_back("shoulder_yaw_joint");
-    joint->velocities.push_back(axes[D_PAD_X]);
-    joint->joint_names.push_back("upper_shoulder_pitch_joint");
-    joint->velocities.push_back(axes[D_PAD_Y]);
-
-    joint->joint_names.push_back("palm_yaw_joint");
-    joint->velocities.push_back(buttons[B] - buttons[X]);
-    joint->joint_names.push_back("wrist_pitch_joint");
-    joint->velocities.push_back(buttons[Y] - buttons[A]);
-    return false;
-  }
+  // Joint jog disabled — Cartesian twist only
+  // if (buttons[A] || buttons[B] || buttons[X] || buttons[Y] || axes[D_PAD_X] || axes[D_PAD_Y])
+  // {
+  //   joint->joint_names.push_back("shoulder_yaw_joint");
+  //   joint->velocities.push_back(axes[D_PAD_X]);
+  //   joint->joint_names.push_back("upper_shoulder_pitch_joint");
+  //   joint->velocities.push_back(axes[D_PAD_Y]);
+  //
+  //   joint->joint_names.push_back("palm_yaw_joint");
+  //   joint->velocities.push_back(buttons[B] - buttons[X]);
+  //   joint->joint_names.push_back("wrist_pitch_joint");
+  //   joint->velocities.push_back(buttons[Y] - buttons[A]);
+  //   return false;
+  // }
 
   // Right stick = position (where the end-effector goes)
   twist->twist.linear.z = axes[RIGHT_STICK_Y];  // up/down
