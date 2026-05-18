@@ -65,6 +65,7 @@ const std::string BASE_FRAME_ID = "base_link";
 // For XBOX 1 controller
 enum Axis
 {
+  // bluetooth
   LEFT_STICK_X = 0,
   LEFT_STICK_Y = 1,
   LEFT_TRIGGER = 5,
@@ -73,9 +74,20 @@ enum Axis
   RIGHT_TRIGGER = 4,
   D_PAD_X = 6,
   D_PAD_Y = 7
+
+  // usb cable
+  // LEFT_STICK_X = 0,
+  // LEFT_STICK_Y = 1,
+  // LEFT_TRIGGER = 2,
+  // RIGHT_STICK_X = 3,
+  // RIGHT_STICK_Y = 4,
+  // RIGHT_TRIGGER = 5,
+  // D_PAD_X = 6,
+  // D_PAD_Y = 7
 };
 enum Button
 {
+  // bluetooth
   A = 0,
   B = 1,
   X = 3,
@@ -87,12 +99,34 @@ enum Button
   HOME = 12,
   LEFT_STICK_CLICK = 13,
   RIGHT_STICK_CLICK = 14
+
+  // USB cable 
+  // A = 0,
+  // B = 1,
+  // X = 2,
+  // Y = 3,
+  // LEFT_BUMPER = 4,
+  // RIGHT_BUMPER = 5,
+  // CHANGE_VIEW = 6,
+  // MENU = 7,
+  // HOME = 8,
+  // LEFT_STICK_CLICK = 9,
+  // RIGHT_STICK_CLICK = 10
 };
 
 // Some axes have offsets (e.g. the default trigger position is 1.0 not 0)
 // This will map the default values for the axes
 std::map<Axis, double> AXIS_DEFAULTS = { { LEFT_TRIGGER, 1.0 }, { RIGHT_TRIGGER, 1.0 } };
 std::map<Button, double> BUTTON_DEFAULTS;
+
+const double DEADZONE = 0.15;
+
+double applyDeadzone(double value)
+{
+  if (std::abs(value) < DEADZONE)
+    return 0.0;
+  return value;
+}
 
 // To change controls or setup a new controller, all you should to do is change the above enums and the follow 2
 // functions
@@ -123,17 +157,17 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
   }
 
   // Right stick = position (where the end-effector goes)
-  twist->twist.linear.z = axes[RIGHT_STICK_Y];  // up/down
-  twist->twist.linear.y = axes[RIGHT_STICK_X];  // left/right
+  twist->twist.linear.z = applyDeadzone(axes[RIGHT_STICK_Y]);  // up/down
+  twist->twist.linear.y = applyDeadzone(axes[RIGHT_STICK_X]);  // left/right
 
   // Triggers = forward/back (X)
   double lin_x_left = -0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
   double lin_x_right = 0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-  twist->twist.linear.x = lin_x_left + lin_x_right;
+  twist->twist.linear.x = applyDeadzone(lin_x_left + lin_x_right);
 
   // Left stick = orientation (how the gripper rotates)
-  twist->twist.angular.y = axes[LEFT_STICK_Y];  // pitch
-  twist->twist.angular.x = axes[LEFT_STICK_X];  // roll
+  twist->twist.angular.y = applyDeadzone(axes[LEFT_STICK_Y]);  // pitch
+  twist->twist.angular.x = applyDeadzone(axes[LEFT_STICK_X]);  // roll
 
   // Bumpers = yaw
   double yaw_positive = buttons[RIGHT_BUMPER];
