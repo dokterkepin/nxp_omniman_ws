@@ -65,8 +65,6 @@ def generate_launch_description():
         parameters=[{
             "dev": "/dev/input/js0",
             "deadzone": 0.15,
-            "low_pass_filter_coeff": 0.1,
-            "autorepeat_rate": 50.0,
         }],
     )
 
@@ -81,6 +79,7 @@ def generate_launch_description():
             moveit_config.robot_description_kinematics,
         ],
         output="screen",
+        arguments=['--ros-args', '--log-level', 'debug'],
     )
 
     return LaunchDescription([servo_node, container, joy_node])
