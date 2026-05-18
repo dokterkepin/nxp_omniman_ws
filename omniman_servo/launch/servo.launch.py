@@ -38,7 +38,6 @@ def generate_launch_description():
     servo_yaml = load_yaml("omniman_servo", "config/servo_params.yaml")
     servo_params = {"moveit_servo": servo_yaml}
 
-    # Launch servo and joy in a component container
     container = ComposableNodeContainer(
         name="moveit_servo_container",
         namespace="/",
@@ -56,13 +55,13 @@ def generate_launch_description():
                 plugin="moveit_servo::JoyToServoPub",
                 name="controller_to_servo_node",
             ),
-            ComposableNode(
-                package="joy",
-                plugin="joy::Joy",
-                name="joy_node",
-            ),
         ],
         output="screen",
+    )
+
+    joy_node = Node(
+        package="joy",
+        executable="joy_node",
     )
 
     # Launch a standalone Servo node
@@ -78,4 +77,4 @@ def generate_launch_description():
         output="screen",
     )
 
-    return LaunchDescription([servo_node, container])
+    return LaunchDescription([servo_node, container, joy_node])
