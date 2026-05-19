@@ -21,7 +21,7 @@ def generate_launch_description():
     pkg_path = FindPackageShare("omniman_ros2_control")
 
     moveit_config = MoveItConfigsBuilder(
-        "nxp_omniman", package_name="omniman_moveit_config"
+        "nxp_omniman", package_name="moveit_config"
     ).to_moveit_configs()
 
     robot_controllers = PathJoinSubstitution(
