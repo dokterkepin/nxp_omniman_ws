@@ -13,7 +13,6 @@ find_package(moveit_visual_tools REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(example_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(moveit_task_constructor_core REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_msgs REQUIRED)
@@ -63,7 +62,6 @@ ament_target_dependencies(commander
   geometry_msgs
   example_interfaces
   std_msgs
-  moveit_task_constructor_core
   tf2_msgs
   tf2_ros
 )
@@ -75,7 +73,6 @@ ament_target_dependencies(commander1
   geometry_msgs
   example_interfaces
   std_msgs
-  moveit_task_constructor_core
   tf2_msgs
   tf2_ros
 )
@@ -87,7 +84,6 @@ ament_target_dependencies(commander2
   geometry_msgs
   example_interfaces
   std_msgs
-  moveit_task_constructor_core
   tf2_msgs
   tf2_ros
 )
@@ -104,7 +100,6 @@ ament_target_dependencies(quaternion_test
   geometry_msgs
   example_interfaces
   std_msgs
-  moveit_task_constructor_core
   tf2_msgs
   tf2_ros
 )

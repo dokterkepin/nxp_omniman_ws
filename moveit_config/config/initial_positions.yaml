@@ -1,0 +1,10 @@
+# Default initial positions for nxp_omniman's ros2_control fake system
+
+initial_positions:
+  arm_yaw_joint: 0
+  forearm_pitch_joint: 0
+  left_finger_prismatic_joint: 0
+  palm_yaw_joint: 0
+  shoulder_yaw_joint: 0
+  upper_shoulder_pitch_joint: 0
+  wrist_pitch_joint: 0
