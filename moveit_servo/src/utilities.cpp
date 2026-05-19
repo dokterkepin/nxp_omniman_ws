@@ -130,28 +130,28 @@ double velocityScalingFactorForSingularity(const moveit::core::JointModelGroup* 
   }
 
   // If this dot product is positive, we're moving toward singularity
-  double dot = vector_toward_singularity.dot(commanded_twist);
-  // see https://github.com/ros-planning/moveit2/pull/620#issuecomment-1201418258 for visual explanation of algorithm
-  double upper_threshold = dot > 0 ? hard_stop_singularity_threshold :
-                                     (hard_stop_singularity_threshold - lower_singularity_threshold) *
-                                             leaving_singularity_threshold_multiplier +
-                                         lower_singularity_threshold;
-  if ((ini_condition > lower_singularity_threshold) && (ini_condition < hard_stop_singularity_threshold))
-  {
-    velocity_scale =
-        1. - (ini_condition - lower_singularity_threshold) / (upper_threshold - lower_singularity_threshold);
-    status =
-        dot > 0 ? StatusCode::DECELERATE_FOR_APPROACHING_SINGULARITY : StatusCode::DECELERATE_FOR_LEAVING_SINGULARITY;
-    RCLCPP_WARN_STREAM_THROTTLE(LOGGER, clock, ROS_LOG_THROTTLE_PERIOD, SERVO_STATUS_CODE_MAP.at(status));
-  }
+  // double dot = vector_toward_singularity.dot(commanded_twist);
+  // // see https://github.com/ros-planning/moveit2/pull/620#issuecomment-1201418258 for visual explanation of algorithm
+  // double upper_threshold = dot > 0 ? hard_stop_singularity_threshold :
+  //                                    (hard_stop_singularity_threshold - lower_singularity_threshold) *
+  //                                            leaving_singularity_threshold_multiplier +
+  //                                        lower_singularity_threshold;
+  // if ((ini_condition > lower_singularity_threshold) && (ini_condition < hard_stop_singularity_threshold))
+  // {
+  //   velocity_scale =
+  //       1. - (ini_condition - lower_singularity_threshold) / (upper_threshold - lower_singularity_threshold);
+  //   status =
+  //       dot > 0 ? StatusCode::DECELERATE_FOR_APPROACHING_SINGULARITY : StatusCode::DECELERATE_FOR_LEAVING_SINGULARITY;
+  //   RCLCPP_WARN_STREAM_THROTTLE(LOGGER, clock, ROS_LOG_THROTTLE_PERIOD, SERVO_STATUS_CODE_MAP.at(status));
+  // }
 
-  // Very close to singularity, so halt.
-  else if (ini_condition >= upper_threshold)
-  {
-    velocity_scale = 0;
-    status = StatusCode::HALT_FOR_SINGULARITY;
-    RCLCPP_WARN_STREAM_THROTTLE(LOGGER, clock, ROS_LOG_THROTTLE_PERIOD, SERVO_STATUS_CODE_MAP.at(status));
-  }
+  // // Very close to singularity, so halt.
+  // else if (ini_condition >= upper_threshold)
+  // {
+  //   velocity_scale = 0;
+  //   status = StatusCode::HALT_FOR_SINGULARITY;
+  //   RCLCPP_WARN_STREAM_THROTTLE(LOGGER, clock, ROS_LOG_THROTTLE_PERIOD, SERVO_STATUS_CODE_MAP.at(status));
+  // }
 
   return velocity_scale;
 }

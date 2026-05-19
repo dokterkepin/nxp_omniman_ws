@@ -71,12 +71,12 @@ def generate_launch_description():
         ],
     )
 
-    robot_state_publisher_node = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        output="both",
-        parameters=[robot_description, sim_time],
-    )
+    # robot_state_publisher_node = Node(
+    #     package="robot_state_publisher",
+    #     executable="robot_state_publisher",
+    #     output="both",
+    #     parameters=[robot_description, sim_time],
+    # )
 
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
@@ -152,6 +152,17 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("use_joy")),
     )
 
+    # rviz_node = Node(
+    #     package="rviz2",
+    #     executable="rviz2",
+    #     name="rviz2",
+    #     output="log",
+    #     parameters=[
+    #         moveit_config.robot_description,
+    #         moveit_config.robot_description_semantic,
+    #     ],
+    # )
+
     move_group_node = Node(
         package="moveit_ros_move_group",
         executable="move_group",
@@ -178,7 +189,7 @@ def generate_launch_description():
             use_sim_arg,
             use_joy_arg,
             control_node,
-            robot_state_publisher_node,
+            # robot_state_publisher_node,
             joint_state_broadcaster_spawner,
             delay_mecanum_controller,
             delay_arm_controller,
@@ -186,6 +197,7 @@ def generate_launch_description():
             joy_node,
             teleop_node,
             move_group_node,
+            rviz_node,
             # usb_cam,
         ]
     )
