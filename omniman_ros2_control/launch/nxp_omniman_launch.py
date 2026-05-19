@@ -90,10 +90,16 @@ def generate_launch_description():
         arguments=["mecanum_drive_controller"],
     )
 
-    arm_controller_spawner = Node(
+    # arm_controller_spawner = Node(
+    #     package="controller_manager",
+    #     executable="spawner",
+    #     arguments=["arm_controller", "--param-file", robot_controllers],
+    # )
+
+    arm_group_position_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["arm_controller", "--param-file", robot_controllers],
+        arguments=["arm_group_position_controller", "--param-file", robot_controllers],
     )
 
     gripper_controller_spawner = Node(
@@ -110,16 +116,16 @@ def generate_launch_description():
         )
     )
 
-    delay_arm_controller = RegisterEventHandler(
+    delay_arm_group_position_controller = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=joint_state_broadcaster_spawner,
-            on_exit=[arm_controller_spawner],
+            on_exit=[arm_group_position_controller_spawner],
         )
     )
 
     delay_gripper_controller = RegisterEventHandler(
         event_handler=OnProcessExit(
-            target_action=arm_controller_spawner,
+            target_action=arm_group_position_controller_spawner,
             on_exit=[gripper_controller_spawner],
         )
     )
@@ -168,7 +174,7 @@ def generate_launch_description():
             robot_state_publisher_node,
             joint_state_broadcaster_spawner,
             delay_mecanum_controller,
-            delay_arm_controller,
+            delay_arm_group_position_controller,
             delay_gripper_controller,
             joy_node,
             teleop_node,
