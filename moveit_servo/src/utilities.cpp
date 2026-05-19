@@ -128,7 +128,7 @@ double velocityScalingFactorForSingularity(const moveit::core::JointModelGroup* 
   {
     vector_toward_singularity *= -1;
   }
-  /*
+
   // If this dot product is positive, we're moving toward singularity
   double dot = vector_toward_singularity.dot(commanded_twist);
   // see https://github.com/ros-planning/moveit2/pull/620#issuecomment-1201418258 for visual explanation of algorithm
@@ -152,7 +152,7 @@ double velocityScalingFactorForSingularity(const moveit::core::JointModelGroup* 
     status = StatusCode::HALT_FOR_SINGULARITY;
     RCLCPP_WARN_STREAM_THROTTLE(LOGGER, clock, ROS_LOG_THROTTLE_PERIOD, SERVO_STATUS_CODE_MAP.at(status));
   }
-  */
+
   return velocity_scale;
 }
 

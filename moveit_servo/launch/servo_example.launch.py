@@ -34,8 +34,8 @@ def load_yaml(package_name, file_path):
 
 def generate_launch_description():
     moveit_config = (
-        MoveItConfigsBuilder("moveit_resources_panda")
-        .robot_description(file_path="config/panda.urdf.xacro")
+        MoveItConfigsBuilder("nxp_omniman", package_name="omniman_moveit_config")
+        .robot_description(file_path="config/nxp_omniman.urdf.xacro")
         .to_moveit_configs()
     )
 
@@ -57,37 +57,6 @@ def generate_launch_description():
             moveit_config.robot_description,
             moveit_config.robot_description_semantic,
         ],
-    )
-
-    # ros2_control using FakeSystem as hardware
-    ros2_controllers_path = os.path.join(
-        get_package_share_directory("moveit_resources_panda_moveit_config"),
-        "config",
-        "ros2_controllers.yaml",
-    )
-    ros2_control_node = Node(
-        package="controller_manager",
-        executable="ros2_control_node",
-        parameters=[moveit_config.robot_description, ros2_controllers_path],
-        output="screen",
-    )
-
-    joint_state_broadcaster_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "joint_state_broadcaster",
-            "--controller-manager-timeout",
-            "300",
-            "--controller-manager",
-            "/controller_manager",
-        ],
-    )
-
-    panda_arm_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["panda_arm_controller", "-c", "/controller_manager"],
     )
 
     # Launch as much as possible in components
@@ -119,21 +88,24 @@ def generate_launch_description():
                 package="tf2_ros",
                 plugin="tf2_ros::StaticTransformBroadcasterNode",
                 name="static_tf2_broadcaster",
-                parameters=[{"child_frame_id": "/panda_link0", "frame_id": "/world"}],
+                parameters=[{"child_frame_id": "/base_footprint", "frame_id": "/world"}],
             ),
             ComposableNode(
                 package="moveit_servo",
                 plugin="moveit_servo::JoyToServoPub",
                 name="controller_to_servo_node",
             ),
-            ComposableNode(
-                package="joy",
-                plugin="joy::Joy",
-                name="joy_node",
-            ),
         ],
         output="screen",
     )
+
+    joy_node = Node(
+        package="joy_linux",
+        executable="joy_linux_node",
+        name="joy_node",
+        output="screen",
+    )
+
     # Launch a standalone Servo node.
     # As opposed to a node component, this may be necessary (for example) if Servo is running on a different PC
     servo_node = Node(
@@ -151,10 +123,8 @@ def generate_launch_description():
     return LaunchDescription(
         [
             rviz_node,
-            ros2_control_node,
-            joint_state_broadcaster_spawner,
-            panda_arm_controller_spawner,
             servo_node,
+            joy_node,
             container,
         ]
     )

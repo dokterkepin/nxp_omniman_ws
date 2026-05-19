@@ -65,17 +65,6 @@ const std::string BASE_FRAME_ID = "base_link";
 // For XBOX 1 controller
 enum Axis
 {
-  // bluetooth
-  // LEFT_STICK_X = 0,
-  // LEFT_STICK_Y = 1,
-  // LEFT_TRIGGER = 5,
-  // RIGHT_STICK_X = 2,
-  // RIGHT_STICK_Y = 3,
-  // RIGHT_TRIGGER = 4,
-  // D_PAD_X = 6,
-  // D_PAD_Y = 7
-
-  // usb cable
   LEFT_STICK_X = 0,
   LEFT_STICK_Y = 1,
   LEFT_TRIGGER = 2,
@@ -87,20 +76,6 @@ enum Axis
 };
 enum Button
 {
-  // bluetooth
-  // A = 0,
-  // B = 1,
-  // X = 3,
-  // Y = 4,
-  // LEFT_BUMPER = 6,
-  // RIGHT_BUMPER = 7,
-  // CHANGE_VIEW = 8,
-  // MENU = 10,
-  // HOME = 12,
-  // LEFT_STICK_CLICK = 13,
-  // RIGHT_STICK_CLICK = 14
-
-  // USB cable 
   A = 0,
   B = 1,
   X = 2,
@@ -132,13 +107,17 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
                      std::unique_ptr<geometry_msgs::msg::TwistStamped>& twist,
                      std::unique_ptr<control_msgs::msg::JointJog>& joint)
 {
+  // Give joint jogging priority because it is only buttons
+  // If any joint jog command is requested, we are only publishing joint commands
   if (buttons[A] || buttons[B] || buttons[X] || buttons[Y] || axes[D_PAD_X] || axes[D_PAD_Y])
   {
+    // Map the D_PAD to the proximal joints
     joint->joint_names.push_back("shoulder_yaw_joint");
     joint->velocities.push_back(axes[D_PAD_X]);
     joint->joint_names.push_back("upper_shoulder_pitch_joint");
     joint->velocities.push_back(axes[D_PAD_Y]);
 
+    // Map the diamond to the distal joints
     joint->joint_names.push_back("palm_yaw_joint");
     joint->velocities.push_back(buttons[B] - buttons[X]);
     joint->joint_names.push_back("wrist_pitch_joint");
@@ -146,23 +125,20 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
     return false;
   }
 
-  // Right stick = position (where the end-effector goes)
-  twist->twist.linear.z = axes[RIGHT_STICK_Y];  // up/down
-  twist->twist.linear.y = axes[RIGHT_STICK_X];  // left/right
+  // The bread and butter: map buttons to twist commands
+  twist->twist.linear.z = axes[RIGHT_STICK_Y];
+  twist->twist.linear.y = axes[RIGHT_STICK_X];
 
-  // Triggers = forward/back (X)
-  double lin_x_left = -0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
-  double lin_x_right = 0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-  twist->twist.linear.x = lin_x_left + lin_x_right;
+  double lin_x_right = -0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
+  double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
+  twist->twist.linear.x = lin_x_right + lin_x_left;
 
-  // Left stick = orientation (how the gripper rotates)
-  twist->twist.angular.y = axes[LEFT_STICK_Y];  // pitch
-  twist->twist.angular.x = axes[LEFT_STICK_X];  // roll
+  twist->twist.angular.y = axes[LEFT_STICK_Y];
+  twist->twist.angular.x = axes[LEFT_STICK_X];
 
-  // Bumpers = yaw
-  double yaw_positive = buttons[RIGHT_BUMPER];
-  double yaw_negative = -1.0 * buttons[LEFT_BUMPER];
-  twist->twist.angular.z = yaw_positive + yaw_negative;
+  double roll_positive = buttons[RIGHT_BUMPER];
+  double roll_negative = -1 * (buttons[LEFT_BUMPER]);
+  twist->twist.angular.z = roll_positive + roll_negative;
 
   return true;
 }
@@ -174,15 +150,9 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
 void updateCmdFrame(std::string& frame_name, const std::vector<int>& buttons)
 {
   if (buttons[CHANGE_VIEW] && frame_name == EEF_FRAME_ID)
-  {
     frame_name = BASE_FRAME_ID;
-    RCLCPP_INFO(rclcpp::get_logger("joy_to_servo"), "Switched to BASE frame: %s", frame_name.c_str());
-  }
   else if (buttons[MENU] && frame_name == BASE_FRAME_ID)
-  {
     frame_name = EEF_FRAME_ID;
-    RCLCPP_INFO(rclcpp::get_logger("joy_to_servo"), "Switched to EEF frame: %s", frame_name.c_str());
-  }
 }
 
 namespace moveit_servo
@@ -214,7 +184,7 @@ public:
       rclcpp::sleep_for(std::chrono::seconds(3));
       // Create collision object, in the way of servoing
       moveit_msgs::msg::CollisionObject collision_object;
-      collision_object.header.frame_id = "base_link"; //panda_link0
+      collision_object.header.frame_id = "panda_link0";
       collision_object.id = "box";
 
       shape_msgs::msg::SolidPrimitive table_1;
@@ -279,7 +249,7 @@ public:
     {
       // publish the JointJog
       joint_msg->header.stamp = this->now();
-      joint_msg->header.frame_id = BASE_FRAME_ID;
+      joint_msg->header.frame_id = BASE_FRAME_ID;  // JointJog messages still need a frame, but it doesn't change with the button press
       joint_pub_->publish(std::move(joint_msg));
     }
   }
