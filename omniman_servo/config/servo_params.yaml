@@ -17,9 +17,9 @@ publish_period: 0.02  # 50 Hz (matches well with 500 Hz controller update rate)
 low_latency_mode: false
 
 # Output to JointTrajectoryController
-command_out_type: trajectory_msgs/JointTrajectory
+command_out_type: std_msgs/Float64MultiArray
 publish_joint_positions: true
-publish_joint_velocities: true
+publish_joint_velocities: false
 publish_joint_accelerations: false
 
 ## Smoothing plugin
@@ -49,7 +49,7 @@ cartesian_command_in_topic: ~/delta_twist_cmds
 joint_command_in_topic: ~/delta_joint_cmds
 joint_topic: /joint_states
 status_topic: ~/status
-command_out_topic: /arm_controller/joint_trajectory
+command_out_topic: /arm_group_position_controller/commands
 
 ## Collision checking
 check_collisions: true
