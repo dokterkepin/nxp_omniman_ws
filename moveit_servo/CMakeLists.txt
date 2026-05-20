@@ -162,6 +162,7 @@ install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 # Install Python scripts
 install(PROGRAMS
   scripts/joy_to_gripper.py
+  scripts/ee_pose_publisher.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
