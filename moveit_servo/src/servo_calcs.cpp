@@ -243,6 +243,12 @@ void ServoCalcs::start()
   // Stop the thread if we are currently running
   stop();
 
+  // Wait for real joint states before starting, so we don't command the URDF default (zero) positions
+  if (!planning_scene_monitor_->getStateMonitor()->waitForCompleteState(parameters_->move_group_name, 5.0))
+  {
+    RCLCPP_WARN(LOGGER, "Timeout waiting for current joint states. Servo may command unexpected initial positions.");
+  }
+
   // Set up the "last" published message, in case we need to send it first
   auto initial_joint_trajectory = std::make_unique<trajectory_msgs::msg::JointTrajectory>();
   initial_joint_trajectory->header.stamp = node_->now();

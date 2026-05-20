@@ -164,16 +164,16 @@ def generate_launch_description():
     #     ],
     # )
 
-    move_group_node = Node(
-        package="moveit_ros_move_group",
-        executable="move_group",
-        output="screen",
-        parameters=[
-            moveit_config.to_dict(),
-            {"publish_robot_description_semantic": True,
-             "publish_robot_description": True},
-        ],
-    )
+    # move_group_node = Node(
+    #     package="moveit_ros_move_group",
+    #     executable="move_group",
+    #     output="screen",
+    #     parameters=[
+    #         moveit_config.to_dict(),
+    #         {"publish_robot_description_semantic": True,
+    #          "publish_robot_description": True},
+    #     ],
+    # )
 
     usb_cam = Node(
         package="usb_cam",
