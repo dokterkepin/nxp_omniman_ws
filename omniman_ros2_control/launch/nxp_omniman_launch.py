@@ -175,16 +175,19 @@ def generate_launch_description():
     #     ],
     # )
 
-    # move_group_node = Node(
-    #     package="moveit_ros_move_group",
-    #     executable="move_group",
-    #     output="screen",
-    #     parameters=[
-    #         moveit_config.to_dict(),
-    #         {"publish_robot_description_semantic": True,
-    #          "publish_robot_description": True},
-    #     ],
-    # )
+    # move_group hosts the planning pipeline + MoveGroupAction server. Only needed
+    # in planning mode (use_servo:=false) — servo bypasses move_group entirely.
+    move_group_node = Node(
+        package="moveit_ros_move_group",
+        executable="move_group",
+        output="screen",
+        parameters=[
+            moveit_config.to_dict(),
+            {"publish_robot_description_semantic": True,
+             "publish_robot_description": True},
+        ],
+        condition=UnlessCondition(LaunchConfiguration("use_servo")),
+    )
 
     usb_cam = Node(
         package="usb_cam",
@@ -210,7 +213,7 @@ def generate_launch_description():
             delay_gripper_controller,
             joy_node,
             teleop_node,
-            # move_group_node,
+            move_group_node,
             # rviz_node,
             # usb_cam,
         ]
