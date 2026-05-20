@@ -3,7 +3,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     RegisterEventHandler,
 )
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import (
     Command,
@@ -39,6 +39,13 @@ def generate_launch_description():
         default_value="false",
         description="Start joy + teleop_twist_joy. Set false when driving "
                     "autonomously to avoid competing /cmd_vel publishers.",
+    )
+
+    use_servo_arg = DeclareLaunchArgument(
+        "use_servo",
+        default_value="true",
+        description="true -> JointGroupPositionController (for MoveIt Servo)."
+                    "false -> JointTrajectoryController",
     )
 
     robot_description_content = Command(
@@ -90,16 +97,18 @@ def generate_launch_description():
         arguments=["mecanum_drive_controller"],
     )
 
-    # arm_controller_spawner = Node(
-    #     package="controller_manager",
-    #     executable="spawner",
-    #     arguments=["arm_controller", "--param-file", robot_controllers],
-    # )
+    arm_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["arm_controller", "--param-file", robot_controllers],
+        condition=UnlessCondition(LaunchConfiguration("use_servo")),
+    )
 
     arm_group_position_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=["arm_group_position_controller", "--param-file", robot_controllers],
+        condition=IfCondition(LaunchConfiguration("use_servo")),
     )
 
     gripper_controller_spawner = Node(
@@ -108,7 +117,7 @@ def generate_launch_description():
         arguments=["gripper_controller", "--param-file", robot_controllers],
     )
 
-    # Sequential startup: broadcaster -> mecanum + arm -> gripper
+    # All other controllers wait on joint_state_broadcaster, then spawn in parallel.
     delay_mecanum_controller = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=joint_state_broadcaster_spawner,
@@ -116,12 +125,12 @@ def generate_launch_description():
         )
     )
 
-    # delay_arm_controller = RegisterEventHandler(
-    #     event_handler=OnProcessExit(
-    #         target_action=joint_state_broadcaster_spawner,
-    #         on_exit=[arm_controller_spawner],
-    #     )
-    # )
+    delay_arm_controller = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[arm_controller_spawner],
+        )
+    )
 
     delay_arm_group_position_controller = RegisterEventHandler(
         event_handler=OnProcessExit(
@@ -130,10 +139,12 @@ def generate_launch_description():
         )
     )
 
+    # Gripper waits on joint_state_broadcaster (not the arm spawner) so it spawns
+    # in both servo and planning modes — the conditioned arm spawner may never
+    # run, which would prevent its OnProcessExit event from firing.
     delay_gripper_controller = RegisterEventHandler(
         event_handler=OnProcessExit(
-            # target_action=arm_controller_spawner,
-            target_action=arm_group_position_controller_spawner,
+            target_action=joint_state_broadcaster_spawner,
             on_exit=[gripper_controller_spawner],
         )
     )
@@ -189,11 +200,12 @@ def generate_launch_description():
         [
             use_sim_arg,
             use_joy_arg,
+            use_servo_arg,
             control_node,
             # robot_state_publisher_node,
             joint_state_broadcaster_spawner,
             delay_mecanum_controller,
-            # delay_arm_controller,
+            delay_arm_controller,
             delay_arm_group_position_controller,
             delay_gripper_controller,
             joy_node,
