@@ -197,7 +197,7 @@ def generate_launch_description():
             joy_node,
             teleop_node,
             move_group_node,
-            rviz_node,
+            # rviz_node,
             # usb_cam,
         ]
     )
