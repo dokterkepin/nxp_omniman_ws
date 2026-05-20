@@ -1541,7 +1541,7 @@
         <joint name="ee_joint" type="fixed">
             <parent link="palm_link" />
             <child link="ee_link" />
-            <origin xyz="0.000 0.000 0.1" rpy="0 0 0" />
+            <origin xyz="0.000 0.000 0.080" rpy="0 0 0" />
         </joint>
 
         <link name="ee_link" />
