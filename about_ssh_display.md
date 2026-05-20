@@ -66,3 +66,32 @@ the entire Xvfb block — no changes needed.
 ```bash
 sudo apt install xvfb
 ```
+
+## Copy files between machines via SSH
+
+Use `rsync` to transfer files from one machine to another over SSH.
+It shows progress and can resume if interrupted.
+
+### Pull files from remote to local
+
+```bash
+rsync -avz --progress dokterkepin@192.168.51.81:~/ws_moveit2/src/ ~/ws_moveit2/src/
+```
+
+- `-a` — archive mode (preserves permissions, symlinks, timestamps)
+- `-v` — verbose output
+- `-z` — compress during transfer
+- `--progress` — show transfer progress
+- Trailing `/` on `src/` copies the **contents** of the folder, not the folder itself
+
+### Push files from local to remote
+
+```bash
+rsync -avz --progress ~/ws_moveit2/src/ erc-i3@192.168.51.151:~/ws_moveit2/src/
+```
+
+### Make sure destination folder exists first
+
+```bash
+ssh erc-i3@192.168.51.151 "mkdir -p ~/ws_moveit2/src"
+```

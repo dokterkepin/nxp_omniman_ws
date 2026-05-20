@@ -16,7 +16,7 @@ The file `dynamixel_hardware_interface/scripts/99-manipulator-cdc.rules` creates
 The rule:
 
 ```
-KERNEL=="ttyUSB*", DRIVERS=="ftdi_sio", MODE="0666", ATTR{device/latency_timer}="1", SYMLINK+="dynamixel"
+KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", MODE="0666", SYMLINK+="dynamixel"
 ```
 After this rule is installed, you can use `/dev/dynamixel` in your config files and it will always point to the correct device.
 
