@@ -106,6 +106,13 @@ def generate_launch_description():
         output="screen",
     )
 
+    joy_to_gripper_node = Node(
+        package="moveit_servo",
+        executable="joy_to_gripper.py",
+        name="joy_to_gripper",
+        output="screen",
+    )
+
     # Launch a standalone Servo node.
     # As opposed to a node component, this may be necessary (for example) if Servo is running on a different PC
     servo_node = Node(
@@ -125,6 +132,7 @@ def generate_launch_description():
             rviz_node,
             servo_node,
             joy_node,
+            joy_to_gripper_node,
             container,
         ]
     )
