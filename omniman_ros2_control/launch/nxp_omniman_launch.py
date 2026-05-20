@@ -196,7 +196,7 @@ def generate_launch_description():
             delay_gripper_controller,
             joy_node,
             teleop_node,
-            move_group_node,
+            # move_group_node,
             # rviz_node,
             # usb_cam,
         ]
