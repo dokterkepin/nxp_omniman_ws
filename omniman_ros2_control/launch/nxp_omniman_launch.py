@@ -78,12 +78,12 @@ def generate_launch_description():
         ],
     )
 
-    # robot_state_publisher_node = Node(
-    #     package="robot_state_publisher",
-    #     executable="robot_state_publisher",
-    #     output="both",
-    #     parameters=[robot_description, sim_time],
-    # )
+    robot_state_publisher_node = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        output="both",
+        parameters=[robot_description, sim_time],
+    )
 
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
@@ -222,7 +222,7 @@ def generate_launch_description():
             use_joy_arg,
             use_servo_arg,
             control_node,
-            # robot_state_publisher_node,
+            robot_state_publisher_node,
             joint_state_broadcaster_spawner,
             delay_mecanum_controller,
             delay_arm_controller,
