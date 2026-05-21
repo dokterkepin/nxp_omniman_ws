@@ -29,23 +29,6 @@ def generate_launch_description():
         [pkg_path, "config", "slam_toolbox_config.rviz"]
     )
 
-    rplidar_node = Node(
-        package="rplidar_ros",
-        executable="rplidar_node",
-        name="rplidar_node",
-        parameters=[{
-            'channel_type': 'serial',
-            'serial_port': '/dev/rplidar',
-            'serial_baudrate': 256000,
-            'frame_id': 'lidar_link',
-            'inverted': False,
-            'angle_compensate': True,
-            'scan_mode': 'Sensitivity',
-        }],
-        output="screen",
-        condition=UnlessCondition(LaunchConfiguration("use_sim")),
-    )
-
     rf2o_node = Node(
         package="rf2o_laser_odometry",
         executable="rf2o_laser_odometry_node",

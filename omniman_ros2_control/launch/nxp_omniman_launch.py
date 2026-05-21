@@ -189,6 +189,23 @@ def generate_launch_description():
         condition=UnlessCondition(LaunchConfiguration("use_servo")),
     )
 
+    rplidar_node = Node(
+        package="rplidar_ros",
+        executable="rplidar_node",
+        name="rplidar_node",
+        parameters=[{
+            'channel_type': 'serial',
+            'serial_port': '/dev/rplidar',
+            'serial_baudrate': 256000,
+            'frame_id': 'lidar_link',
+            'inverted': False,
+            'angle_compensate': True,
+            'scan_mode': 'Sensitivity',
+        }],
+        output="screen",
+        condition=UnlessCondition(LaunchConfiguration("use_sim")),
+    )
+
     usb_cam = Node(
         package="usb_cam",
         executable="usb_cam_node_exe",
@@ -216,5 +233,6 @@ def generate_launch_description():
             move_group_node,
             # rviz_node,
             # usb_cam,
+            rplidar_node
         ]
     )
