@@ -45,12 +45,25 @@ You should see something like `dynamixel -> ttyUSB0`.
 
 > **Note:** There is also a helper script `create_udev_rules` that does steps 1-2 automatically via `ros2 run dynamixel_hardware_interface create_udev_rules`, but that requires the workspace to be built and sourced first.
 
-## Updating Config Files
+## How to Check Device Attributes Before Writing a Rule
 
-Once installed, use `/dev/dynamixel` as the port in your hardware configuration instead of `/dev/ttyUSB0`:
+Before writing or updating a udev rule, verify the actual device attributes first so the rule matches the correct device.
 
-```yaml
-serial_port: /dev/dynamixel
+**1. List connected USB TTY devices:**
+
+```bash
+ls /dev/ttyUSB* /dev/ttyACM*
 ```
 
-This way the port never changes even if other USB devices are added or removed.
+**2. Get the full attribute tree for a specific device:**
+
+```bash
+udevadm info -a -n /dev/ttyUSB0
+```
+
+This prints all attributes you can match against: `idVendor`, `idProduct`, `serial`, `manufacturer`, `product`, etc.
+
+**3. Filter for the most useful fields:**
+
+```bash
+udevadm info -a -n /dev/ttyUSB0 | grep -E 'idVendor|idProduct|serial|manufacturer|product'
