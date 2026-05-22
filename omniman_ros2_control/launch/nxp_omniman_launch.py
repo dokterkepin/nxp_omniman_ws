@@ -41,6 +41,13 @@ def generate_launch_description():
                     "autonomously to avoid competing /cmd_vel publishers.",
     )
 
+    use_keyboard_arg = DeclareLaunchArgument(
+        "use_keyboard",
+        default_value="false",
+        description="Start keyboard_teleop. Set false when driving "
+                    "autonomously to avoid competing /cmd_vel publishers.",
+    )
+
     use_servo_arg = DeclareLaunchArgument(
         "use_servo",
         default_value="true",
@@ -150,18 +157,30 @@ def generate_launch_description():
     )
 
     joy_node = Node(
-        package="joy",
-        executable="joy_node",
+        package="joy_linux",
+        executable="joy_linux_node",
+        name="joy_node",
+        output="screen",
         parameters=[joystick_config],
         condition=IfCondition(LaunchConfiguration("use_joy")),
     )
 
-    teleop_node = Node(
+    teleop_joy_node = Node(
         package="teleop_twist_joy",
         executable="teleop_node",
         parameters=[joystick_config],
         remappings=[("/cmd_vel", "/cmd_vel_stamped")],
         condition=IfCondition(LaunchConfiguration("use_joy")),
+    )
+
+    keyboard_node = Node(
+        package="teleop_twist_keyboard",
+        executable="teleop_twist_keyboard",
+        name="keyboard_node",
+        output="screen",
+        prefix="xterm -e",
+        condition=IfCondition(LaunchConfiguration("use_keyboard")),
+        remappings=[("/cmd_vel", "/cmd_vel_stamped")],
     )
 
     # rviz_node = Node(
@@ -220,6 +239,7 @@ def generate_launch_description():
         [
             use_sim_arg,
             use_joy_arg,
+            use_keyboard_arg,
             use_servo_arg,
             control_node,
             robot_state_publisher_node,
@@ -229,7 +249,8 @@ def generate_launch_description():
             delay_arm_group_position_controller,
             delay_gripper_controller,
             joy_node,
-            teleop_node,
+            teleop_joy_node,
+            keyboard_node,
             move_group_node,
             # rviz_node,
             # usb_cam,
