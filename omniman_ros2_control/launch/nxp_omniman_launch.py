@@ -1,7 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
-    ExecuteProcess,
     RegisterEventHandler,
 )
 from launch.conditions import IfCondition, UnlessCondition
@@ -40,12 +39,6 @@ def generate_launch_description():
         default_value="false",
         description="Start joy + teleop_twist_joy. Set false when driving "
                     "autonomously to avoid competing /cmd_vel publishers.",
-    )
-
-    use_teleop_arg = DeclareLaunchArgument(
-        "use_teleop",
-        default_value="false",
-        description="Start keyboard teleop (teleop_twist_keyboard).",
     )
 
     use_servo_arg = DeclareLaunchArgument(
@@ -156,16 +149,6 @@ def generate_launch_description():
         )
     )
 
-    # Keyboard teleop publishes geometry_msgs/Twist on /cmd_vel (unstamped).
-    # That matches the controller's "reference_unstamped" input remapped to /cmd_vel.
-    keyboard_teleop = ExecuteProcess(
-        cmd=["ros2", "run", "teleop_twist_keyboard", "teleop_twist_keyboard"],
-        output="screen",
-        emulate_tty=True,
-        condition=IfCondition(LaunchConfiguration("use_teleop")),
-    )
-
-    # Joystick teleop path (kept untouched; enable via use_joy:=true).
     joy_node = Node(
         package="joy",
         executable="joy_node",
@@ -237,7 +220,6 @@ def generate_launch_description():
         [
             use_sim_arg,
             use_joy_arg,
-            use_teleop_arg,
             use_servo_arg,
             control_node,
             robot_state_publisher_node,
@@ -246,7 +228,6 @@ def generate_launch_description():
             delay_arm_controller,
             delay_arm_group_position_controller,
             delay_gripper_controller,
-            keyboard_teleop,
             joy_node,
             teleop_node,
             move_group_node,
