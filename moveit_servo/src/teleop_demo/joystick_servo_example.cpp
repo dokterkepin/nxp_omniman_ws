@@ -65,6 +65,17 @@ const std::string BASE_FRAME_ID = "base_link";
 // For XBOX 1 controller
 enum Axis
 {
+  // bluetooth
+  // LEFT_STICK_X = 0,
+  // LEFT_STICK_Y = 1,
+  // LEFT_TRIGGER = 5,
+  // RIGHT_STICK_X = 2,
+  // RIGHT_STICK_Y = 3,
+  // RIGHT_TRIGGER = 4,
+  // D_PAD_X = 6,
+  // D_PAD_Y = 7
+
+  //USB
   LEFT_STICK_X = 0,
   LEFT_STICK_Y = 1,
   LEFT_TRIGGER = 2,
@@ -76,6 +87,20 @@ enum Axis
 };
 enum Button
 {
+  // bluetooth
+  // A = 0,
+  // B = 1,
+  // X = 3,
+  // Y = 4,
+  // LEFT_BUMPER = 6,
+  // RIGHT_BUMPER = 7,
+  // CHANGE_VIEW = 10,
+  // MENU = 11,
+  // HOME = 12,
+  // LEFT_STICK_CLICK = 13,
+  // RIGHT_STICK_CLICK = 14
+  
+  // USB
   A = 0,
   B = 1,
   X = 2,

@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""Joystick → gripper bridge.
-
-LEFT_STICK_CLICK  (button 9)  opens the gripper.
-RIGHT_STICK_CLICK (button 10) closes the gripper.
-While held, the target position steps by STEP_M each joy frame
-(rate-limited to RATE_HZ), then a GripperCommand action goal is sent.
-"""
+"""Joystick → gripper bridge."""
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from sensor_msgs.msg import Joy
 from control_msgs.action import GripperCommand
 
+# Bluetooth
+# LEFT_STICK_CLICK = 13
+# RIGHT_STICK_CLICK = 14
 
+# USB
 LEFT_STICK_CLICK = 9
 RIGHT_STICK_CLICK = 10
 

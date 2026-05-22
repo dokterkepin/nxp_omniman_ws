@@ -72,7 +72,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         use_sim_arg,
-        rplidar_node,
         rf2o_node,
         ekf_node,
         slam_toolbox_node,
