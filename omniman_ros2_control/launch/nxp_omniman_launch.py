@@ -11,7 +11,6 @@ from launch.substitutions import (
     FindExecutable,
     LaunchConfiguration,
     PathJoinSubstitution,
-    PythonExpression,
 )
 
 from launch_ros.actions import Node
@@ -39,16 +38,14 @@ def generate_launch_description():
     use_joy_arg = DeclareLaunchArgument(
         "use_joy",
         default_value="false",
-        description=(
-            "Enable manual teleop input. Default teleop_device:=keyboard. "
-            "Set false when driving autonomously to avoid competing /cmd_vel publishers."
-        ),
+        description="Start joy + teleop_twist_joy. Set false when driving "
+                    "autonomously to avoid competing /cmd_vel publishers.",
     )
 
-    teleop_device_arg = DeclareLaunchArgument(
-        "teleop_device",
-        default_value="keyboard",
-        description="Teleop backend when use_joy:=true: keyboard|joystick",
+    use_teleop_arg = DeclareLaunchArgument(
+        "use_teleop",
+        default_value="false",
+        description="Start keyboard teleop (teleop_twist_keyboard).",
     )
 
     use_servo_arg = DeclareLaunchArgument(
@@ -159,48 +156,21 @@ def generate_launch_description():
         )
     )
 
-    use_joy = LaunchConfiguration("use_joy")
-    teleop_device = LaunchConfiguration("teleop_device")
-
-    keyboard_teleop_condition = IfCondition(
-        PythonExpression(
-            [
-                "'",
-                use_joy,
-                "' == 'true' and '",
-                teleop_device,
-                "' == 'keyboard'",
-            ]
-        )
-    )
-
-    joystick_teleop_condition = IfCondition(
-        PythonExpression(
-            [
-                "'",
-                use_joy,
-                "' == 'true' and '",
-                teleop_device,
-                "' == 'joystick'",
-            ]
-        )
-    )
-
     # Keyboard teleop publishes geometry_msgs/Twist on /cmd_vel (unstamped).
     # That matches the controller's "reference_unstamped" input remapped to /cmd_vel.
     keyboard_teleop = ExecuteProcess(
         cmd=["ros2", "run", "teleop_twist_keyboard", "teleop_twist_keyboard"],
         output="screen",
         emulate_tty=True,
-        condition=keyboard_teleop_condition,
+        condition=IfCondition(LaunchConfiguration("use_teleop")),
     )
 
-    # Joystick teleop path (kept for when you have a joystick available).
+    # Joystick teleop path (kept untouched; enable via use_joy:=true).
     joy_node = Node(
         package="joy",
         executable="joy_node",
         parameters=[joystick_config],
-        condition=joystick_teleop_condition,
+        condition=IfCondition(LaunchConfiguration("use_joy")),
     )
 
     teleop_node = Node(
@@ -208,7 +178,7 @@ def generate_launch_description():
         executable="teleop_node",
         parameters=[joystick_config],
         remappings=[("/cmd_vel", "/cmd_vel_stamped")],
-        condition=joystick_teleop_condition,
+        condition=IfCondition(LaunchConfiguration("use_joy")),
     )
 
     # rviz_node = Node(
@@ -267,7 +237,7 @@ def generate_launch_description():
         [
             use_sim_arg,
             use_joy_arg,
-            teleop_device_arg,
+            use_teleop_arg,
             use_servo_arg,
             control_node,
             robot_state_publisher_node,
