@@ -253,7 +253,7 @@ def generate_launch_description():
             keyboard_node,
             move_group_node,
             # rviz_node,
-            # usb_cam,
+            usb_cam,
             rplidar_node
         ]
     )
