@@ -1,3 +1,17 @@
+## Teleoperation via ROS2 DDS
+in order to teleoperate using joy stick or keyboard, ros2 has a really good feature where we don't 
+neccasary to connected the controller in robot body, but instead using the same domain id, we can use different machine. remember to connected either via usb or bluetooth in the different machine in the same domain id and run the node 
+
+### joy stick teleop:
+```bash
+ros2 run joy_linux joy_linux_node
+```
+
+### keyboard teleop:
+```bash
+ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r /cmd_vel:=/cmd_vel_stamped -p stamped:="true"
+```
+
 ## Virtual Display for Headless SSH Sessions
 When running GUI applications like RViz2 over SSH on a headless machine
 (e.g., ASUS NUC robot PC with no monitor), Qt crashes immediately:

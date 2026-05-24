@@ -110,6 +110,12 @@ To also enable joystick teleoperation:
 ros2 launch omniman_ros2_control nxp_omniman_launch.py use_joy:=true
 ```
 
+Or instead enable keyboard teleoperation:
+
+```bash
+ros2 launch omniman_ros2_control nxp_omniman_launch.py use_keyboard:=true
+```
+
 Verify controllers are running:
 
 ```bash
