@@ -28,9 +28,9 @@ def generate_launch_description():
         [pkg_path, "config", "controllers.yaml"]
     )
 
-    rviz_config_file = (
-        get_package_share_directory("omniman_ros2_control") + "/config/ros2_control_config.rviz"
-    )
+    rviz_config_file = (PathJoinSubstitution(
+        [pkg_path, "config", "ros2_control_config.rviz"]
+    ))
 
     use_sim_arg = DeclareLaunchArgument(
         "use_sim",
