@@ -187,17 +187,17 @@ def generate_launch_description():
         remappings=[("/cmd_vel", "/cmd_vel_stamped")],
     )
 
-    rviz_node = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="log",
-        arguments=["-d", rviz_config_file],
-        parameters=[
-            moveit_config.robot_description,
-            moveit_config.robot_description_semantic,
-        ],
-    )
+    # rviz_node = Node(
+    #     package="rviz2",
+    #     executable="rviz2",
+    #     name="rviz2",
+    #     output="log",
+    #     arguments=["-d", rviz_config_file],
+    #     parameters=[
+    #         moveit_config.robot_description,
+    #         moveit_config.robot_description_semantic,
+    #     ],
+    # )
 
     # move_group hosts the planning pipeline + MoveGroupAction server. Only needed
     # in planning mode (use_servo:=false) — servo bypasses move_group entirely.
@@ -257,7 +257,7 @@ def generate_launch_description():
             teleop_joy_node,
             keyboard_node,
             move_group_node,
-            rviz_node,
+            # rviz_node,
             usb_cam,
             rplidar_node
         ]
