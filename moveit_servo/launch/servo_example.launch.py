@@ -46,17 +46,17 @@ def launch_setup(context, *args, **kwargs):
     rviz_config_file = (
         get_package_share_directory("moveit_servo") + "/config/omniman_servo_config.rviz"
     )
-    rviz_node = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="log",
-        arguments=["-d", rviz_config_file],
-        parameters=[
-            moveit_config.robot_description,
-            moveit_config.robot_description_semantic,
-        ],
-    )
+    # rviz_node = Node(
+    #     package="rviz2",
+    #     executable="rviz2",
+    #     name="rviz2",
+    #     output="log",
+    #     arguments=["-d", rviz_config_file],
+    #     parameters=[
+    #         moveit_config.robot_description,
+    #         moveit_config.robot_description_semantic,
+    #     ],
+    # )
 
     container = ComposableNodeContainer(
         name="moveit_servo_demo_container",
@@ -112,7 +112,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
-        rviz_node,
+        # rviz_node,
         servo_node,
         joy_node,
         joy_to_gripper_node,
