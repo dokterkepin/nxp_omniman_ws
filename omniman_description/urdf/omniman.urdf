@@ -1471,6 +1471,34 @@
                      izz="0.000145" />
         </inertial>
     </link>
+    
+    <!-- ==================== Camera =================== -->
+    <link name="camera_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Camera/Camera_link.STL" />
+            </geometry>
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://omniman_description/meshes/visual/Camera/Camera_link.STL" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.312030" />
+            <origin xyz="-0.056976 0.020980 0.034842" rpy="0 0 0" />
+            <inertia ixx="0.000262" ixy="0.000000" ixz="-0.000079"
+                     iyy="0.000228" iyz="0.000000"
+                     izz="0.000228" />
+        </inertial>
+    </link>
+
+    <joint name="camera_fixed_joint" type="fixed">
+        <parent link="palm_link" />
+        <child link="camera_link" />
+        <origin xyz="0.008 -0.021 0.006" rpy="0 0 0" />
+    </joint>
 
     <joint name="left_finger_prismatic_joint" type="prismatic">
         <parent link="palm_link" />
