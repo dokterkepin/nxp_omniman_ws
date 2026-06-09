@@ -1,0 +1,45 @@
+# Sim-only controllers for the omniman hand-teleop RViz demo.
+# Same as moveit_config/config/ros2_controllers.yaml, but joint_state_broadcaster
+# also publishes the 4 passive mecanum wheel joints so RViz has TF for the
+# wheels (the mock hardware does not actuate them).
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    gripper_controller:
+      type: position_controllers/GripperActionController
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+arm_controller:
+  ros__parameters:
+    joints:
+      - shoulder_yaw_joint
+      - upper_shoulder_pitch_joint
+      - arm_yaw_joint
+      - forearm_pitch_joint
+      - wrist_pitch_joint
+      - palm_yaw_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+
+gripper_controller:
+  ros__parameters:
+    joint: left_finger_prismatic_joint
+
+joint_state_broadcaster:
+  ros__parameters:
+    # Passive wheels aren't in ros2_control / mock hardware. Publish them (at 0)
+    # so robot_state_publisher can emit TF for the wheel + roller links.
+    extra_joints:
+      - Front_left_plate_continuous_joint
+      - Front_right_plate_continuous_joint
+      - Rear_left_plate_continuous_joint
+      - Rear_right_plate_continuous_joint

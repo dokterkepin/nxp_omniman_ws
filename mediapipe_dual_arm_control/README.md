@@ -20,7 +20,36 @@
 **Files:** `src/omniman_pose_tracking_node.cpp`,
 `scripts/hand_pose_publisher_node.py`,
 `config/pose_tracking/omniman_pose_tracking.yaml`,
-`launch/omniman_hand_teleop.launch.py`.
+`launch/omniman_hand_teleop.launch.py` (real hardware),
+`launch/omniman_hand_teleop_sim.launch.py` (fake hardware + RViz).
+
+### Try it in simulation first (RViz, no robot) ✅ recommended
+
+The sim launch brings up **everything** with fake hardware (`mock_components`)
+so you can watch the arm follow your hand and see the target-pose arrow in RViz
+before touching the real robot:
+
+```bash
+cd ~/workspaces/nxp_omniman_ws
+colcon build --packages-select mediapipe_dual_arm_control
+source install/setup.bash
+pip3 install -r src/mediapipe_dual_arm_control/requirements.txt   # first time only
+ros2 launch mediapipe_dual_arm_control omniman_hand_teleop_sim.launch.py camera_device:=2
+```
+
+In RViz: the **RobotModel** follows the servo commands and the red **TargetPose**
+arrow (`/target_pose`) shows where your hand is commanding the EE.
+
+**No webcam yet?** Dry-run the servo + RViz and drive the target by hand:
+
+```bash
+ros2 launch mediapipe_dual_arm_control omniman_hand_teleop_sim.launch.py start_mediapipe:=false
+# in another terminal:
+ros2 topic pub -r 10 /hand_target_pose geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: base_link}, pose: {position: {x: 0.25, y: 0.05, z: 0.40}, orientation: {w: 1.0}}}"
+```
+
+(Verified: this makes the servo emit `/arm_controller/joint_trajectory` commands and the arm moves in RViz.)
 
 ### Run it (real hardware)
 

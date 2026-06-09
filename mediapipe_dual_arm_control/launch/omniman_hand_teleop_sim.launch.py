@@ -64,9 +64,9 @@ def launch_setup(context, *args, **kwargs):
     )
 
     # --- ros2_control (fake hardware) + controllers ---------------------------
-    ros2_controllers_path = os.path.join(
-        get_package_share_directory("moveit_config"), "config", "ros2_controllers.yaml"
-    )
+    # Sim-only controllers: same as moveit_config but joint_state_broadcaster
+    # also publishes the passive mecanum wheels so RViz has wheel TF.
+    ros2_controllers_path = os.path.join(pkg_share, "config", "sim", "ros2_controllers.yaml")
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
