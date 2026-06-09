@@ -18,6 +18,7 @@ All workspace / camera / gripper values are ROS parameters so you can tune them
 live (ros2 param set) without rebuilding.  Defaults are sized for the compact
 omniman arm (~0.45 m reach); tune them to your robot.
 """
+# import math  # needed when workspace_angle zone rotation is re-enabled
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -47,12 +48,18 @@ class OmnimanHandTeleop(Node):
             "gripper_action", "/gripper_controller/gripper_cmd").value
 
         # Robot workspace box (planning frame, metres). Defaults for omniman.
-        self.robot_x_min = self.declare_parameter("robot_x_min", 0.15).value   # forward, near
+        self.robot_x_min = self.declare_parameter("robot_x_min", 0.05).value   # forward, near (low allows side reach)
         self.robot_x_max = self.declare_parameter("robot_x_max", 0.40).value   # forward, far
-        self.robot_y_min = self.declare_parameter("robot_y_min", -0.20).value  # lateral
-        self.robot_y_max = self.declare_parameter("robot_y_max", 0.20).value
+        self.robot_y_min = self.declare_parameter("robot_y_min", -0.40).value  # lateral (wider for left/right reach)
+        self.robot_y_max = self.declare_parameter("robot_y_max", 0.40).value
         self.robot_z_min = self.declare_parameter("robot_z_min", 0.10).value   # height (lowest reach)
         self.robot_z_max = self.declare_parameter("robot_z_max", 0.50).value
+        # Zone angle [deg]: rotates the reach/lateral mapping around base_link Z.
+        #   0   = front (+X reach)
+        #   90  = left  (+Y reach)
+        #  -90  = right (-Y reach)
+        #   180 = back  (-X reach)
+        self.workspace_angle = float(self.declare_parameter("workspace_angle", 0.0).value)
 
         # Forward reach (robot X) from hand depth. Two methods:
         #  - hand-size (default): apparent palm length in the image. Robust,
@@ -127,10 +134,17 @@ class OmnimanHandTeleop(Node):
             z_clamped = max(min(z_val, self.depth_far), self.depth_near)
             x_norm = (z_clamped - self.depth_near) / (self.depth_far - self.depth_near)
 
-        # Raw targets: reach -> X, horizontal -> Y, vertical (inverted) -> Z
+        # Direct mapping: hand depth -> X (forward), hand horizontal -> Y, hand height -> Z.
         rx = self.robot_x_min + x_norm * (self.robot_x_max - self.robot_x_min)
         ry = self.robot_y_min + cx * (self.robot_y_max - self.robot_y_min)
         rz = self.robot_z_min + (1.0 - cy) * (self.robot_z_max - self.robot_z_min)
+        # Zone rotation — uncomment to map the same gestures into left/right/back zones
+        # via workspace_angle (0=front, 90=left, -90=right, 180=back):
+        # r     = rx
+        # lat   = ry
+        # a_rad = math.radians(self.workspace_angle)
+        # rx    = r * math.cos(a_rad) - lat * math.sin(a_rad)
+        # ry    = r * math.sin(a_rad) + lat * math.cos(a_rad)
 
         # --- Exponential smoothing (tames jitter, esp. on depth) ---------
         a = self.pose_smoothing

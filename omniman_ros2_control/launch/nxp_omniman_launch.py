@@ -52,11 +52,11 @@ def generate_launch_description():
                     "autonomously to avoid competing /cmd_vel publishers.",
     )
 
-    use_servo_arg = DeclareLaunchArgument(
-        "use_servo",
-        default_value="true",
-        description="true -> JointGroupPositionController (for MoveIt Servo)."
-                    "false -> JointTrajectoryController",
+    use_trajectory_arg = DeclareLaunchArgument(
+        "use_trajectory",
+        default_value="false",
+        description="false -> JointGroupPositionController (for MoveIt Servo). "
+                    "true  -> JointTrajectoryController (for planned motion / PoseTracking trajectory mode).",
     )
 
     robot_description_content = Command(
@@ -112,14 +112,14 @@ def generate_launch_description():
         package="controller_manager",
         executable="spawner",
         arguments=["arm_controller", "--param-file", robot_controllers],
-        condition=UnlessCondition(LaunchConfiguration("use_servo")),
+        condition=IfCondition(LaunchConfiguration("use_trajectory")),
     )
 
     arm_group_position_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=["arm_group_position_controller", "--param-file", robot_controllers],
-        condition=IfCondition(LaunchConfiguration("use_servo")),
+        condition=UnlessCondition(LaunchConfiguration("use_trajectory")),
     )
 
     gripper_controller_spawner = Node(
@@ -210,7 +210,7 @@ def generate_launch_description():
             {"publish_robot_description_semantic": True,
              "publish_robot_description": True},
         ],
-        condition=UnlessCondition(LaunchConfiguration("use_servo")),
+        condition=IfCondition(LaunchConfiguration("use_trajectory")),
     )
 
     rplidar_node = Node(
@@ -245,7 +245,7 @@ def generate_launch_description():
             use_sim_arg,
             use_joy_arg,
             use_keyboard_arg,
-            use_servo_arg,
+            use_trajectory_arg,
             control_node,
             robot_state_publisher_node,
             joint_state_broadcaster_spawner,
