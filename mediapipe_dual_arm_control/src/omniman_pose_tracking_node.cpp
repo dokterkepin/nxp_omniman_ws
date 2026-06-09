@@ -34,6 +34,24 @@
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("omniman_pose_tracking_node");
 
+// Roll/pitch/yaw (degrees, in the planning frame) -> quaternion. Used to hold a
+// fixed EE orientation (e.g. gripper pointing down) for pick-and-place.
+static geometry_msgs::msg::Quaternion quaternionFromRPYDegrees(double roll_deg, double pitch_deg, double yaw_deg)
+{
+  const double r = roll_deg * M_PI / 180.0;
+  const double p = pitch_deg * M_PI / 180.0;
+  const double y = yaw_deg * M_PI / 180.0;
+  const double cr = std::cos(r * 0.5), sr = std::sin(r * 0.5);
+  const double cp = std::cos(p * 0.5), sp = std::sin(p * 0.5);
+  const double cy = std::cos(y * 0.5), sy = std::sin(y * 0.5);
+  geometry_msgs::msg::Quaternion q;
+  q.x = sr * cp * cy - cr * sp * sy;
+  q.y = cr * sp * cy + sr * cp * sy;
+  q.z = cr * cp * sy - sr * sp * cy;
+  q.w = cr * cp * cy + sr * sp * sy;
+  return q;
+}
+
 // Logs moveit_servo status whenever it changes.
 class StatusMonitor
 {
@@ -71,8 +89,16 @@ int main(int argc, char** argv)
   const double lin_tolerance = node->declare_parameter<double>("linear_tolerance", 0.01);     // [m]
   const double rot_tolerance = node->declare_parameter<double>("rotational_tolerance", 0.1);  // [rad]
   const double target_pose_timeout = node->declare_parameter<double>("target_pose_timeout", 0.5);  // [s] per moveToPose call
-  const double no_pose_timeout = node->declare_parameter<double>("no_pose_timeout", 1.0);     // [s] stop tracking if idle
+  const double no_pose_timeout = node->declare_parameter<double>("no_pose_timeout", 5.0);     // [s] stop tracking if idle
   const bool track_orientation = node->declare_parameter<bool>("track_orientation", false);
+  // Hold a FIXED EE orientation (position-only mode) instead of the arm's startup
+  // orientation. Set use_fixed_orientation:=true and tune roll/pitch/yaw (degrees,
+  // planning frame) in RViz -- e.g. fixed_pitch:=90 tends to point the gripper down
+  // for top-down pick-and-place. Default false keeps the old "hold startup pose".
+  const bool use_fixed_orientation = node->declare_parameter<bool>("use_fixed_orientation", false);
+  const double fixed_roll = node->declare_parameter<double>("fixed_roll", 0.0);    // [deg]
+  const double fixed_pitch = node->declare_parameter<double>("fixed_pitch", 0.0);  // [deg]
+  const double fixed_yaw = node->declare_parameter<double>("fixed_yaw", 0.0);      // [deg]
   // Generous safety box (planning frame, metres). The Python node already
   // clamps to the reachable workspace; this just rejects NaN / absurd targets.
   const double ws_xy_limit = node->declare_parameter<double>("workspace_xy_limit", 2.0);
@@ -132,12 +158,25 @@ int main(int argc, char** argv)
 
   const Eigen::Vector3d lin_tol{ lin_tolerance, lin_tolerance, lin_tolerance };
 
-  // Capture the current EE orientation so position-only mode can hold it.
-  geometry_msgs::msg::TransformStamped current_ee_tf;
-  tracker.getCommandFrameTransform(current_ee_tf);
-  const geometry_msgs::msg::Quaternion held_orientation = current_ee_tf.transform.rotation;
-  RCLCPP_INFO(LOGGER, "Holding EE orientation [x=%.3f y=%.3f z=%.3f w=%.3f] in position-only mode",
-              held_orientation.x, held_orientation.y, held_orientation.z, held_orientation.w);
+  // Orientation to hold in position-only mode: either a fixed user-specified one
+  // (good for top-down pick-and-place) or the arm's startup orientation.
+  geometry_msgs::msg::Quaternion held_orientation;
+  if (use_fixed_orientation)
+  {
+    held_orientation = quaternionFromRPYDegrees(fixed_roll, fixed_pitch, fixed_yaw);
+    RCLCPP_INFO(LOGGER, "Holding FIXED EE orientation RPY [%.1f, %.1f, %.1f] deg -> "
+                        "[x=%.3f y=%.3f z=%.3f w=%.3f]",
+                fixed_roll, fixed_pitch, fixed_yaw,
+                held_orientation.x, held_orientation.y, held_orientation.z, held_orientation.w);
+  }
+  else
+  {
+    geometry_msgs::msg::TransformStamped current_ee_tf;
+    tracker.getCommandFrameTransform(current_ee_tf);
+    held_orientation = current_ee_tf.transform.rotation;
+    RCLCPP_INFO(LOGGER, "Holding STARTUP EE orientation [x=%.3f y=%.3f z=%.3f w=%.3f] in position-only mode",
+                held_orientation.x, held_orientation.y, held_orientation.z, held_orientation.w);
+  }
 
   std::atomic<bool> tracking_active{ false };
   std::shared_ptr<std::thread> move_to_pose_thread;

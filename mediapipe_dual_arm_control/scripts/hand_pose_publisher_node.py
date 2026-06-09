@@ -54,9 +54,20 @@ class OmnimanHandTeleop(Node):
         self.robot_z_min = self.declare_parameter("robot_z_min", 0.25).value   # height
         self.robot_z_max = self.declare_parameter("robot_z_max", 0.50).value
 
-        # Hand-depth (MediaPipe relative z of middle-finger MCP) -> robot X.
+        # Forward reach (robot X) from hand depth. Two methods:
+        #  - hand-size (default): apparent palm length in the image. Robust,
+        #    monotonic: hand close to camera = bigger = reach forward.
+        #  - mediapipe-z (legacy): landmark[9].z. Noisy/unreliable on a mono cam.
+        self.use_hand_size_depth = self.declare_parameter("use_hand_size_depth", True).value
+        # Palm length (wrist->middle-MCP, normalised image coords) calibration.
+        # Hold your hand at the near/far extremes and read the on-screen "size=" to tune.
+        self.hand_size_min = self.declare_parameter("hand_size_min", 0.12).value  # hand far  -> X min
+        self.hand_size_max = self.declare_parameter("hand_size_max", 0.32).value  # hand close-> X max
+        # Legacy MediaPipe-z mapping (only used if use_hand_size_depth=False).
         self.depth_near = self.declare_parameter("depth_near", -0.15).value
         self.depth_far = self.declare_parameter("depth_far", 0.01).value
+        # Exponential smoothing on the output pose (0..1, lower = smoother/laggier).
+        self.pose_smoothing = self.declare_parameter("pose_smoothing", 0.3).value
 
         # Gripper limits (omniman left_finger_prismatic_joint: -0.010..0.019)
         self.gripper_open = self.declare_parameter("gripper_open_position", 0.019).value
@@ -85,6 +96,8 @@ class OmnimanHandTeleop(Node):
 
         self.frame_count = 0
         self._gripper_open_state = None   # None until first command
+        self._filt = None                 # EMA-smoothed [x, y, z]
+        self._hand_size = 0.0             # last apparent palm length (for HUD)
 
         self.timer = self.create_timer(0.02, self.timer_callback)  # 50 Hz
         self.get_logger().info(
@@ -95,21 +108,43 @@ class OmnimanHandTeleop(Node):
     # ---------------------------------------------------------------------
     def publish_arm_pose(self, hand_landmarks, w, h):
         """Map the right hand to a target EE pose and publish it."""
-        cx, cy, _roll = get_hand_pose_from_landmarks(hand_landmarks.landmark, w, h)
+        lm = hand_landmarks.landmark
+        cx, cy, _roll = get_hand_pose_from_landmarks(lm, w, h)
 
-        # Depth from middle-finger MCP z (wrist z is always ~0 in MediaPipe).
-        z_val = hand_landmarks.landmark[9].z
-        z_clamped = max(min(z_val, self.depth_far), self.depth_near)
-        z_norm = (z_clamped - self.depth_near) / (self.depth_far - self.depth_near)
+        # --- Forward reach (robot X) -------------------------------------
+        if self.use_hand_size_depth:
+            # Apparent palm length: wrist(0) -> middle-finger MCP(9), normalised
+            # image coords. Stable, monotonic depth cue (closer hand = bigger).
+            wrist, mid_mcp = lm[0], lm[9]
+            self._hand_size = ((mid_mcp.x - wrist.x) ** 2 + (mid_mcp.y - wrist.y) ** 2) ** 0.5
+            s = max(min(self._hand_size, self.hand_size_max), self.hand_size_min)
+            x_norm = (s - self.hand_size_min) / (self.hand_size_max - self.hand_size_min)
+        else:
+            z_val = lm[9].z   # legacy: noisy MediaPipe per-landmark z
+            z_clamped = max(min(z_val, self.depth_far), self.depth_near)
+            x_norm = (z_clamped - self.depth_near) / (self.depth_far - self.depth_near)
+
+        # Raw targets: reach -> X, horizontal -> Y, vertical (inverted) -> Z
+        rx = self.robot_x_min + x_norm * (self.robot_x_max - self.robot_x_min)
+        ry = self.robot_y_min + cx * (self.robot_y_max - self.robot_y_min)
+        rz = self.robot_z_min + (1.0 - cy) * (self.robot_z_max - self.robot_z_min)
+
+        # --- Exponential smoothing (tames jitter, esp. on depth) ---------
+        a = self.pose_smoothing
+        if self._filt is None:
+            self._filt = [rx, ry, rz]
+        else:
+            self._filt[0] += a * (rx - self._filt[0])
+            self._filt[1] += a * (ry - self._filt[1])
+            self._filt[2] += a * (rz - self._filt[2])
+        fx, fy, fz = self._filt
 
         pose = PoseStamped()
         pose.header.stamp = self.get_clock().now().to_msg()
         pose.header.frame_id = self.planning_frame
-
-        # depth -> X (forward), horizontal -> Y, vertical (inverted) -> Z
-        pose.pose.position.x = self.robot_x_min + z_norm * (self.robot_x_max - self.robot_x_min)
-        pose.pose.position.y = self.robot_y_min + cx * (self.robot_y_max - self.robot_y_min)
-        pose.pose.position.z = self.robot_z_min + (1.0 - cy) * (self.robot_z_max - self.robot_z_min)
+        pose.pose.position.x = fx
+        pose.pose.position.y = fy
+        pose.pose.position.z = fz
 
         # Orientation is ignored by the C++ node in position-only mode; send
         # identity so the message is well-formed.
@@ -172,6 +207,10 @@ class OmnimanHandTeleop(Node):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
                 cv2.putText(frame, f"Fingers:{fingers_up} | {'OPEN' if want_open else 'CLOSE'}",
                             (10, 78), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                if self.use_hand_size_depth:
+                    cv2.putText(frame, f"size:{self._hand_size:.3f} "
+                                       f"(min {self.hand_size_min:.2f}/max {self.hand_size_max:.2f})",
+                                (10, 101), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
             if self.frame_count % 30 == 0:
                 self.get_logger().info(
                     f"Pose [{pose.pose.position.x:.2f}, {pose.pose.position.y:.2f}, "

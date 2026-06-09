@@ -39,6 +39,10 @@ def launch_setup(context, *args, **kwargs):
     camera_device = int(LaunchConfiguration("camera_device").perform(context))
     track_orientation = LaunchConfiguration("track_orientation").perform(context).lower() == "true"
     show_window = LaunchConfiguration("show_window").perform(context).lower() == "true"
+    use_fixed_orientation = LaunchConfiguration("use_fixed_orientation").perform(context).lower() == "true"
+    fixed_roll = float(LaunchConfiguration("fixed_roll").perform(context))
+    fixed_pitch = float(LaunchConfiguration("fixed_pitch").perform(context))
+    fixed_yaw = float(LaunchConfiguration("fixed_yaw").perform(context))
 
     moveit_config = (
         MoveItConfigsBuilder("nxp_omniman", package_name="moveit_config")
@@ -95,7 +99,13 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             moveit_config.to_dict(),
             servo_params,
-            {"track_orientation": track_orientation},
+            {
+                "track_orientation": track_orientation,
+                "use_fixed_orientation": use_fixed_orientation,
+                "fixed_roll": fixed_roll,
+                "fixed_pitch": fixed_pitch,
+                "fixed_yaw": fixed_yaw,
+            },
         ],
     )
 
@@ -145,6 +155,10 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("camera_device", default_value="2"),
             DeclareLaunchArgument("track_orientation", default_value="false"),
+            DeclareLaunchArgument("use_fixed_orientation", default_value="false"),
+            DeclareLaunchArgument("fixed_roll", default_value="0.0"),
+            DeclareLaunchArgument("fixed_pitch", default_value="0.0"),
+            DeclareLaunchArgument("fixed_yaw", default_value="0.0"),
             DeclareLaunchArgument("show_window", default_value="true"),
             DeclareLaunchArgument("start_mediapipe", default_value="true"),
             DeclareLaunchArgument("start_rviz", default_value="true"),
