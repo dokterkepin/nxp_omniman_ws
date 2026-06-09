@@ -38,3 +38,4 @@ build
 **/pycache/
 **/__pycache__/
 *.pyc
+.kiro

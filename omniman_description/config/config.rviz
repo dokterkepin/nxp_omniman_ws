@@ -7,7 +7,6 @@ Panels:
         - /Global Options1
         - /Status1
         - /TF1
-        - /TF1/Frames1
       Splitter Ratio: 0.5
     Tree Height: 1787
   - Class: rviz_common/Selection
@@ -143,31 +142,33 @@ Visualization Manager:
         Rear_right_roller_link9:
           Value: false
         arm_link:
-          Value: false
+          Value: true
         base_footprint:
           Value: false
         base_link:
           Value: false
         camera_link:
           Value: false
+        camera_optical_frame:
+          Value: true
         ee_link:
           Value: true
         forearm_link:
-          Value: false
+          Value: true
         left_finger_link:
           Value: false
         lidar_link:
           Value: false
         palm_link:
-          Value: false
+          Value: true
         right_finger_link:
           Value: false
         shoulder_link:
-          Value: false
+          Value: true
         upper_shoulder_link:
-          Value: false
+          Value: true
         wrist_link:
-          Value: false
+          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
@@ -265,7 +266,8 @@ Visualization Manager:
                     wrist_link:
                       palm_link:
                         camera_link:
-                          {}
+                          camera_optical_frame:
+                            {}
                         ee_link:
                           {}
                         left_finger_link:
@@ -531,6 +533,10 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
+        camera_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
         ee_link:
           Alpha: 1
           Show Axes: false
@@ -629,7 +635,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 0.9534447193145752
+      Distance: 1.3395211696624756
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -644,10 +650,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.08979705721139908
+      Pitch: 0.49979689717292786
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 6.24860954284668
+      Yaw: 5.038606643676758
     Saved: ~
 Window Geometry:
   Displays:

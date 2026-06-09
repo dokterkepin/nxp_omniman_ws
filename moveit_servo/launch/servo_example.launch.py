@@ -112,7 +112,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
-        rviz_node,
+        # rviz_node,
         servo_node,
         joy_node,
         joy_to_gripper_node,

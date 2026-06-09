@@ -1473,6 +1473,12 @@
     </link>
     
     <!-- ==================== Camera =================== -->
+    <joint name="camera_fixed_joint" type="fixed">
+        <parent link="palm_link" />
+        <child link="camera_link" />
+        <origin xyz="0.008 -0.021 0.006" rpy="0 0 0" />
+    </joint>
+    
     <link name="camera_link">
         <visual>
             <geometry>
@@ -1494,11 +1500,13 @@
         </inertial>
     </link>
 
-    <joint name="camera_fixed_joint" type="fixed">
-        <parent link="palm_link" />
-        <child link="camera_link" />
-        <origin xyz="0.008 -0.021 0.006" rpy="0 0 0" />
+    <joint name="camera_optical_fixed_joint" type="fixed">
+        <parent link="camera_link" />
+        <child link="camera_optical_frame" />
+        <origin xyz="-0.071 0.021 0.059" rpy="0 0 -1.5707963" />
     </joint>
+    
+    <link name="camera_optical_frame" />
 
     <joint name="left_finger_prismatic_joint" type="prismatic">
         <parent link="palm_link" />

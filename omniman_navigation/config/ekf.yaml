@@ -26,3 +26,4 @@ ekf_filter_node:
                    false, false, true,
                    false, false, false]
     odom1_differential: true
+    odom1_relative: true

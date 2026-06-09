@@ -7,12 +7,12 @@ from sensor_msgs.msg import Joy
 from control_msgs.action import GripperCommand
 
 # Bluetooth
-# LEFT_STICK_CLICK = 13
-# RIGHT_STICK_CLICK = 14
+LEFT_STICK_CLICK = 13
+RIGHT_STICK_CLICK = 14
 
 # USB
-LEFT_STICK_CLICK = 9
-RIGHT_STICK_CLICK = 10
+# LEFT_STICK_CLICK = 9
+# RIGHT_STICK_CLICK = 10
 
 OPEN_LIMIT = 0.019
 CLOSE_LIMIT = -0.010
