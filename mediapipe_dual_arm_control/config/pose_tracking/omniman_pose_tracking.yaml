@@ -1,0 +1,57 @@
+###############################################################################
+# MoveIt Servo PoseTracking config for the omniman single 6-DOF arm.
+# Frame / group / topic names mirror the known-good values from
+# moveit_servo/config/panda_simulated_config.yaml (the working joystick teleop).
+###############################################################################
+use_gazebo: false
+
+## Properties of incoming (internally generated) twist commands
+command_in_type: "speed_units"   # PoseTracking PID outputs m/s and rad/s
+scale:
+  linear:  0.4   # Max linear EE velocity [m/s] (small arm -> keep modest)
+  rotational:  0.5  # Max angular EE velocity [rad/s]
+  joint: 0.01
+
+## Properties of outgoing commands
+publish_period: 0.034   # ~30 Hz
+command_out_type: trajectory_msgs/JointTrajectory
+publish_joint_positions: true
+publish_joint_velocities: true
+publish_joint_accelerations: false
+
+## Smoothing
+smoothing_filter_plugin_name: "online_signal_smoothing::ButterworthFilterPlugin"
+
+# This servo node is the only planning-scene source when running without move_group.
+is_primary_planning_scene_monitor: true
+
+## MoveIt properties (omniman arm)
+move_group_name: arm
+planning_frame: base_link
+
+## Other frames
+ee_frame_name: ee_link
+robot_link_command_frame: ee_link   # PoseTracking commands the EE frame
+
+## Stopping behaviour
+incoming_command_timeout: 0.1
+num_outgoing_halt_msgs_to_publish: 4
+
+## Singularity / joint-limit handling
+lower_singularity_threshold: 17.0
+hard_stop_singularity_threshold: 30.0
+joint_limit_margin: 0.1
+leaving_singularity_threshold_multiplier: 2.0
+
+## Topic names
+cartesian_command_in_topic: ~/delta_twist_cmds
+joint_command_in_topic: ~/delta_joint_cmds
+joint_topic: /joint_states
+status_topic: ~/status
+command_out_topic: /arm_controller/joint_trajectory   # omniman JointTrajectoryController
+
+## Collision checking
+check_collisions: true
+collision_check_rate: 10.0
+self_collision_proximity_threshold: 0.01
+scene_collision_proximity_threshold: 0.02

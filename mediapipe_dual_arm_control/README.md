@@ -1,4 +1,61 @@
-# 🤖 Dual-Arm Teleoperation with MediaPipe Hand Pose Tracking
+# 🦾 Omniman single-arm adaptation
+
+> This fork has been adapted from the original **dual-arm Panda** demo (below) to
+> drive the **single 6-DOF omniman arm** with one hand. It reuses the omniman
+> `moveit_config` (URDF/SRDF/kinematics) and the `moveit_servo` `PoseTracking`
+> interface that are already in this workspace.
+
+**What changed vs. the original**
+
+| | Original | Omniman |
+|---|---|---|
+| Arms | 2 (left/right Panda) | 1 (`arm` group, `ee_link`) |
+| Hand | both hands | **right hand only** |
+| Planning frame | `world`/`panda_link0` | `base_link` |
+| Arm command out | `*_arm_controller` | `/arm_controller/joint_trajectory` |
+| Gripper | `JointTrajectory` | **`GripperCommand` action** (`/gripper_controller/gripper_cmd`) |
+| Camera | `/dev/video0` | `/dev/video2` (C920) — `camera_device` param |
+| Orientation | mapped from hand | **position-only by default** (6-DOF arm has no null space) |
+
+**Files:** `src/omniman_pose_tracking_node.cpp`,
+`scripts/hand_pose_publisher_node.py`,
+`config/pose_tracking/omniman_pose_tracking.yaml`,
+`launch/omniman_hand_teleop.launch.py`.
+
+### Run it (real hardware)
+
+The launch file starts **only** the servo + MediaPipe nodes. Bring up the robot
+first, in **servo mode** — `arm_controller` (JointTrajectoryController) and
+`gripper_controller` active, publishing `/joint_states`, and **no `move_group`
+running** (the servo node owns the planning scene).
+
+```bash
+# Terminal 1 — your robot bringup in servo mode (controllers + /joint_states up)
+#   e.g. ros2 launch omniman_ros2_control nxp_omniman_launch.py use_servo:=true
+
+# Terminal 2 — build + launch hand teleop
+cd ~/workspaces/nxp_omniman_ws
+colcon build --packages-select mediapipe_dual_arm_control
+source install/setup.bash
+pip3 install -r src/mediapipe_dual_arm_control/requirements.txt   # first time only
+ros2 launch mediapipe_dual_arm_control omniman_hand_teleop.launch.py camera_device:=2
+```
+
+Show your **right hand** to the camera: hand position moves the EE, raise **2+
+fingers to OPEN** the gripper (fewer to close). Press `q` in the camera window to quit.
+
+**Tuning** (no rebuild needed — all ROS params):
+- Workspace box: `robot_x_min/max`, `robot_y_min/max`, `robot_z_min/max` on `hand_pose_publisher_node`.
+- Hand depth → X mapping: `depth_near`, `depth_far`.
+- Gripper travel: `gripper_open_position` (0.019), `gripper_close_position` (-0.010).
+- Enable hand-orientation tracking: `ros2 launch ... track_orientation:=true` (expect EE-position drift on this arm).
+
+> ⚠️ The defaults assume the omniman arm starts in a raised pose (e.g. the SRDF
+> `ready` state). Start with small hand motions near the centre of the box.
+
+---
+
+# 🤖 Dual-Arm Teleoperation with MediaPipe Hand Pose Tracking (original)
 Control two robotic arms using your hands! This project combines [MediaPipe](https://github.com/google-ai-edge/mediapipe) hand tracking with [MoveIt Servo](https://moveit.ai/moveit/ros2/servo/jog/2020/09/09/moveit2-servo.html) for smooth, intuitive dual-arm panda robot control.
 
 ## 🎬 Demo Video
