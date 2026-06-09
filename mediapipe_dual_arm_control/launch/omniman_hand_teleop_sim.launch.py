@@ -153,7 +153,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("camera_device", default_value="2"),
+            DeclareLaunchArgument("camera_device", default_value="1"),
             DeclareLaunchArgument("track_orientation", default_value="false"),
             DeclareLaunchArgument("use_fixed_orientation", default_value="false"),
             DeclareLaunchArgument("fixed_roll", default_value="0.0"),

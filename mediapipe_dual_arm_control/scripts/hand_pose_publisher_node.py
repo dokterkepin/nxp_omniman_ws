@@ -41,7 +41,7 @@ class OmnimanHandTeleop(Node):
         super().__init__("hand_pose_publisher_node")
 
         # ---- Parameters --------------------------------------------------
-        self.camera_device = self.declare_parameter("camera_device", 2).value          # /dev/video2 (C920)
+        self.camera_device = int(self.declare_parameter("camera_device", 0).value)       # /dev/video0 (C920)
         self.planning_frame = self.declare_parameter("planning_frame", "base_link").value
         self.gripper_action = self.declare_parameter(
             "gripper_action", "/gripper_controller/gripper_cmd").value
@@ -51,7 +51,7 @@ class OmnimanHandTeleop(Node):
         self.robot_x_max = self.declare_parameter("robot_x_max", 0.40).value   # forward, far
         self.robot_y_min = self.declare_parameter("robot_y_min", -0.20).value  # lateral
         self.robot_y_max = self.declare_parameter("robot_y_max", 0.20).value
-        self.robot_z_min = self.declare_parameter("robot_z_min", 0.25).value   # height
+        self.robot_z_min = self.declare_parameter("robot_z_min", 0.10).value   # height (lowest reach)
         self.robot_z_max = self.declare_parameter("robot_z_max", 0.50).value
 
         # Forward reach (robot X) from hand depth. Two methods:
@@ -61,8 +61,11 @@ class OmnimanHandTeleop(Node):
         self.use_hand_size_depth = self.declare_parameter("use_hand_size_depth", True).value
         # Palm length (wrist->middle-MCP, normalised image coords) calibration.
         # Hold your hand at the near/far extremes and read the on-screen "size=" to tune.
-        self.hand_size_min = self.declare_parameter("hand_size_min", 0.12).value  # hand far  -> X min
-        self.hand_size_max = self.declare_parameter("hand_size_max", 0.32).value  # hand close-> X max
+        self.hand_size_min = self.declare_parameter("hand_size_min", 0.05).value  # hand far  -> X min
+        # hand close-> X max. Keep this comfortably BELOW a screen-filling palm so
+        # full forward reach is hit while the hand is still well inside the frame
+        # (room left for X/Y). Read the on-screen "size=" HUD to recalibrate.
+        self.hand_size_max = self.declare_parameter("hand_size_max", 0.24).value
         # Legacy MediaPipe-z mapping (only used if use_hand_size_depth=False).
         self.depth_near = self.declare_parameter("depth_near", -0.15).value
         self.depth_far = self.declare_parameter("depth_far", 0.01).value
