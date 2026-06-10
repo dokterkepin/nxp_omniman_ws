@@ -84,8 +84,9 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        DeclareLaunchArgument("camera_device",   default_value="4",
-                              description="Webcam index (0 -> /dev/video4, C920)"),
+        DeclareLaunchArgument("camera_device",   default_value="2",
+                              description="Webcam index (2 -> /dev/video2, C920; "
+                                          "check with v4l2-ctl --list-devices)"),
         DeclareLaunchArgument("use_trajectory",  default_value="false",
                               description="false -> JGPC (arm_group_position_controller). "
                                           "true  -> JTC  (arm_controller). "

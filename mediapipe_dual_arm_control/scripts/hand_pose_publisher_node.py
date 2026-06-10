@@ -24,12 +24,22 @@ appended to a CSV in `record_dir` (default: this package's dataset/) with both t
 mapped position (rx,ry,rz -- pre-smoothing) and the EMA output (fx,fy,fz). The
 robot does NOT need to be running. Train with
 notebooks/train_lstm_hand_trajectory.ipynb.
+
+LSTM trajectory predictor (the model trained by that notebook): when `use_lstm`
+is true (default) and the exported files exist in `model_dir`, the published
+target is the LSTM's ~100 ms-ahead predicted position instead of the lagging
+EMA. Press 'm' to toggle LSTM/EMA live (A/B comparison on the robot). The EMA
+remains the fallback while the input window fills (~0.5 s after the hand
+appears) or if the model cannot be loaded.
 """
 # import math  # needed when workspace_angle zone rotation is re-enabled
 import csv
+import json
 import os
 import time
+from collections import deque
 
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -108,6 +118,15 @@ class OmnimanHandTeleop(Node):
                 "~/workspaces/nxp_omniman_ws/src/mediapipe_dual_arm_control/dataset",
             ).value)
 
+        # LSTM trajectory predictor (exported by the training notebook).
+        # 'm' key toggles LSTM/EMA live for A/B comparison.
+        self.use_lstm = self.declare_parameter("use_lstm", True).value
+        self.model_dir = os.path.expanduser(
+            self.declare_parameter(
+                "model_dir",
+                "~/workspaces/nxp_omniman_ws/src/mediapipe_dual_arm_control/models",
+            ).value)
+
         # ---- ROS interfaces ---------------------------------------------
         self.pose_pub = self.create_publisher(PoseStamped, "/hand_target_pose", 10)
         self.named_pose_pub = self.create_publisher(String, "/arm_named_pose", 10)
@@ -140,6 +159,9 @@ class OmnimanHandTeleop(Node):
         self._rec_count = 0
         self._rec_segment = 0
         self._rec_hand_lost = False
+
+        self._pred_src = "EMA"            # what the last published target came from (HUD)
+        self._load_lstm()
 
         self.timer = self.create_timer(0.02, self.timer_callback)  # 50 Hz
         self.get_logger().info(
@@ -184,6 +206,52 @@ class OmnimanHandTeleop(Node):
         self._rec_count += 1
 
     # ---------------------------------------------------------------------
+    def _load_lstm(self):
+        """Load the TorchScript trajectory predictor exported by the notebook.
+        On any failure the node simply keeps using the EMA."""
+        self.lstm = None
+        self.lstm_active = False
+        if not self.use_lstm:
+            return
+        try:
+            import torch
+            with open(os.path.join(self.model_dir, "lstm_hand_traj.json")) as f:
+                meta = json.load(f)
+            torch.set_num_threads(1)   # tiny model; don't fight the camera loop
+            self.lstm = torch.jit.load(
+                os.path.join(self.model_dir, "lstm_hand_traj.torchscript.pt"),
+                map_location="cpu")
+            self.lstm.eval()
+            self._torch = torch
+            # model i/o is z-normalized displacement relative to the window's last frame
+            self.lstm_mean = np.array(meta["input_mean"], dtype=np.float32)
+            self.lstm_std = np.array(meta["input_std"], dtype=np.float32)
+            self._raw_buf = deque(maxlen=int(meta["seq_len"]))
+            with torch.no_grad():   # JIT warm-up: the first few calls are slow
+                for _ in range(5):
+                    self.lstm(torch.zeros(1, int(meta["seq_len"]), 3))
+            self.lstm_active = True
+            self.get_logger().info(
+                f"LSTM predictor loaded: {meta['seq_len']}-frame window, "
+                f"+{meta.get('lead_ms', '?')} ms lead, test MAE "
+                f"{meta.get('test_mae_mm', '?')} mm. Press 'm' to toggle LSTM/EMA.")
+        except Exception as e:
+            self.lstm = None
+            self.get_logger().warn(f"LSTM predictor unavailable ({e}); using EMA smoothing.")
+
+    def lstm_predict(self, rx, ry, rz):
+        """Push the raw position into the window and return the predicted
+        position ~100 ms ahead, or None while the window is still filling."""
+        self._raw_buf.append((rx, ry, rz))
+        if len(self._raw_buf) < self._raw_buf.maxlen:
+            return None
+        win = np.asarray(self._raw_buf, dtype=np.float32)
+        x = (win - win[-1] - self.lstm_mean) / self.lstm_std
+        with self._torch.no_grad():
+            out = self.lstm(self._torch.from_numpy(x).unsqueeze(0))[0].numpy()
+        return win[-1] + out * self.lstm_std + self.lstm_mean
+
+    # ---------------------------------------------------------------------
     def publish_arm_pose(self, hand_landmarks, w, h):
         """Map the right hand to a target EE pose and publish it."""
         lm = hand_landmarks.landmark
@@ -218,12 +286,29 @@ class OmnimanHandTeleop(Node):
 
         self.record_sample(rx, ry, rz, fx, fy, fz)
 
+        # --- Published target: LSTM prediction (~100 ms lead) or the EMA --
+        tx, ty, tz = fx, fy, fz
+        self._pred_src = "EMA"
+        if self.lstm is not None:
+            try:
+                p = self.lstm_predict(rx, ry, rz)
+            except Exception as e:
+                self.get_logger().error(f"LSTM inference failed ({e}); reverting to EMA.")
+                self.lstm = None
+                p = None
+            if p is not None and self.lstm_active:
+                # never command outside the workspace box
+                tx = min(max(float(p[0]), self.robot_x_min), self.robot_x_max)
+                ty = min(max(float(p[1]), self.robot_y_min), self.robot_y_max)
+                tz = min(max(float(p[2]), self.robot_z_min), self.robot_z_max)
+                self._pred_src = "LSTM"
+
         pose = PoseStamped()
         pose.header.stamp = self.get_clock().now().to_msg()
         pose.header.frame_id = self.planning_frame
-        pose.pose.position.x = fx
-        pose.pose.position.y = fy
-        pose.pose.position.z = fz
+        pose.pose.position.x = tx
+        pose.pose.position.y = ty
+        pose.pose.position.z = tz
 
         # Orientation is ignored by the C++ node in position-only mode; send
         # identity so the message is well-formed.
@@ -297,8 +382,8 @@ class OmnimanHandTeleop(Node):
             self.command_gripper(want_open)
 
             if self.show_window:
-                cv2.putText(frame, "RIGHT HAND (controlling arm)", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                cv2.putText(frame, f"RIGHT HAND (controlling arm) [{self._pred_src}]",
+                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
                 cv2.putText(frame, f"X:{pose.pose.position.x:.2f} Y:{pose.pose.position.y:.2f} "
                                    f"Z:{pose.pose.position.z:.2f}", (10, 55),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
@@ -315,6 +400,8 @@ class OmnimanHandTeleop(Node):
                     f"gripper={'OPEN' if want_open else 'CLOSE'}")
         else:
             self._rec_hand_lost = True   # break the recording segment at gaps
+            if self.lstm is not None:
+                self._raw_buf.clear()    # never predict across a tracking gap
             if self.show_window:
                 cv2.putText(frame, "Show your RIGHT hand", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
@@ -327,7 +414,7 @@ class OmnimanHandTeleop(Node):
 
         if self.show_window:
             cv2.putText(frame, f"{self.open_finger_count}+ fingers = OPEN, fewer = CLOSE | "
-                               f"'r' rec | 'q' quits",
+                               f"'m' LSTM/EMA | 'r' rec | 'q' quits",
                         (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             if self._rec_file is not None:
                 cv2.circle(frame, (w - 160, 25), 8, (0, 0, 255), -1)
@@ -339,6 +426,10 @@ class OmnimanHandTeleop(Node):
                 rclpy.shutdown()
             elif key == ord("r"):
                 self.toggle_recording()
+            elif key == ord("m") and self.lstm is not None:
+                self.lstm_active = not self.lstm_active
+                self.get_logger().info(
+                    f"Predictor -> {'LSTM' if self.lstm_active else 'EMA'}")
 
     def destroy_node(self):
         if self._rec_file is not None:
