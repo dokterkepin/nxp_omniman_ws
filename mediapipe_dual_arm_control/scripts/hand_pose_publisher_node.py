@@ -17,8 +17,19 @@ Adapted from the dual-arm demo for a single arm + a GripperActionController.
 All workspace / camera / gripper values are ROS parameters so you can tune them
 live (ros2 param set) without rebuilding.  Defaults are sized for the compact
 omniman arm (~0.45 m reach); tune them to your robot.
+
+Dataset recording (for the LSTM trajectory-prediction project): press 'r' in the
+OpenCV window to start/stop recording. Each frame with a tracked right hand is
+appended to a CSV in `record_dir` (default: this package's dataset/) with both the RAW
+mapped position (rx,ry,rz -- pre-smoothing) and the EMA output (fx,fy,fz). The
+robot does NOT need to be running. Train with
+notebooks/train_lstm_hand_trajectory.ipynb.
 """
 # import math  # needed when workspace_angle zone rotation is re-enabled
+import csv
+import os
+import time
+
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -43,7 +54,7 @@ class OmnimanHandTeleop(Node):
         super().__init__("hand_pose_publisher_node")
 
         # ---- Parameters --------------------------------------------------
-        self.camera_device = int(self.declare_parameter("camera_device", 4).value)      
+        self.camera_device = int(self.declare_parameter("camera_device", 2).value)      
         self.planning_frame = self.declare_parameter("planning_frame", "base_link").value
         self.gripper_action = self.declare_parameter(
             "gripper_action", "/gripper_controller/gripper_cmd").value
@@ -89,6 +100,14 @@ class OmnimanHandTeleop(Node):
 
         self.show_window = self.declare_parameter("show_window", True).value
 
+        # Trajectory dataset recording ('r' key). CSVs land here; the LSTM
+        # training notebook reads the same directory.
+        self.record_dir = os.path.expanduser(
+            self.declare_parameter(
+                "record_dir",
+                "~/workspaces/nxp_omniman_ws/src/mediapipe_dual_arm_control/dataset",
+            ).value)
+
         # ---- ROS interfaces ---------------------------------------------
         self.pose_pub = self.create_publisher(PoseStamped, "/hand_target_pose", 10)
         self.named_pose_pub = self.create_publisher(String, "/arm_named_pose", 10)
@@ -113,11 +132,56 @@ class OmnimanHandTeleop(Node):
         self._hand_size = 0.0             # last apparent palm length (for HUD)
         self._reset_sent = False          # latch: left-hand reset fires once per gesture
 
+        # Recording state. A "segment" is an unbroken run of tracked frames;
+        # it increments whenever the hand is lost so the training notebook
+        # never builds an LSTM window across a tracking gap.
+        self._rec_file = None
+        self._rec_writer = None
+        self._rec_count = 0
+        self._rec_segment = 0
+        self._rec_hand_lost = False
+
         self.timer = self.create_timer(0.02, self.timer_callback)  # 50 Hz
         self.get_logger().info(
             f"Omniman hand teleop started. Camera=/dev/video{self.camera_device}, "
             f"controlling with the {CONTROL_HAND.upper()} hand. "
             f"Raise {self.open_finger_count}+ fingers = OPEN gripper.")
+
+    # ---------------------------------------------------------------------
+    def toggle_recording(self):
+        """'r' key: start/stop appending hand positions to a timestamped CSV."""
+        if self._rec_file is None:
+            os.makedirs(self.record_dir, exist_ok=True)
+            path = os.path.join(self.record_dir,
+                                time.strftime("hand_traj_%Y%m%d_%H%M%S.csv"))
+            self._rec_file = open(path, "w", newline="")
+            self._rec_writer = csv.writer(self._rec_file)
+            self._rec_writer.writerow(["t", "seg", "rx", "ry", "rz", "fx", "fy", "fz"])
+            self._rec_count = 0
+            self._rec_segment = 0
+            self._rec_hand_lost = False
+            self.get_logger().info(f"RECORDING hand trajectory -> {path}")
+        else:
+            path = self._rec_file.name
+            self._rec_file.close()
+            self._rec_file = None
+            self._rec_writer = None
+            self.get_logger().info(
+                f"Recording stopped: {self._rec_count} samples, "
+                f"{self._rec_segment + 1} segment(s) -> {path}")
+
+    def record_sample(self, rx, ry, rz, fx, fy, fz):
+        """Append one frame: raw mapped position + the node's EMA output."""
+        if self._rec_writer is None:
+            return
+        if self._rec_hand_lost:
+            self._rec_segment += 1
+            self._rec_hand_lost = False
+        self._rec_writer.writerow(
+            [f"{time.monotonic():.4f}", self._rec_segment,
+             f"{rx:.5f}", f"{ry:.5f}", f"{rz:.5f}",
+             f"{fx:.5f}", f"{fy:.5f}", f"{fz:.5f}"])
+        self._rec_count += 1
 
     # ---------------------------------------------------------------------
     def publish_arm_pose(self, hand_landmarks, w, h):
@@ -151,6 +215,8 @@ class OmnimanHandTeleop(Node):
             self._filt[1] += a * (ry - self._filt[1])
             self._filt[2] += a * (rz - self._filt[2])
         fx, fy, fz = self._filt
+
+        self.record_sample(rx, ry, rz, fx, fy, fz)
 
         pose = PoseStamped()
         pose.header.stamp = self.get_clock().now().to_msg()
@@ -247,9 +313,11 @@ class OmnimanHandTeleop(Node):
                     f"Pose [{pose.pose.position.x:.2f}, {pose.pose.position.y:.2f}, "
                     f"{pose.pose.position.z:.2f}]  fingers={fingers_up}  "
                     f"gripper={'OPEN' if want_open else 'CLOSE'}")
-        elif self.show_window:
-            cv2.putText(frame, "Show your RIGHT hand", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        else:
+            self._rec_hand_lost = True   # break the recording segment at gaps
+            if self.show_window:
+                cv2.putText(frame, "Show your RIGHT hand", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
         # LEFT hand: open palm resets the arm to the "ready" SRDF pose.
         lfingers = self.command_named_pose(left_hand)
@@ -258,13 +326,23 @@ class OmnimanHandTeleop(Node):
                         (10, 124), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 200, 0), 1)
 
         if self.show_window:
-            cv2.putText(frame, f"{self.open_finger_count}+ fingers = OPEN, fewer = CLOSE | 'q' quits",
+            cv2.putText(frame, f"{self.open_finger_count}+ fingers = OPEN, fewer = CLOSE | "
+                               f"'r' rec | 'q' quits",
                         (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            if self._rec_file is not None:
+                cv2.circle(frame, (w - 160, 25), 8, (0, 0, 255), -1)
+                cv2.putText(frame, f"REC {self._rec_count}", (w - 145, 32),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
             cv2.imshow("Omniman Hand Teleop", frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord("q"):
                 rclpy.shutdown()
+            elif key == ord("r"):
+                self.toggle_recording()
 
     def destroy_node(self):
+        if self._rec_file is not None:
+            self.toggle_recording()   # flush + close the CSV
         self.cap.release()
         cv2.destroyAllWindows()
         super().destroy_node()
