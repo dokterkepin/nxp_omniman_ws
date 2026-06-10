@@ -10,15 +10,9 @@ from launch_param_builder import ParameterBuilder
 
 
 def launch_setup(context, *args, **kwargs):
-    use_trajectory       = LaunchConfiguration("use_trajectory").perform(context).lower() == "true"
-    track_orientation    = LaunchConfiguration("track_orientation").perform(context).lower() == "true"
-    use_fixed_orientation = LaunchConfiguration("use_fixed_orientation").perform(context).lower() == "true"
-    fixed_roll           = float(LaunchConfiguration("fixed_roll").perform(context))
-    fixed_pitch          = float(LaunchConfiguration("fixed_pitch").perform(context))
-    fixed_yaw            = float(LaunchConfiguration("fixed_yaw").perform(context))
-    camera_device        = int(LaunchConfiguration("camera_device").perform(context))
-    show_window          = LaunchConfiguration("show_window").perform(context).lower() == "true"
-    workspace_angle      = float(LaunchConfiguration("workspace_angle").perform(context))
+    use_trajectory = LaunchConfiguration("use_trajectory").perform(context).lower() == "true"
+    camera_device  = int(LaunchConfiguration("camera_device").perform(context))
+    show_window   = LaunchConfiguration("show_window").perform(context).lower() == "true"
 
     pkg_share  = get_package_share_directory("mediapipe_dual_arm_control")
     config_dir = os.path.join(pkg_share, "config", "pose_tracking")
@@ -56,13 +50,6 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             moveit_config.to_dict(),
             servo_params,
-            {
-                "track_orientation":     track_orientation,
-                "use_fixed_orientation": use_fixed_orientation,
-                "fixed_roll":            fixed_roll,
-                "fixed_pitch":           fixed_pitch,
-                "fixed_yaw":             fixed_yaw,
-            },
         ],
     )
 
@@ -86,10 +73,9 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         condition=IfCondition(LaunchConfiguration("start_mediapipe")),
         parameters=[{
-            "camera_device":   camera_device,
-            "show_window":     show_window,
-            "planning_frame":  "base_link",
-            "workspace_angle": workspace_angle,
+            "camera_device":  camera_device,
+            "show_window":    show_window,
+            "planning_frame": "base_link",
         }],
     )
 
@@ -98,19 +84,12 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        DeclareLaunchArgument("camera_device",   default_value="0",
-                              description="Webcam index (0 -> /dev/video0, C920)"),
+        DeclareLaunchArgument("camera_device",   default_value="4",
+                              description="Webcam index (0 -> /dev/video4, C920)"),
         DeclareLaunchArgument("use_trajectory",  default_value="false",
                               description="false -> JGPC (arm_group_position_controller). "
                                           "true  -> JTC  (arm_controller). "
                                           "Must match nxp_omniman_launch.py use_trajectory."),
-        DeclareLaunchArgument("track_orientation",     default_value="false"),
-        DeclareLaunchArgument("use_fixed_orientation", default_value="false"),
-        DeclareLaunchArgument("fixed_roll",   default_value="0.0",  description="EE roll [deg]"),
-        DeclareLaunchArgument("fixed_pitch",  default_value="0.0",  description="EE pitch [deg]"),
-        DeclareLaunchArgument("fixed_yaw",    default_value="0.0",  description="EE yaw [deg]"),
-        DeclareLaunchArgument("workspace_angle", default_value="0.0",
-                              description="Zone angle [deg]: 0=front, 90=left, -90=right, 180=back"),
         DeclareLaunchArgument("show_window",     default_value="true"),
         DeclareLaunchArgument("start_mediapipe", default_value="true"),
         DeclareLaunchArgument("start_rviz",      default_value="true"),

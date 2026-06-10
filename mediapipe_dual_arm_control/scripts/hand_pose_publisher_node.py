@@ -26,6 +26,7 @@ import cv2
 import mediapipe as mp
 
 from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import String
 from control_msgs.action import GripperCommand
 from hand_utils import quaternion_from_euler_numpy, get_hand_pose_from_landmarks, get_finger_states
 
@@ -42,7 +43,7 @@ class OmnimanHandTeleop(Node):
         super().__init__("hand_pose_publisher_node")
 
         # ---- Parameters --------------------------------------------------
-        self.camera_device = int(self.declare_parameter("camera_device", 0).value)       # /dev/video0 (C920)
+        self.camera_device = int(self.declare_parameter("camera_device", 4).value)      
         self.planning_frame = self.declare_parameter("planning_frame", "base_link").value
         self.gripper_action = self.declare_parameter(
             "gripper_action", "/gripper_controller/gripper_cmd").value
@@ -54,12 +55,6 @@ class OmnimanHandTeleop(Node):
         self.robot_y_max = self.declare_parameter("robot_y_max", 0.40).value
         self.robot_z_min = self.declare_parameter("robot_z_min", 0.10).value   # height (lowest reach)
         self.robot_z_max = self.declare_parameter("robot_z_max", 0.50).value
-        # Zone angle [deg]: rotates the reach/lateral mapping around base_link Z.
-        #   0   = front (+X reach)
-        #   90  = left  (+Y reach)
-        #  -90  = right (-Y reach)
-        #   180 = back  (-X reach)
-        self.workspace_angle = float(self.declare_parameter("workspace_angle", 0.0).value)
 
         # Forward reach (robot X) from hand depth. Two methods:
         #  - hand-size (default): apparent palm length in the image. Robust,
@@ -85,10 +80,18 @@ class OmnimanHandTeleop(Node):
         self.gripper_effort = self.declare_parameter("gripper_max_effort", 1.0).value
         self.open_finger_count = self.declare_parameter("open_finger_count", 2).value
 
+        # Left-hand "reset" gesture: an open LEFT palm publishes an SRDF named
+        # pose (default "ready") to /arm_named_pose. The C++ node pauses servo
+        # tracking and sends the arm there -- a singularity escape + orientation
+        # reset. Needs the robot launched with use_trajectory:=true (JTC).
+        self.reset_pose_name = self.declare_parameter("reset_pose_name", "ready").value
+        self.reset_finger_count = self.declare_parameter("reset_finger_count", 4).value
+
         self.show_window = self.declare_parameter("show_window", True).value
 
         # ---- ROS interfaces ---------------------------------------------
         self.pose_pub = self.create_publisher(PoseStamped, "/hand_target_pose", 10)
+        self.named_pose_pub = self.create_publisher(String, "/arm_named_pose", 10)
         self.gripper_client = ActionClient(self, GripperCommand, self.gripper_action)
 
         # ---- Camera + MediaPipe -----------------------------------------
@@ -108,6 +111,7 @@ class OmnimanHandTeleop(Node):
         self._gripper_open_state = None   # None until first command
         self._filt = None                 # EMA-smoothed [x, y, z]
         self._hand_size = 0.0             # last apparent palm length (for HUD)
+        self._reset_sent = False          # latch: left-hand reset fires once per gesture
 
         self.timer = self.create_timer(0.02, self.timer_callback)  # 50 Hz
         self.get_logger().info(
@@ -134,17 +138,9 @@ class OmnimanHandTeleop(Node):
             z_clamped = max(min(z_val, self.depth_far), self.depth_near)
             x_norm = (z_clamped - self.depth_near) / (self.depth_far - self.depth_near)
 
-        # Direct mapping: hand depth -> X (forward), hand horizontal -> Y, hand height -> Z.
         rx = self.robot_x_min + x_norm * (self.robot_x_max - self.robot_x_min)
         ry = self.robot_y_min + cx * (self.robot_y_max - self.robot_y_min)
         rz = self.robot_z_min + (1.0 - cy) * (self.robot_z_max - self.robot_z_min)
-        # Zone rotation — uncomment to map the same gestures into left/right/back zones
-        # via workspace_angle (0=front, 90=left, -90=right, 180=back):
-        # r     = rx
-        # lat   = ry
-        # a_rad = math.radians(self.workspace_angle)
-        # rx    = r * math.cos(a_rad) - lat * math.sin(a_rad)
-        # ry    = r * math.sin(a_rad) + lat * math.cos(a_rad)
 
         # --- Exponential smoothing (tames jitter, esp. on depth) ---------
         a = self.pose_smoothing
@@ -190,6 +186,21 @@ class OmnimanHandTeleop(Node):
         self.get_logger().info(f"Gripper -> {'OPEN' if want_open else 'CLOSE'} "
                                f"({goal.command.position:.3f} m)")
 
+    def command_named_pose(self, left_hand):
+        """Open LEFT palm publishes the reset/named pose once per gesture."""
+        if left_hand is None:
+            self._reset_sent = False
+            return None
+        lfingers = sum(get_finger_states(left_hand.landmark))
+        trigger = lfingers >= self.reset_finger_count
+        if trigger and not self._reset_sent:
+            self.named_pose_pub.publish(String(data=self.reset_pose_name))
+            self._reset_sent = True
+            self.get_logger().info(f"LEFT hand reset -> named pose '{self.reset_pose_name}'")
+        elif not trigger:
+            self._reset_sent = False   # re-arm once the palm closes again
+        return lfingers
+
     # ---------------------------------------------------------------------
     def timer_callback(self):
         ret, frame = self.cap.read()
@@ -202,12 +213,15 @@ class OmnimanHandTeleop(Node):
         self.frame_count += 1
 
         right_hand = None
+        left_hand = None
         if results.multi_hand_landmarks and results.multi_handedness:
             for landmarks, handedness in zip(results.multi_hand_landmarks, results.multi_handedness):
                 label = handedness.classification[0].label.lower()
                 mp_drawing.draw_landmarks(frame, landmarks, mp_hands.HAND_CONNECTIONS)
                 if label == CONTROL_HAND:
                     right_hand = landmarks
+                else:
+                    left_hand = landmarks
 
         if right_hand is not None:
             pose = self.publish_arm_pose(right_hand, w, h)
@@ -236,6 +250,12 @@ class OmnimanHandTeleop(Node):
         elif self.show_window:
             cv2.putText(frame, "Show your RIGHT hand", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
+        # LEFT hand: open palm resets the arm to the "ready" SRDF pose.
+        lfingers = self.command_named_pose(left_hand)
+        if self.show_window and left_hand is not None:
+            cv2.putText(frame, f"LEFT:{lfingers} (open palm = RESET '{self.reset_pose_name}')",
+                        (10, 124), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 200, 0), 1)
 
         if self.show_window:
             cv2.putText(frame, f"{self.open_finger_count}+ fingers = OPEN, fewer = CLOSE | 'q' quits",

@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
@@ -24,6 +25,7 @@ ament_target_dependencies(omniman_pose_tracking_node
   rclcpp
   std_msgs
   geometry_msgs
+  trajectory_msgs
   moveit_core
   moveit_ros_planning
   moveit_ros_planning_interface

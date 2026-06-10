@@ -13,44 +13,31 @@
  *    - one arm only (no left/right, no namespaces)
  *    - no gripper publisher here (Python sends a GripperCommand action goal)
  *    - PoseTracking owns its own Servo, so we do NOT create a second one
- *    - position-only tracking by default (the 6-DOF arm has no null space, so
- *      tracking hand orientation tends to drag the EE position around -- see
- *      track_orientation param)
+ *    - position-only tracking (the 6-DOF arm has no null space, so tracking hand
+ *      orientation drags the EE position around). The held orientation is
+ *      re-captured every time tracking (re)starts.
+ *    - a left-hand gesture (Python) can publish an SRDF named pose name on
+ *      /arm_named_pose; we pause servo and send the arm there via the trajectory
+ *      controller -- a clean singularity escape + orientation reset.
  *
  * BSD 3-Clause License (inherited from moveit_servo)
  *******************************************************************************/
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/int8.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <trajectory_msgs/msg/joint_trajectory.hpp>
+#include <moveit/robot_state/robot_state.h>
 #include <moveit_servo/pose_tracking.h>
 #include <moveit_servo/status_codes.h>
 #include <moveit_servo/servo_parameters.h>
 #include <moveit_servo/make_shared_from_pool.h>
 #include <thread>
 #include <atomic>
-#include <cmath>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("omniman_pose_tracking_node");
-
-// Roll/pitch/yaw (degrees, in the planning frame) -> quaternion. Used to hold a
-// fixed EE orientation (e.g. gripper pointing down) for pick-and-place.
-static geometry_msgs::msg::Quaternion quaternionFromRPYDegrees(double roll_deg, double pitch_deg, double yaw_deg)
-{
-  const double r = roll_deg * M_PI / 180.0;
-  const double p = pitch_deg * M_PI / 180.0;
-  const double y = yaw_deg * M_PI / 180.0;
-  const double cr = std::cos(r * 0.5), sr = std::sin(r * 0.5);
-  const double cp = std::cos(p * 0.5), sp = std::sin(p * 0.5);
-  const double cy = std::cos(y * 0.5), sy = std::sin(y * 0.5);
-  geometry_msgs::msg::Quaternion q;
-  q.x = sr * cp * cy - cr * sp * sy;
-  q.y = cr * sp * cy + sr * cp * sy;
-  q.z = cr * cp * sy - sr * sp * cy;
-  q.w = cr * cp * cy + sr * sp * sy;
-  return q;
-}
 
 // Logs moveit_servo status whenever it changes.
 class StatusMonitor
@@ -90,15 +77,12 @@ int main(int argc, char** argv)
   const double rot_tolerance = node->declare_parameter<double>("rotational_tolerance", 0.1);  // [rad]
   const double target_pose_timeout = node->declare_parameter<double>("target_pose_timeout", 0.5);  // [s] per moveToPose call
   const double no_pose_timeout = node->declare_parameter<double>("no_pose_timeout", 5.0);     // [s] stop tracking if idle
-  const bool track_orientation = node->declare_parameter<bool>("track_orientation", false);
-  // Hold a FIXED EE orientation (position-only mode) instead of the arm's startup
-  // orientation. Set use_fixed_orientation:=true and tune roll/pitch/yaw (degrees,
-  // planning frame) in RViz -- e.g. fixed_pitch:=90 tends to point the gripper down
-  // for top-down pick-and-place. Default false keeps the old "hold startup pose".
-  const bool use_fixed_orientation = node->declare_parameter<bool>("use_fixed_orientation", false);
-  const double fixed_roll = node->declare_parameter<double>("fixed_roll", 0.0);    // [deg]
-  const double fixed_pitch = node->declare_parameter<double>("fixed_pitch", 0.0);  // [deg]
-  const double fixed_yaw = node->declare_parameter<double>("fixed_yaw", 0.0);      // [deg]
+  // Named-pose reset (e.g. "ready"): a left-hand gesture publishes a group state
+  // name here, and we send the arm there via the trajectory controller.
+  const std::string named_pose_topic = node->declare_parameter<std::string>("named_pose_topic", "/arm_named_pose");
+  const std::string arm_controller_topic =
+      node->declare_parameter<std::string>("arm_controller_topic", "/arm_controller/joint_trajectory");
+  const double named_pose_time = node->declare_parameter<double>("named_pose_time", 3.0);  // [s] move duration
   // Generous safety box (planning frame, metres). The Python node already
   // clamps to the reachable workspace; this just rejects NaN / absurd targets.
   const double ws_xy_limit = node->declare_parameter<double>("workspace_xy_limit", 2.0);
@@ -147,7 +131,7 @@ int main(int argc, char** argv)
   RCLCPP_INFO(LOGGER, "Planning frame   : %s", servo_parameters->planning_frame.c_str());
   RCLCPP_INFO(LOGGER, "EE frame         : %s", servo_parameters->ee_frame_name.c_str());
   RCLCPP_INFO(LOGGER, "Command out topic: %s", servo_parameters->command_out_topic.c_str());
-  RCLCPP_INFO(LOGGER, "Track orientation: %s", track_orientation ? "true" : "false (position-only)");
+  RCLCPP_INFO(LOGGER, "Mode             : position-only (orientation re-held on each (re)start)");
   RCLCPP_INFO(LOGGER, "============================");
 
   // Republish target poses onto the tracker's "target_pose" topic.
@@ -158,27 +142,16 @@ int main(int argc, char** argv)
 
   const Eigen::Vector3d lin_tol{ lin_tolerance, lin_tolerance, lin_tolerance };
 
-  // Orientation to hold in position-only mode: either a fixed user-specified one
-  // (good for top-down pick-and-place) or the arm's startup orientation.
-  geometry_msgs::msg::Quaternion held_orientation;
-  if (use_fixed_orientation)
-  {
-    held_orientation = quaternionFromRPYDegrees(fixed_roll, fixed_pitch, fixed_yaw);
-    RCLCPP_INFO(LOGGER, "Holding FIXED EE orientation RPY [%.1f, %.1f, %.1f] deg -> "
-                        "[x=%.3f y=%.3f z=%.3f w=%.3f]",
-                fixed_roll, fixed_pitch, fixed_yaw,
-                held_orientation.x, held_orientation.y, held_orientation.z, held_orientation.w);
-  }
-  else
-  {
-    geometry_msgs::msg::TransformStamped current_ee_tf;
-    tracker.getCommandFrameTransform(current_ee_tf);
-    held_orientation = current_ee_tf.transform.rotation;
-    RCLCPP_INFO(LOGGER, "Holding STARTUP EE orientation [x=%.3f y=%.3f z=%.3f w=%.3f] in position-only mode",
-                held_orientation.x, held_orientation.y, held_orientation.z, held_orientation.w);
-  }
+  // In position-only mode, hold the EE orientation captured at startup.
+  geometry_msgs::msg::TransformStamped current_ee_tf;
+  tracker.getCommandFrameTransform(current_ee_tf);
+  geometry_msgs::msg::Quaternion held_orientation = current_ee_tf.transform.rotation;
+  RCLCPP_INFO(LOGGER, "Holding STARTUP EE orientation [x=%.3f y=%.3f z=%.3f w=%.3f]",
+              held_orientation.x, held_orientation.y, held_orientation.z, held_orientation.w);
 
   std::atomic<bool> tracking_active{ false };
+  std::atomic<bool> executing_named_pose{ false };
+  rclcpp::Time named_pose_end_time = node->now();
   std::shared_ptr<std::thread> move_to_pose_thread;
   rclcpp::Time last_pose_time = node->now();
   bool pose_received = false;
@@ -186,6 +159,9 @@ int main(int argc, char** argv)
   // ---- Incoming target-pose subscription ----------------------------------
   auto hand_sub = node->create_subscription<geometry_msgs::msg::PoseStamped>(
       hand_pose_topic, 10, [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+        if (executing_named_pose.load())
+          return;  // ignore hand poses while moving to a named/reset pose
+
         const double x = msg->pose.position.x;
         const double y = msg->pose.position.y;
         const double z = msg->pose.position.z;
@@ -198,10 +174,19 @@ int main(int argc, char** argv)
           return;
         }
 
+        // (Re)start of tracking: hold whatever EE orientation the arm has right
+        // now -- startup, or wherever a named/reset pose just left it. This is
+        // what lets a "ready" reset also reset the locked orientation.
+        if (!tracking_active.load())
+        {
+          geometry_msgs::msg::TransformStamped ee_tf;
+          tracker.getCommandFrameTransform(ee_tf);
+          held_orientation = ee_tf.transform.rotation;
+        }
+
         auto relay_msg = *msg;
         relay_msg.header.stamp = node->now();
-        if (!track_orientation)
-          relay_msg.pose.orientation = held_orientation;  // position-only tracking
+        relay_msg.pose.orientation = held_orientation;  // position-only tracking
         target_pose_pub->publish(relay_msg);
 
         pose_received = true;
@@ -233,13 +218,69 @@ int main(int argc, char** argv)
         }
       });
 
+  // ---- Named-pose reset (e.g. "ready") ------------------------------------
+  // The Python node publishes an SRDF group-state name here (left-hand gesture).
+  // We pause servo tracking and send the arm to that named configuration via the
+  // trajectory controller -- a clean singularity escape and orientation reset.
+  // NOTE: needs the JointTrajectoryController (launch with use_trajectory:=true);
+  // in JGPC mode there is no trajectory interpolation and the arm would jump.
+  auto named_pose_pub = node->create_publisher<trajectory_msgs::msg::JointTrajectory>(
+      arm_controller_topic, rclcpp::SystemDefaultsQoS());
+
+  auto named_pose_sub = node->create_subscription<std_msgs::msg::String>(
+      named_pose_topic, 10, [&](const std_msgs::msg::String::SharedPtr msg) {
+        const std::string pose_name = msg->data;
+        const auto* jmg =
+            planning_scene_monitor->getRobotModel()->getJointModelGroup(servo_parameters->move_group_name);
+        if (jmg == nullptr)
+        {
+          RCLCPP_ERROR(LOGGER, "Unknown move group '%s'", servo_parameters->move_group_name.c_str());
+          return;
+        }
+
+        moveit::core::RobotState goal_state(planning_scene_monitor->getRobotModel());
+        goal_state.setToDefaultValues();
+        if (!goal_state.setToDefaultValues(jmg, pose_name))
+        {
+          RCLCPP_ERROR(LOGGER, "No SRDF named pose '%s' for group '%s' -- check your .srdf.",
+                       pose_name.c_str(), servo_parameters->move_group_name.c_str());
+          return;
+        }
+        std::vector<double> positions;
+        goal_state.copyJointGroupPositions(jmg, positions);
+
+        // Pause servo tracking so it doesn't fight the trajectory controller.
+        tracking_active = false;
+        tracker.stopMotion();
+        executing_named_pose = true;
+        named_pose_end_time = node->now() + rclcpp::Duration::from_seconds(named_pose_time + 0.5);
+
+        trajectory_msgs::msg::JointTrajectory traj;
+        traj.joint_names = jmg->getActiveJointModelNames();
+        trajectory_msgs::msg::JointTrajectoryPoint point;
+        point.positions = positions;
+        point.time_from_start = rclcpp::Duration::from_seconds(named_pose_time);
+        traj.points.push_back(point);
+        named_pose_pub->publish(traj);
+        RCLCPP_INFO(LOGGER, "Reset: moving group '%s' to named pose '%s' over %.1fs",
+                    servo_parameters->move_group_name.c_str(), pose_name.c_str(), named_pose_time);
+      });
+
   RCLCPP_INFO(LOGGER, "Ready. Listening for target poses on: %s", hand_pose_topic.c_str());
+  RCLCPP_INFO(LOGGER, "Named-pose reset on %s (needs use_trajectory:=true).", named_pose_topic.c_str());
   RCLCPP_INFO(LOGGER, "Run the MediaPipe node and show your RIGHT hand to the camera to start tracking.");
 
   // ---- Idle watchdog: stop tracking when no poses arrive ------------------
   rclcpp::WallRate loop_rate(50);
   while (rclcpp::ok())
   {
+    // Release the named-pose lock once the move has had time to finish.
+    if (executing_named_pose.load() && node->now() >= named_pose_end_time)
+    {
+      executing_named_pose = false;
+      RCLCPP_INFO(LOGGER, "Named-pose move complete -- show your RIGHT hand to resume tracking.");
+    }
+
     const bool active = pose_received && (node->now() - last_pose_time).seconds() < no_pose_timeout;
     if (!active && tracking_active.load())
     {
