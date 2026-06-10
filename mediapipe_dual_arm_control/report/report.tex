@@ -35,9 +35,12 @@ coordinates failed dramatically (10.6\,mm test MAE, losing to a trivial
 copy-last-frame baseline at 0.8\,mm) due to distribution shift between
 workspace regions under a leakage-safe chronological split; reformulating the
 task as translation-invariant \emph{displacement} prediction fixed it. The
-final model achieves 2.32\,mm test MAE at a 98\,ms prediction horizon,
-outperforming the persistence baseline (4.36\,mm) by 47\% and the deployed EMA
-pipeline (7.20\,mm) by 68\%. The model is exported to TorchScript and runs
+final model achieves 2.32\,mm MAE and 5.68\,mm RMSE at a 98\,ms prediction horizon,
+outperforming the persistence baseline (4.36\,mm MAE) by 47\% and the deployed EMA
+pipeline (7.20\,mm MAE) by 68\%; the RMSE ratio is even more favourable ($2.9{\times}$
+vs.\ the EMA). Under 5-fold blocked cross-validation the LSTM scores
+$2.28 \pm 0.45$\,mm MAE and $4.75 \pm 1.67$\,mm RMSE, beating both baselines in every
+fold on both metrics. The model is exported to TorchScript and runs
 inside the live teleoperation node at 0.2\,ms per inference with a runtime
 LSTM/EMA toggle for A/B comparison. On the real robot the improvement in the
 target signal is measurable but not perceptible, which we attribute to the
@@ -378,11 +381,19 @@ matches the latency we want to compensate, so we adopt it.
 \label{sec:results}
 
 The final model was trained on the combined dataset (15{,}573 training,
-3{,}255 validation, and 3{,}257 test windows). Training converged without
-overfitting (Figure~\ref{fig:loss}); validation loss ending below training
-loss indicates the dataset is adequate for this model capacity (the
-validation slices happen to contain somewhat calmer motion than the training
-slices, a side effect of the chronological split).
+3{,}255 validation, and 3{,}257 test windows). Figure~\ref{fig:loss} shows the
+convergence behaviour: training loss decreases monotonically, while validation
+loss reaches its minimum ($0.099$, normalized) around epoch 20 and then drifts
+upward---mild overfitting. The best-validation checkpoint selection neutralizes
+this: the deployed model is the epoch-20 one, so checkpointing acts as early
+stopping and the later epochs are simply discarded. Two further observations:
+validation loss sits above training loss throughout, because the chronological
+split places somewhat different motion in the validation slices than in the
+training slices (a distribution difference, not estimation variance); and
+although the window count exceeds the parameter count by $3\times$,
+overlapping windows are highly correlated, so the effective sample size is
+smaller than the nominal count---consistent with overfitting appearing despite
+the seemingly comfortable data-to-parameter ratio.
 
 \begin{figure}[t]
   \centering
@@ -416,6 +427,46 @@ higher, which is expected: the second session deliberately contains fast
 motion, making the test set harder for every method (the persistence error
 more than doubled). The honest comparison is therefore the relative one, and
 it improved with the harder data.
+
+\paragraph{Cross-validation.} A single chronological split yields one test
+estimate; to quantify its variance we ran 5-fold \emph{blocked} cross-validation
+with purging. Plain $k$-fold is invalid on time series---random folds would
+scatter near-duplicate consecutive frames across train and test (the same
+leakage the chronological split avoids)---so instead each fold's test set is a
+contiguous time block of every segment, the model is retrained from scratch on
+the remainder, and a gap of $L{+}H$ frames around each test block is discarded
+so that no training window overlaps test frames. Table~\ref{tab:cv} reports both
+MAE and RMSE for all five folds. The LSTM achieves $2.28 \pm 0.45$\,mm MAE
+($4.75 \pm 1.67$\,mm RMSE) versus $4.25 \pm 0.72$\,mm MAE ($8.19 \pm 1.75$\,mm
+RMSE) for persistence and $6.95 \pm 1.05$\,mm MAE ($13.34 \pm 2.52$\,mm RMSE)
+for the EMA, and \textbf{outperforms both baselines in 5 of 5 folds on both
+metrics}. The RMSE gap is proportionally larger than the MAE gap---consistent
+with the single-split results in Table~\ref{tab:results}---because RMSE
+penalises the large errors that occur during fast motion more heavily.
+The cross-validated MAE mean agrees with the single-split estimate (2.32\,mm),
+confirming the headline result is not an artifact of one particular split.
+
+\begin{table}[t]
+  \centering
+  \caption{5-fold blocked (purged) cross-validation. Upper rows: MAE (mm);
+           lower rows: RMSE (mm). Bold = best per fold.}
+  \label{tab:cv}
+  \begin{tabular}{lccccc|c}
+    \toprule
+    Method & fold 1 & fold 2 & fold 3 & fold 4 & fold 5 & mean $\pm$ std \\
+    \midrule
+    \multicolumn{7}{l}{\textit{MAE (mm)}} \\[2pt]
+    \textbf{LSTM (ours)} & \textbf{3.16} & \textbf{2.10} & \textbf{1.91} & \textbf{2.08} & \textbf{2.14} & $\mathbf{2.28 \pm 0.45}$ \\
+    Persistence          & 5.64 & 4.17 & 3.92 & 3.55 & 3.96 & $4.25 \pm 0.72$ \\
+    EMA (deployed)       & 8.92 & 6.91 & 6.61 & 5.78 & 6.53 & $6.95 \pm 1.05$ \\
+    \midrule
+    \multicolumn{7}{l}{\textit{RMSE (mm)}} \\[2pt]
+    \textbf{LSTM (ours)} & \textbf{7.55} & \textbf{3.26} & \textbf{2.87} & \textbf{4.84} & \textbf{5.24} & $\mathbf{4.75 \pm 1.67}$ \\
+    Persistence          & 11.05 & 7.07 & 6.39 & 7.07 & 9.37 & $8.19 \pm 1.75$ \\
+    EMA (deployed)       & 17.27 & 11.94 & 10.93 & 11.20 & 15.34 & $13.34 \pm 2.52$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 Figure~\ref{fig:overlay} shows the qualitative behaviour on the longest test
 piece: the EMA visibly trails the raw trajectory during motion, while the LSTM
@@ -494,9 +545,10 @@ and the robot is currently the bottleneck in exploiting it.
         22k samples suffice for a 4.7k-parameter model, but all data come from
         one operator, one camera, and two sessions. Generalization across
         users and lighting conditions is untested.
-  \item \textbf{Single test distribution.} The test split is the chronological
-        tail of each segment; metrics carry the variance of a $\sim$1.8-minute
-        test set.
+  \item \textbf{Within-dataset validation only.} Blocked cross-validation
+        (Table~\ref{tab:cv}) bounds the split-to-split variance, but all folds
+        still come from the same two recording sessions; it cannot measure
+        generalization to a new user or camera setup.
   \item \textbf{Baselines.} A Kalman filter with a constant-velocity model is
         the natural classical competitor and would sharpen the claim about
         what the LSTM adds beyond linear extrapolation.
