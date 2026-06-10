@@ -36,6 +36,7 @@
 #include <moveit_servo/make_shared_from_pool.h>
 #include <thread>
 #include <atomic>
+#include <chrono>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("omniman_pose_tracking_node");
 
@@ -229,6 +230,12 @@ int main(int argc, char** argv)
 
   auto named_pose_sub = node->create_subscription<std_msgs::msg::String>(
       named_pose_topic, 10, [&](const std_msgs::msg::String::SharedPtr msg) {
+        if (executing_named_pose.load())
+        {
+          RCLCPP_DEBUG(LOGGER, "Already moving to a named pose, ignoring '%s'", msg->data.c_str());
+          return;  // debounce repeat triggers (e.g. finger-count flicker on the left hand)
+        }
+
         const std::string pose_name = msg->data;
         const auto* jmg =
             planning_scene_monitor->getRobotModel()->getJointModelGroup(servo_parameters->move_group_name);
@@ -249,11 +256,21 @@ int main(int argc, char** argv)
         std::vector<double> positions;
         goal_state.copyJointGroupPositions(jmg, positions);
 
-        // Pause servo tracking so it doesn't fight the trajectory controller.
-        tracking_active = false;
-        tracker.stopMotion();
+        // Hand the arm over to the trajectory controller cleanly. Servo and this
+        // node both publish to the SAME controller topic, so we must SILENCE servo
+        // first: otherwise its position-hold / halt messages (it sends
+        // num_outgoing_halt_msgs_to_publish of them after a stop) land right after
+        // our trajectory and the controller cancels our move. setPaused(true) gates
+        // ALL servo publishing; stopMotion() breaks the pose-tracking loop out early.
         executing_named_pose = true;
+        tracking_active = false;
+        tracker.servo_->setPaused(true);
+        tracker.stopMotion();
         named_pose_end_time = node->now() + rclcpp::Duration::from_seconds(named_pose_time + 0.5);
+
+        // Let any servo message already in flight reach the controller first, so
+        // OUR trajectory is the last command it sees (publish_period ~34 ms).
+        rclcpp::sleep_for(std::chrono::milliseconds(60));
 
         trajectory_msgs::msg::JointTrajectory traj;
         traj.joint_names = jmg->getActiveJointModelNames();
@@ -262,7 +279,7 @@ int main(int argc, char** argv)
         point.time_from_start = rclcpp::Duration::from_seconds(named_pose_time);
         traj.points.push_back(point);
         named_pose_pub->publish(traj);
-        RCLCPP_INFO(LOGGER, "Reset: moving group '%s' to named pose '%s' over %.1fs",
+        RCLCPP_INFO(LOGGER, "Reset: servo paused, moving group '%s' to named pose '%s' over %.1fs",
                     servo_parameters->move_group_name.c_str(), pose_name.c_str(), named_pose_time);
       });
 
@@ -277,8 +294,9 @@ int main(int argc, char** argv)
     // Release the named-pose lock once the move has had time to finish.
     if (executing_named_pose.load() && node->now() >= named_pose_end_time)
     {
+      tracker.servo_->setPaused(false);  // re-enable servo for Cartesian tracking
       executing_named_pose = false;
-      RCLCPP_INFO(LOGGER, "Named-pose move complete -- show your RIGHT hand to resume tracking.");
+      RCLCPP_INFO(LOGGER, "Named-pose move complete -- servo resumed; show your RIGHT hand to resume tracking.");
     }
 
     const bool active = pose_received && (node->now() - last_pose_time).seconds() < no_pose_timeout;
