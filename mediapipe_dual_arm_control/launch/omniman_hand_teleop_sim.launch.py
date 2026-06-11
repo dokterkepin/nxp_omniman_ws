@@ -59,6 +59,13 @@ def launch_setup(context, *args, **kwargs):
         .to_dict()
     }
 
+    # Sim always uses arm_controller (JTC); override the yaml default which
+    # points at arm_group_position_controller (JGPC, not spawned in sim).
+    s = servo_params["moveit_servo"]
+    s["command_out_type"]         = "trajectory_msgs/JointTrajectory"
+    s["command_out_topic"]        = "/arm_controller/joint_trajectory"
+    s["publish_joint_velocities"] = True
+
     # --- Robot state publisher ------------------------------------------------
     robot_state_publisher = Node(
         package="robot_state_publisher",
