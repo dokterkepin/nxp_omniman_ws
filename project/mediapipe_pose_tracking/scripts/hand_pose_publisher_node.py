@@ -49,7 +49,7 @@ import mediapipe as mp
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
 from control_msgs.action import GripperCommand
-from project.mediapipe_pose_tracking.scripts.hand_utils import quaternion_from_euler_numpy, get_hand_pose_from_landmarks, get_finger_states
+from hand_utils import quaternion_from_euler_numpy, get_hand_pose_from_landmarks, get_finger_states
 
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
@@ -64,7 +64,7 @@ class OmnimanHandTeleop(Node):
         super().__init__("hand_pose_publisher_node")
 
         # ---- Parameters --------------------------------------------------
-        self.camera_device = int(self.declare_parameter("camera_device", 2).value)      
+        self.camera_device = int(self.declare_parameter("camera_device", 0).value)
         self.planning_frame = self.declare_parameter("planning_frame", "base_link").value
         self.gripper_action = self.declare_parameter(
             "gripper_action", "/gripper_controller/gripper_cmd").value
@@ -133,11 +133,11 @@ class OmnimanHandTeleop(Node):
         self.gripper_client = ActionClient(self, GripperCommand, self.gripper_action)
 
         # ---- Camera + MediaPipe -----------------------------------------
-        self.cap = cv2.VideoCapture(self.camera_device)
+        self.cap = cv2.VideoCapture(self.camera_device, cv2.CAP_V4L2)
         if not self.cap.isOpened():
             self.get_logger().error(
                 f"Could not open camera device {self.camera_device}. "
-                f"Set the 'camera_device' param (your C920 is /dev/video2 -> 2).")
+                f"Set the 'camera_device' param (C920=/dev/video0 -> 0, laptop=/dev/video2 -> 2).")
         self.hands = mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=2,            # detect both, but only act on the right hand

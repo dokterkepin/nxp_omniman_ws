@@ -164,7 +164,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("camera_device", default_value="2"),
+            DeclareLaunchArgument("camera_device", default_value="0"),
             DeclareLaunchArgument("track_orientation", default_value="false"),
             DeclareLaunchArgument("use_fixed_orientation", default_value="false"),
             DeclareLaunchArgument("fixed_roll", default_value="0.0"),
@@ -177,8 +177,9 @@ def generate_launch_description():
                                   description="true = LSTM predictor (~98 ms lead); "
                                               "false = EMA smoothing. Toggle at runtime with 'm'."),
             DeclareLaunchArgument("model_dir",
-                                  default_value="~/workspaces/nxp_omniman_ws/src/"
-                                                "mediapipe_pose_tracking/models",
+                                  default_value=os.path.join(
+                                      get_package_share_directory("mediapipe_pose_tracking"),
+                                      "models"),
                                   description="Path to lstm_hand_traj.torchscript.pt and .json"),
             OpaqueFunction(function=launch_setup),
         ]

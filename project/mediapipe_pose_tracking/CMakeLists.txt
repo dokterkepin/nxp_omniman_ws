@@ -46,9 +46,10 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Launch + config
+# Launch + config + models
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 install(DIRECTORY config/ DESTINATION share/${PROJECT_NAME}/config)
+install(DIRECTORY models/ DESTINATION share/${PROJECT_NAME}/models)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
