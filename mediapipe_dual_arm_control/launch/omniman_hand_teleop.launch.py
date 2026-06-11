@@ -12,7 +12,9 @@ from launch_param_builder import ParameterBuilder
 def launch_setup(context, *args, **kwargs):
     use_trajectory = LaunchConfiguration("use_trajectory").perform(context).lower() == "true"
     camera_device  = int(LaunchConfiguration("camera_device").perform(context))
-    show_window   = LaunchConfiguration("show_window").perform(context).lower() == "true"
+    show_window    = LaunchConfiguration("show_window").perform(context).lower() == "true"
+    use_lstm       = LaunchConfiguration("use_lstm").perform(context).lower() == "true"
+    model_dir      = os.path.expanduser(LaunchConfiguration("model_dir").perform(context))
 
     pkg_share  = get_package_share_directory("mediapipe_dual_arm_control")
     config_dir = os.path.join(pkg_share, "config", "pose_tracking")
@@ -76,6 +78,8 @@ def launch_setup(context, *args, **kwargs):
             "camera_device":  camera_device,
             "show_window":    show_window,
             "planning_frame": "base_link",
+            "use_lstm":       use_lstm,
+            "model_dir":      model_dir,
         }],
     )
 
@@ -94,5 +98,12 @@ def generate_launch_description():
         DeclareLaunchArgument("show_window",     default_value="true"),
         DeclareLaunchArgument("start_mediapipe", default_value="true"),
         DeclareLaunchArgument("start_rviz",      default_value="true"),
+        DeclareLaunchArgument("use_lstm",        default_value="true",
+                              description="true = LSTM predictor (~98 ms lead); "
+                                          "false = EMA smoothing. Toggle at runtime with 'm'."),
+        DeclareLaunchArgument("model_dir",
+                              default_value="~/workspaces/nxp_omniman_ws/src/"
+                                            "mediapipe_dual_arm_control/models",
+                              description="Path to lstm_hand_traj.torchscript.pt and .json"),
         OpaqueFunction(function=launch_setup),
     ])

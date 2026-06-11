@@ -43,6 +43,8 @@ def launch_setup(context, *args, **kwargs):
     fixed_roll = float(LaunchConfiguration("fixed_roll").perform(context))
     fixed_pitch = float(LaunchConfiguration("fixed_pitch").perform(context))
     fixed_yaw = float(LaunchConfiguration("fixed_yaw").perform(context))
+    use_lstm = LaunchConfiguration("use_lstm").perform(context).lower() == "true"
+    model_dir = os.path.expanduser(LaunchConfiguration("model_dir").perform(context))
 
     moveit_config = (
         MoveItConfigsBuilder("nxp_omniman", package_name="moveit_config")
@@ -58,6 +60,13 @@ def launch_setup(context, *args, **kwargs):
         .yaml(os.path.join(pt_dir, "omniman_pose_tracking.yaml"))
         .to_dict()
     }
+
+    # Sim always uses arm_controller (JTC); override the yaml default which
+    # points at arm_group_position_controller (JGPC, not spawned in sim).
+    s = servo_params["moveit_servo"]
+    s["command_out_type"]        = "trajectory_msgs/JointTrajectory"
+    s["command_out_topic"]       = "/arm_controller/joint_trajectory"
+    s["publish_joint_velocities"] = True
 
     # --- Robot state publisher ------------------------------------------------
     robot_state_publisher = Node(
@@ -131,11 +140,13 @@ def launch_setup(context, *args, **kwargs):
         name="hand_pose_publisher_node",
         output="screen",
         condition=IfCondition(LaunchConfiguration("start_mediapipe")),
-        parameters=[
-            {"camera_device": camera_device},
-            {"show_window": show_window},
-            {"planning_frame": "base_link"},
-        ],
+        parameters=[{
+            "camera_device":  camera_device,
+            "show_window":    show_window,
+            "planning_frame": "base_link",
+            "use_lstm":       use_lstm,
+            "model_dir":      model_dir,
+        }],
     )
 
     return [
@@ -162,6 +173,13 @@ def generate_launch_description():
             DeclareLaunchArgument("show_window", default_value="true"),
             DeclareLaunchArgument("start_mediapipe", default_value="true"),
             DeclareLaunchArgument("start_rviz", default_value="true"),
+            DeclareLaunchArgument("use_lstm", default_value="true",
+                                  description="true = LSTM predictor (~98 ms lead); "
+                                              "false = EMA smoothing. Toggle at runtime with 'm'."),
+            DeclareLaunchArgument("model_dir",
+                                  default_value="~/workspaces/nxp_omniman_ws/src/"
+                                                "mediapipe_dual_arm_control/models",
+                                  description="Path to lstm_hand_traj.torchscript.pt and .json"),
             OpaqueFunction(function=launch_setup),
         ]
     )
