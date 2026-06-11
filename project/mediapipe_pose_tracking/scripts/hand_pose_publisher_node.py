@@ -49,7 +49,7 @@ import mediapipe as mp
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
 from control_msgs.action import GripperCommand
-from hand_utils import quaternion_from_euler_numpy, get_hand_pose_from_landmarks, get_finger_states
+from project.mediapipe_pose_tracking.scripts.hand_utils import quaternion_from_euler_numpy, get_hand_pose_from_landmarks, get_finger_states
 
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils

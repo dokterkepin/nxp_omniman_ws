@@ -1,8 +1,8 @@
 """
-Omniman single-arm hand teleop -- SIMULATION / RViz visualization.
+Omniman single-arm hand teleop -- DEMO / RViz visualization (fake hardware).
 
-This is the "try before real hardware" launch. It brings up EVERYTHING with
-fake hardware (mock_components/GenericSystem from the moveit_config URDF):
+This is the "try before real hardware" launch, equivalent to MoveIt's demo.launch.
+It brings up EVERYTHING with fake hardware (mock_components/GenericSystem from the moveit_config URDF):
 
   * robot_state_publisher
   * ros2_control_node (fake hardware) + joint_state_broadcaster
@@ -62,7 +62,7 @@ def launch_setup(context, *args, **kwargs):
     }
 
     # Sim always uses arm_controller (JTC); override the yaml default which
-    # points at arm_group_position_controller (JGPC, not spawned in sim).
+    # points at arm_group_position_controller (JGPC, not spawned in demo mode).
     s = servo_params["moveit_servo"]
     s["command_out_type"]        = "trajectory_msgs/JointTrajectory"
     s["command_out_topic"]       = "/arm_controller/joint_trajectory"
@@ -79,7 +79,7 @@ def launch_setup(context, *args, **kwargs):
     # --- ros2_control (fake hardware) + controllers ---------------------------
     # Sim-only controllers: same as moveit_config but joint_state_broadcaster
     # also publishes the passive mecanum wheels so RViz has wheel TF.
-    ros2_controllers_path = os.path.join(pkg_share, "config", "sim", "ros2_controllers.yaml")
+    ros2_controllers_path = os.path.join(pkg_share, "config", "demo", "ros2_controllers.yaml")
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",

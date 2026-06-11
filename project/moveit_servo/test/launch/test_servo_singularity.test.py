@@ -4,11 +4,14 @@ import sys
 import unittest
 
 sys.path.append(os.path.dirname(__file__))
-from servo_launch_test_common import generate_servo_test_description
+from project.moveit_servo.test.launch.servo_launch_test_common import generate_servo_test_description
 
 
 def generate_test_description():
-    return generate_servo_test_description(gtest_name="test_servo_integration")
+    return generate_servo_test_description(
+        gtest_name="test_servo_singularity",
+        start_position_path="../config/singularity_start_positions.yaml",
+    )
 
 
 class TestGTestWaitForCompletion(unittest.TestCase):
