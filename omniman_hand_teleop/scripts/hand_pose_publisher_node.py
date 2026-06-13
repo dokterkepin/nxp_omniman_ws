@@ -43,7 +43,7 @@ class OmnimanHandTeleop(Node):
         super().__init__("hand_pose_publisher_node")
 
         # ---- Parameters --------------------------------------------------
-        self.camera_device = int(self.declare_parameter("camera_device", 4).value)      
+        self.camera_device = self.declare_parameter("camera_device", "/dev/video_c920").value
         self.planning_frame = self.declare_parameter("planning_frame", "base_link").value
         self.gripper_action = self.declare_parameter(
             "gripper_action", "/gripper_controller/gripper_cmd").value

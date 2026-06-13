@@ -11,10 +11,10 @@ from launch_param_builder import ParameterBuilder
 
 def launch_setup(context, *args, **kwargs):
     use_trajectory = LaunchConfiguration("use_trajectory").perform(context).lower() == "true"
-    camera_device  = int(LaunchConfiguration("camera_device").perform(context))
     show_window   = LaunchConfiguration("show_window").perform(context).lower() == "true"
 
-    pkg_share  = get_package_share_directory("mediapipe_dual_arm_control")
+    pkg_share  = get_package_share_directory("omniman_hand_teleop")
+    teleop_params = os.path.join(pkg_share, "config", "teleop.yaml")
     config_dir = os.path.join(pkg_share, "config", "pose_tracking")
     rviz_config = os.path.join(pkg_share, "config", "rviz", "omniman_hand_teleop.rviz")
 
@@ -25,7 +25,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     servo_params = {
-        "moveit_servo": ParameterBuilder("mediapipe_dual_arm_control")
+        "moveit_servo": ParameterBuilder("omniman_hand_teleop")
         .yaml(os.path.join(config_dir, "pose_tracking_settings.yaml"))
         .yaml(os.path.join(config_dir, "omniman_pose_tracking.yaml"))
         .to_dict()
@@ -44,7 +44,7 @@ def launch_setup(context, *args, **kwargs):
         s["publish_joint_velocities"] = False
 
     pose_tracking_node = Node(
-        package="mediapipe_dual_arm_control",
+        package="omniman_hand_teleop",
         executable="omniman_pose_tracking_node",
         output="screen",
         parameters=[
@@ -67,16 +67,18 @@ def launch_setup(context, *args, **kwargs):
     )
 
     mediapipe_node = Node(
-        package="mediapipe_dual_arm_control",
+        package="omniman_hand_teleop",
         executable="hand_pose_publisher_node.py",
         name="hand_pose_publisher_node",
         output="screen",
         condition=IfCondition(LaunchConfiguration("start_mediapipe")),
-        parameters=[{
-            "camera_device":  camera_device,
-            "show_window":    show_window,
-            "planning_frame": "base_link",
-        }],
+        parameters=[
+            teleop_params,
+            {
+                "show_window":    show_window,
+                "planning_frame": "base_link",
+            },
+        ],
     )
 
     return [pose_tracking_node, rviz_node, mediapipe_node]
@@ -84,11 +86,9 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        DeclareLaunchArgument("camera_device",   default_value="4",
-                              description="Webcam index (0 -> /dev/video4, C920)"),
-        DeclareLaunchArgument("use_trajectory",  default_value="false",
-                              description="false -> JGPC (arm_group_position_controller). "
-                                          "true  -> JTC  (arm_controller). "
+        DeclareLaunchArgument("use_trajectory",  default_value="true",
+                              description="true  -> JTC  (arm_controller). "
+                                          "false -> JGPC (arm_group_position_controller). "
                                           "Must match nxp_omniman_launch.py use_trajectory."),
         DeclareLaunchArgument("show_window",     default_value="true"),
         DeclareLaunchArgument("start_mediapipe", default_value="true"),

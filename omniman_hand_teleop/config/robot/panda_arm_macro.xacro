@@ -4,10 +4,10 @@
     <xacro:macro name="panda_arm" params="name prefix parent *origin initial_positions_file" >
 
         <!-- ros2_control -->
-        <xacro:include filename="$(find mediapipe_dual_arm_control)/config/robot/panda.ros2_control.xacro" />
+        <xacro:include filename="$(find omniman_hand_teleop)/config/robot/panda.ros2_control.xacro" />
         <xacro:panda_arm_ros2_control name="${name}" initial_positions_file="${initial_positions_file}" prefix="${prefix}"/>
 
-        <xacro:include filename="panda_hand.ros2_control.xacro" />
+        <xacro:include filename="$(find omniman_hand_teleop)/config/robot/panda_hand.ros2_control.xacro" />
         <xacro:panda_hand_ros2_control name="${name}" prefix="${prefix}"/>
 
         <!-- base_joint fixes base_link to the environment -->

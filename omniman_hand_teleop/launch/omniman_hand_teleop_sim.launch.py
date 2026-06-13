@@ -36,7 +36,6 @@ from launch_param_builder import ParameterBuilder
 
 
 def launch_setup(context, *args, **kwargs):
-    camera_device = int(LaunchConfiguration("camera_device").perform(context))
     track_orientation = LaunchConfiguration("track_orientation").perform(context).lower() == "true"
     show_window = LaunchConfiguration("show_window").perform(context).lower() == "true"
     use_fixed_orientation = LaunchConfiguration("use_fixed_orientation").perform(context).lower() == "true"
@@ -50,10 +49,11 @@ def launch_setup(context, *args, **kwargs):
         .to_moveit_configs()
     )
 
-    pkg_share = get_package_share_directory("mediapipe_dual_arm_control")
+    pkg_share = get_package_share_directory("omniman_hand_teleop")
+    teleop_params = os.path.join(pkg_share, "config", "teleop.yaml")
     pt_dir = os.path.join(pkg_share, "config", "pose_tracking")
     servo_params = {
-        "moveit_servo": ParameterBuilder("mediapipe_dual_arm_control")
+        "moveit_servo": ParameterBuilder("omniman_hand_teleop")
         .yaml(os.path.join(pt_dir, "pose_tracking_settings.yaml"))
         .yaml(os.path.join(pt_dir, "omniman_pose_tracking.yaml"))
         .to_dict()
@@ -100,7 +100,7 @@ def launch_setup(context, *args, **kwargs):
 
     # --- Servo pose tracking node ---------------------------------------------
     pose_tracking_node = Node(
-        package="mediapipe_dual_arm_control",
+        package="omniman_hand_teleop",
         executable="omniman_pose_tracking_node",
         output="screen",
         parameters=[
@@ -133,15 +133,17 @@ def launch_setup(context, *args, **kwargs):
 
     # --- MediaPipe (optional) -------------------------------------------------
     mediapipe_node = Node(
-        package="mediapipe_dual_arm_control",
+        package="omniman_hand_teleop",
         executable="hand_pose_publisher_node.py",
         name="hand_pose_publisher_node",
         output="screen",
         condition=IfCondition(LaunchConfiguration("start_mediapipe")),
         parameters=[
-            {"camera_device": camera_device},
-            {"show_window": show_window},
-            {"planning_frame": "base_link"},
+            teleop_params,
+            {
+                "show_window":    show_window,
+                "planning_frame": "base_link",
+            },
         ],
     )
 
@@ -160,7 +162,6 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("camera_device", default_value="1"),
             DeclareLaunchArgument("track_orientation", default_value="false"),
             DeclareLaunchArgument("use_fixed_orientation", default_value="false"),
             DeclareLaunchArgument("fixed_roll", default_value="0.0"),

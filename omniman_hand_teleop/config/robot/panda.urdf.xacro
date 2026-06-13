@@ -2,9 +2,9 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="panda">
 
     <xacro:arg name="left_initial_positions_file"
-            default="$(find mediapipe_dual_arm_control)/config/robot/left_initial_positions.yaml"/>
+            default="$(find omniman_hand_teleop)/config/robot/left_initial_positions.yaml"/>
     <xacro:arg name="right_initial_positions_file"
-            default="$(find mediapipe_dual_arm_control)/config/robot/right_initial_positions.yaml"/>
+            default="$(find omniman_hand_teleop)/config/robot/right_initial_positions.yaml"/>
 
     <!-- Root link -->
     <link name="world"/>

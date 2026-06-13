@@ -54,7 +54,7 @@ def generate_launch_description():
 
     use_trajectory_arg = DeclareLaunchArgument(
         "use_trajectory",
-        default_value="false",
+        default_value="true",
         description="false -> JointGroupPositionController (for MoveIt Servo). "
                     "true  -> JointTrajectoryController (for planned motion / PoseTracking trajectory mode).",
     )
@@ -199,8 +199,7 @@ def generate_launch_description():
     #     ],
     # )
 
-    # move_group hosts the planning pipeline + MoveGroupAction server. Only needed
-    # in planning mode (use_servo:=false) — servo bypasses move_group entirely.
+    # move_group hosts the planning pipeline + MoveGroupAction server. Only needed in planning mode
     move_group_node = Node(
         package="moveit_ros_move_group",
         executable="move_group",

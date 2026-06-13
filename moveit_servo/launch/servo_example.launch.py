@@ -123,7 +123,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     use_trajectory_arg = DeclareLaunchArgument(
         "use_trajectory",
-        default_value="false",
+        default_value="true",
         description="false -> Float64MultiArray to JointGroupPositionController. "
                     "true -> JointTrajectory to JointTrajectoryController.",
     )
