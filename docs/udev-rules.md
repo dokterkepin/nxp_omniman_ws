@@ -67,3 +67,4 @@ This prints all attributes you can match against: `idVendor`, `idProduct`, `seri
 
 ```bash
 udevadm info -a -n /dev/ttyUSB0 | grep -E 'idVendor|idProduct|serial|manufacturer|product'
+```

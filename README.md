@@ -15,11 +15,9 @@ for SLAM and navigation.
 - [ros2_control](#ros2_control)
 - [MoveIt](#moveit)
 - [Navigation](#navigation)
-  - [SLAM (Mapping)](#slam-mapping)
-  - [Nav2 (Autonomous Navigation)](#nav2-autonomous-navigation)
 - [Simulation (Isaac Sim)](#simulation-isaac-sim)
+- [Hand Teleop (MediaPipe)](#hand-teleop-mediapipe)
 - [Package Overview](#package-overview)
-- [Multi-Machine Setup](#multi-machine-setup)
 
 ## Hardware Overview
 
@@ -74,15 +72,15 @@ ip link show can_base
 ip link show can_arm
 ```
 
-For more details, see [cybergear_hardware/about_can.md](cybergear_hardware/about_can.md) and
-[cybergear_hardware/about_socketcan.md](cybergear_hardware/about_socketcan.md).
+For more details, see [docs/can-bus.md](docs/can-bus.md) and
+[docs/motor-zero-position.md](docs/motor-zero-position.md).
 
 ## Udev Rules
 
 Udev rules map the RPLidar and Dynamixel to fixed device names (`/dev/rplidar`, `/dev/dynamixel`),
 so the port doesn't change when devices are plugged in different USB slots.
 
-See [dynamixel_hardware/about_udev.md](dynamixel_hardware/about_udev.md) for setup instructions.
+See [docs/udev-rules.md](docs/udev-rules.md) for setup instructions.
 
 ## Build
 
@@ -132,70 +130,30 @@ You should see:
 
 ## MoveIt
 
-MoveIt provides motion planning for the 6-DOF arm and gripper.
+Motion planning via RViz interactive markers, real-time joystick control via MoveIt Servo,
+and hand gesture teleop via MediaPipe + Servo pose tracking.
 ros2_control must be running first.
 
 ```bash
-ros2 launch omniman_moveit_config demo.launch.py
+ros2 launch omniman_moveit_config moveit_rviz.launch.py   # motion planning (real hardware)
+ros2 launch moveit_servo servo_example.launch.py           # joystick servo teleop
 ```
 
-This opens RViz with the MoveIt motion planning plugin. You can:
-- Drag the interactive marker to set a goal pose
-- Click **Plan & Execute** to move the arm
-- Use the gripper controls to open/close
-
-![MoveIt RViz](docs/images/moveit.png)
+See [docs/moveit.md](docs/moveit.md) for all three control modes, the `use_trajectory` flag, and joystick mapping.
 
 ---
 
 ## Navigation
 
-### SLAM (Mapping)
-
-Build a map of the environment using `slam_toolbox` with laser odometry from `rf2o`.
+SLAM mapping with `slam_toolbox` + `rf2o` laser odometry, and autonomous navigation with Nav2 + AMCL.
 ros2_control must be running first.
 
 ```bash
-ros2 launch omniman_navigation slam_launch.py
+ros2 launch omniman_navigation slam_launch.py      # mapping
+ros2 launch omniman_navigation nav2_launch.py      # autonomous navigation
 ```
 
-This starts:
-- **RPLidar** — publishes `/scan`
-- **rf2o_laser_odometry** — laser-based odometry → `/odom_rf2o`
-- **EKF (robot_localization)** — fuses mecanum wheel odom + rf2o → `/odometry/filtered`
-- **slam_toolbox** — builds the map
-- **RViz** — visualization
-
-Drive the robot around using joystick or `cmd_vel` to build the map, then save it:
-
-```bash
-ros2 run nav2_map_server map_saver_cli -f ~/workspaces/nxp_omniman_ws/src/omniman_navigation/maps/my_map
-```
-
-![SLAM Occupancy Grid Mapping](docs/images/occupancy_grid_mapping.png)
-
-### Nav2 (Autonomous Navigation)
-
-Autonomous navigation using a saved map.
-ros2_control must be running first.
-
-```bash
-ros2 launch omniman_navigation nav2_launch.py
-```
-
-This starts the full Nav2 stack:
-- **map_server** + **AMCL** — localization on the saved map
-- **Nav2 planner/controller** — path planning + DWB local planner (configured for mecanum)
-- **rf2o + EKF** — odometry fusion
-
-In RViz:
-1. Set the initial pose with **2D Pose Estimate**
-2. Send goals with **2D Goal Pose**
-
-> **Note:** Nav2's DWB controller sends `geometry_msgs/TwistStamped`, but teleop_twist_joy sends
-> plain `Twist`. A relay node (`twist_to_twist_stamped.py`) bridges this gap when needed.
-
-![Nav2 Navigation](docs/images/nav2.png)
+See [docs/navigation.md](docs/navigation.md) for the full pipeline, map saving, and multi-machine setup.
 
 ---
 
@@ -203,7 +161,7 @@ In RViz:
 
 The robot can run in NVIDIA Isaac Sim using the `TopicBasedSystem` ros2_control plugin.
 **Always pass `use_sim:=true`** to every launch file when running in simulation.
-For more detail [about use_sim:=true](about_use_sim.md)
+For more detail see [docs/simulation.md](docs/simulation.md).
 
 ```bash
 ros2 launch omniman_ros2_control nxp_omniman_launch.py use_sim:=true use_joy:=true
@@ -217,6 +175,19 @@ The USD scene files are in `omniman_description/urdf/omniman_isaac/` (open `omni
 
 ---
 
+## Hand Teleop (MediaPipe)
+
+Control the arm with hand gestures from a webcam using Google MediaPipe landmark detection
+and MoveIt Servo. Requires ros2_control in Servo mode (`use_trajectory:=false`).
+
+```bash
+ros2 launch omniman_hand_teleop omniman_hand_teleop.launch.py
+```
+
+See [docs/hand-teleop.md](docs/hand-teleop.md) for launch sequence, gesture mapping, and parameters.
+
+---
+
 ## Package Overview
 
 | Package | Description |
@@ -225,6 +196,7 @@ The USD scene files are in `omniman_description/urdf/omniman_isaac/` (open `omni
 | `omniman_ros2_control` | Main launch file, controller config, URDF with ros2_control hardware tags |
 | `omniman_moveit_config` | MoveIt configuration (SRDF, kinematics, planning pipeline) |
 | `omniman_navigation` | SLAM, Nav2, EKF configs, and saved maps |
+| `omniman_hand_teleop` | MediaPipe hand gesture teleop for the arm via MoveIt Servo |
 | `omniman_commander` | Mission scripts and MoveIt commander nodes (pick-place, FIRA, traffic) |
 | `cybergear_hardware` | CyberGear/Robstride motor driver, CAN bus setup, ros2_control plugin |
 | `dynamixel_hardware` | Dynamixel servo driver, SDK, and ros2_control plugin |

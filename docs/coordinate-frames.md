@@ -88,4 +88,4 @@ The controller doesn't know about motor mounting. It just outputs numbers from t
 It assumes that when it says `+1.0` to a wheel, that wheel contributes to forward motion.
 But physically that's only true if the motor happens to be mounted the right way.
 
-
+See [axis-direction.md](axis-direction.md) for the full implementation breakdown.

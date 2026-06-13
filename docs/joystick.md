@@ -40,4 +40,4 @@ When you run `jstest`, move sticks and press buttons — it will show you in rea
 
 ## Solution: Dual Configuration in `joystick.yaml`
 
-The solution is to maintain **two configurations** in `config/joystick.yaml` — one for USB and one for Bluetooth. 
+The solution is to maintain **two configurations** in `config/joystick.yaml` — one for USB and one for Bluetooth.
