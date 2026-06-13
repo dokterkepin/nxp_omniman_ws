@@ -34,8 +34,8 @@
 .vscode/
 build
 *.log
-.claude
+.claude/
 **/pycache/
 **/__pycache__/
 *.pyc
-.kiro
+.kiro/
