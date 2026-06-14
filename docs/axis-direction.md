@@ -65,4 +65,4 @@ This means the entire ros2_control stack (controllers, URDF kinematics, Nav2, et
 The sign flip cancels out from the perspective of any higher-level controller. the left-side wheels (-1) are mirror-mounted, so their physical "positive" rotation is opposite to what the kinematics expect. 
 Multiplying by -1 on both read and write transparently corrects.
 
-> **Note:** `axis_direction` is only relevant for wheel motors. Arm joints always use `1` because MoveIt's kinematic solver handles axis orientation through the URDF model — see [ros2-coordinate-frames.md](ros2-coordinate-frames.md).
+> **Note:** `axis_direction` is only relevant for wheel motors. Arm joints always use `1` because MoveIt's kinematic solver handles axis orientation through the URDF model — see [coordinate-frames.md](coordinate-frames.md).

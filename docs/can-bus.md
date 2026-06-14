@@ -76,7 +76,7 @@ These names must match exactly what this script configures. `can_base` is for th
 ### How to run
 Run with `sudo` before launching ros2_control:
 ```bash
-sudo bash canbus_init.sh
+sudo bash canbus_init.sh   # or bringup_canbus.sh — both work
 ```
 This must be done **after every boot** — CAN interface configuration does not persist across reboots.
 Make sure the LED in hardware is bright after running this file.

@@ -12,6 +12,7 @@ for SLAM and navigation.
 - [CAN Bus Setup](#can-bus-setup)
 - [Udev Rules](#udev-rules)
 - [Build](#build)
+- [Quick Start](#quick-start)
 - [ros2_control](#ros2_control)
 - [MoveIt](#moveit)
 - [Navigation](#navigation)
@@ -90,6 +91,35 @@ source /opt/ros/humble/setup.bash
 colcon build --symlink-install
 source install/setup.bash
 ```
+
+---
+
+## Quick Start
+
+Every session on real hardware follows this boot sequence:
+
+**Step 1 — CAN bus** (after every reboot)
+```bash
+cd ~/workspaces/nxp_omniman_ws/src/cybergear_hardware
+sudo bash canbus_init.sh
+```
+
+**Step 2 — ros2_control** (always required)
+```bash
+ros2 launch omniman_ros2_control nxp_omniman_launch.py
+```
+
+**Step 3 — choose a feature**
+
+| Goal | Command |
+|---|---|
+| Motion planning (MoveIt RViz) | `ros2 launch omniman_moveit_config moveit_rviz.launch.py` |
+| Joystick arm control (Servo) | `ros2 launch moveit_servo servo_example.launch.py` |
+| Hand gesture arm control | `ros2 launch omniman_hand_teleop omniman_hand_teleop.launch.py` |
+| SLAM mapping | `ros2 launch omniman_navigation slam_launch.py` |
+| Autonomous navigation | `ros2 launch omniman_navigation nav2_launch.py` |
+
+> For Isaac Sim, skip Step 1 and add `use_sim:=true` to every launch in Step 2 and 3.
 
 ---
 

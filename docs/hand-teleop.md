@@ -46,7 +46,7 @@ hand_pose_publisher_node:
 
 ### Demo mode (no robot needed)
 ```bash
-ros2 launch omniman_hand_teleop omniman_hand_teleop_sim.launch.py
+ros2 launch omniman_hand_teleop omniman_hand_teleop_demo.launch.py
 ```
 
 ### Real hardware
