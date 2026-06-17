@@ -233,7 +233,7 @@ def generate_launch_description():
         package="usb_cam",
         executable="usb_cam_node_exe",
         parameters=[{
-            'video_device': '/dev/video0',
+            'video_device': '/dev/video_c930',
             'focus_auto': 0,
             'focus_absolute': 30,
         }]
@@ -255,9 +255,9 @@ def generate_launch_description():
             joy_node,
             teleop_joy_node,
             keyboard_node,
-            # move_group_node,
+            move_group_node,
             # rviz_node,
-            # usb_cam,
+            usb_cam,
             # rplidar_node
         ]
     )
