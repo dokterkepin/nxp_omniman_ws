@@ -1,70 +1,123 @@
-# Dynamixel Udev Rules
+# Udev Rules
 
-we should follow this tutorial from official dynamixel manual for open manipulator: 
-https://emanual.robotis.com/docs/en/platform/openmanipulator_x/quick_start_guide/
+Linux assigns device names (`/dev/ttyUSB0`, `can0`, `/dev/video0`, …) based on detection order, which can change between reboots or reconnects. udev rules create stable symlinks so your config files always point to the right device.
 
-## Problem
+---
 
-When multiple USB devices are connected (e.g., Dynamixel U2D2 adapter and RPLidar), Linux assigns `/dev/ttyUSB0`, `/dev/ttyUSB1`, etc. based on the order they are detected. This order can change between boots or when devices are reconnected, so a device that was `/dev/ttyUSB0` yesterday might become `/dev/ttyUSB1` today.
+## Dynamixel U2D2
 
-This causes problems because our launch files and config files reference a specific port (e.g., `/dev/ttyUSB0`). If the assignment shifts, the wrong device gets opened.
-
-## Solution: Udev Symlink
-
-The file `dynamixel_hardware_interface/scripts/99-manipulator-cdc.rules` creates a persistent symlink so the Dynamixel U2D2 adapter is always accessible at `/dev/dynamixel`, regardless of which `ttyUSB` number it gets assigned.
-
-The rule:
-
-```
-KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", MODE="0666", SYMLINK+="dynamixel"
-```
-After this rule is installed, you can use `/dev/dynamixel` in your config files and it will always point to the correct device.
-
-## How to Install
-
-1. Copy the rules file to the udev rules directory:
-
+the rules file already exists, copy it automatically
 ```bash
 sudo cp ~/workspaces/nxp_omniman_ws/src/dynamixel_hardware/dynamixel_hardware_interface/scripts/99-manipulator-cdc.rules /etc/udev/rules.d/
 ```
 
-2. Reload udev rules:
-
+or do it manually — find your device node and attributes
 ```bash
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-```
-
-3. Verify the symlink exists (with the U2D2 plugged in):
-
-```bash
-ls -l /dev/dynamixel
-```
-
-You should see something like `dynamixel -> ttyUSB0`.
-
-> **Note:** There is also a helper script `create_udev_rules` that does steps 1-2 automatically via `ros2 run dynamixel_hardware_interface create_udev_rules`, but that requires the workspace to be built and sourced first.
-
-## How to Check Device Attributes Before Writing a Rule
-
-Before writing or updating a udev rule, verify the actual device attributes first so the rule matches the correct device.
-
-**1. List connected USB TTY devices:**
-
-```bash
-ls /dev/ttyUSB* /dev/ttyACM*
-```
-
-**2. Get the full attribute tree for a specific device:**
-
-```bash
+ls /dev/ttyUSB*
 udevadm info -a -n /dev/ttyUSB0
 ```
 
-This prints all attributes you can match against: `idVendor`, `idProduct`, `serial`, `manufacturer`, `product`, etc.
-
-**3. Filter for the most useful fields:**
-
+create and modify the rules file
 ```bash
-udevadm info -a -n /dev/ttyUSB0 | grep -E 'idVendor|idProduct|serial|manufacturer|product'
+sudo nano /etc/udev/rules.d/99-manipulator-cdc.rules
 ```
+
+put this inside and save
+```
+KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", MODE="0666", SYMLINK+="dynamixel"
+```
+
+reload and verify
+```bash
+sudo udevadm control --reload-rules && sudo udevadm trigger
+ls -l /dev/dynamixel
+```
+must show output like: `dynamixel -> ttyUSB0`
+
+---
+
+## RPLidar
+
+the rules file already exists, copy it automatically
+```bash
+sudo cp ~/workspaces/nxp_omniman_ws/src/rplidar_ros/scripts/rplidar.rules /etc/udev/rules.d/
+```
+
+or do it manually — find your device node and attributes
+```bash
+ls /dev/ttyUSB*
+udevadm info -a -n /dev/ttyUSB0
+```
+
+create and modify the rules file
+```bash
+sudo nano /etc/udev/rules.d/rplidar.rules
+```
+
+put this inside and save
+```
+KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0777", SYMLINK+="rplidar"
+```
+
+reload and verify
+```bash
+sudo udevadm control --reload-rules && sudo udevadm trigger
+ls -l /dev/rplidar
+```
+must show output like: `rplidar -> ttyUSB1`
+
+---
+
+## CAN Bus Adapters
+
+plug in **one adapter at a time** and find its serial number
+```bash
+udevadm info -a -p /sys/class/net/can0 | grep serial
+```
+repeat for the second adapter — note which serial belongs to wheels and which to the arm
+
+create and modify the rules file
+```bash
+sudo nano /etc/udev/rules.d/80-can.rules
+```
+
+put this inside and save, replacing the serial numbers with yours
+```
+SUBSYSTEM=="net", ACTION=="add", ATTRS{serial}=="<wheels-serial>", NAME="can_base"
+SUBSYSTEM=="net", ACTION=="add", ATTRS{serial}=="<arm-serial>", NAME="can_arm"
+```
+
+reload and verify
+```bash
+sudo udevadm control --reload-rules && sudo udevadm trigger
+ip link show can_base && ip link show can_arm
+```
+must show both interfaces
+
+---
+
+## C920 Webcam
+
+find which video node is the C920 and get its attributes
+```bash
+v4l2-ctl --list-devices
+udevadm info -a -n /dev/video2
+```
+replace `video2` with whatever node the C920 capture device is on your system
+
+create and modify the rules file
+```bash
+sudo nano /etc/udev/rules.d/99-camera.rules
+```
+
+put this inside and save
+```
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="08e5", ATTR{index}=="0", SYMLINK+="video_c920", MODE="0666"
+```
+
+reload and verify
+```bash
+sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=video4linux
+ls -la /dev/video_c920
+```
+must show output like: `video_c920 -> video2`

@@ -14,6 +14,7 @@ for SLAM and navigation.
 - [Build](#build)
 - [Quick Start](#quick-start)
 - [ros2_control](#ros2_control)
+- [Teleoperation from Another Machine](#teleoperation-from-another-machine)
 - [MoveIt](#moveit)
 - [Navigation](#navigation)
 - [Simulation (Isaac Sim)](#simulation-isaac-sim)
@@ -56,32 +57,19 @@ rosdep install --from-paths src --ignore-src -r -y
 sudo apt install -y can-utils
 ```
 
-## CAN Bus Setup
+## Device Ports
 
-The robot uses two CAN buses: `can_base` for mecanum wheels and `can_arm` for arm joints.
-
-```bash
-# Bring up both CAN interfaces (run once after boot)
-cd ~/workspaces/nxp_omniman_ws/src/cybergear_hardware
-sudo bash bringup_canbus.sh
-```
-
-Verify CAN is up:
+Before launching, verify all devices are reachable at their stable ports.
 
 ```bash
-ip link show can_base
-ip link show can_arm
+ls -l /dev/dynamixel      # Dynamixel U2D2
+ls -l /dev/rplidar        # RPLidar
+ls -la /dev/video_c920    # C920 webcam
+ip link show can_base     # CAN bus — wheels
+ip link show can_arm      # CAN bus — arm
 ```
 
-For more details, see [docs/can-bus.md](docs/can-bus.md) and
-[docs/motor-zero-position.md](docs/motor-zero-position.md).
-
-## Udev Rules
-
-Udev rules map the RPLidar and Dynamixel to fixed device names (`/dev/rplidar`, `/dev/dynamixel`),
-so the port doesn't change when devices are plugged in different USB slots.
-
-See [docs/udev-rules.md](docs/udev-rules.md) for setup instructions.
+If any port is missing, see [docs/udev-rules.md](docs/udev-rules.md) for setup instructions.
 
 ## Build
 
@@ -155,6 +143,22 @@ You should see:
 - `mecanum_drive_controller` — active
 - `arm_controller` — active
 - `gripper_controller` — active
+
+---
+
+## Teleoperation from Another Machine
+
+ROS 2 DDS lets you run the joystick or keyboard node on a separate machine — no need to plug the controller into the robot. Connect the controller on the remote machine, set the same `ROS_DOMAIN_ID`, then run:
+
+```bash
+# joystick
+ros2 run joy_linux joy_linux_node
+```
+
+```bash
+# keyboard
+ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r /cmd_vel:=/cmd_vel_stamped -p stamped:="true"
+```
 
 ---
 

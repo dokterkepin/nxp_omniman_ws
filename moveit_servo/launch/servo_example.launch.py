@@ -1,8 +1,7 @@
 import os
 import yaml
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.substitutions import LaunchConfiguration
+from launch.actions import OpaqueFunction
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import ComposableNodeContainer
@@ -22,10 +21,6 @@ def load_yaml(package_name, file_path):
 
 
 def launch_setup(context, *args, **kwargs):
-    use_trajectory = (
-        LaunchConfiguration("use_trajectory").perform(context).lower() == "true"
-    )
-
     moveit_config = (
         MoveItConfigsBuilder("nxp_omniman", package_name="moveit_config")
         .robot_description(file_path="config/nxp_omniman.urdf.xacro")
@@ -33,14 +28,6 @@ def launch_setup(context, *args, **kwargs):
     )
 
     servo_yaml = load_yaml("moveit_servo", "config/panda_simulated_config.yaml")
-
-    if use_trajectory:
-        servo_yaml["command_out_type"] = "trajectory_msgs/JointTrajectory"
-        servo_yaml["command_out_topic"] = "/arm_controller/joint_trajectory"
-    else:
-        servo_yaml["command_out_type"] = "std_msgs/Float64MultiArray"
-        servo_yaml["command_out_topic"] = "/arm_group_position_controller/commands"
-
     servo_params = {"moveit_servo": servo_yaml}
 
     rviz_config_file = (
@@ -121,16 +108,8 @@ def launch_setup(context, *args, **kwargs):
 
 
 def generate_launch_description():
-    use_trajectory_arg = DeclareLaunchArgument(
-        "use_trajectory",
-        default_value="true",
-        description="false -> Float64MultiArray to JointGroupPositionController. "
-                    "true -> JointTrajectory to JointTrajectoryController.",
-    )
-
     return LaunchDescription(
         [
-            use_trajectory_arg,
             OpaqueFunction(function=launch_setup),
         ]
     )

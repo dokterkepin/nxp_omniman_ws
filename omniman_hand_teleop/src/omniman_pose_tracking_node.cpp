@@ -9,17 +9,6 @@
  *  time.  The gripper is handled separately by the MediaPipe Python node.
  *
  *  Adapted from the dual-arm MediaPipe demo (Nabil-Miri/mediapipe_dual_arm_control)
- *  for the single omniman arm.  Differences from the original:
- *    - one arm only (no left/right, no namespaces)
- *    - no gripper publisher here (Python sends a GripperCommand action goal)
- *    - PoseTracking owns its own Servo, so we do NOT create a second one
- *    - position-only tracking (the 6-DOF arm has no null space, so tracking hand
- *      orientation drags the EE position around). The held orientation is
- *      re-captured every time tracking (re)starts.
- *    - a left-hand gesture (Python) can publish an SRDF named pose name on
- *      /arm_named_pose; we pause servo and send the arm there via the trajectory
- *      controller -- a clean singularity escape + orientation reset.
- *
  * BSD 3-Clause License (inherited from moveit_servo)
  *******************************************************************************/
 
