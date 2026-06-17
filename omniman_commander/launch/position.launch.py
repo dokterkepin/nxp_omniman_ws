@@ -5,7 +5,7 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
     moveit_config = (
-        MoveItConfigsBuilder("nxp_omniman", package_name="omniman_moveit_config").to_moveit_configs()
+        MoveItConfigsBuilder("nxp_omniman", package_name="moveit_config").to_moveit_configs()
     )
 
     position_node = Node(

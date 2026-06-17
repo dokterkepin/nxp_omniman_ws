@@ -1,203 +1,194 @@
 #include <memory>
 #include <thread>
-#include <algorithm>
-#include <iostream>
+#include <string>
 
 #include <rclcpp/rclcpp.hpp>
-#include <moveit/move_group_interface/move_group_interface.h>
-#include <moveit/planning_scene_interface/planning_scene_interface.h>
-#include <moveit_visual_tools/moveit_visual_tools.h>
 
-namespace rvt = rviz_visual_tools;
+#include "omniman_commander/arm_commander.hpp"
 
-using moveit::planning_interface::MoveGroupInterface;
+using omniman::ArmCommander;
+using omniman::Offset;
+using omniman::apply_offset;
 
-struct CommanderParams {
-  double arm_max_velocity_scaling_factor = 0.1;
-  double arm_max_acceleration_scaling_factor = 0.1;
-  std::string end_effector_link = "ee_link";
+// ---------- Mission config loaded from poses.yaml (no recompile to change poses) ----------
+
+struct MissionConfig {
+  Offset pre_grasp, grasp, lift, place;
 };
 
-class Commander1 {
-public:
-  Commander1(
-    std::shared_ptr<rclcpp::Logger> logger,
-    MoveGroupInterface& arm_move_group,
-    MoveGroupInterface& gripper_move_group,
-    moveit_visual_tools::MoveItVisualTools& visual_tools,
-    CommanderParams& params)
-    : logger_(logger),
-      arm_move_group_(&arm_move_group),
-      gripper_move_group_(&gripper_move_group),
-      visual_tools_(&visual_tools),
-      params_(&params)
-  {
-    text_pose_ = Eigen::Isometry3d::Identity();
-    text_pose_.translation().z() = 1.0;
-
-    joint_model_group_ = arm_move_group_->getRobotModel()->getJointModelGroup("arm");
-    
+// automatically_declare_parameters_from_overrides pre-declares params from YAML,
+// so we check before declaring to avoid ParameterAlreadyDeclaredException.
+template<typename T>
+static T get_param(rclcpp::Node::SharedPtr node, const std::string & name, T default_val)
+{
+  if (!node->has_parameter(name)) {
+    node->declare_parameter(name, default_val);
   }
+  return node->get_parameter(name).get_value<T>();
+}
 
-  void clear_target_n_constraints() {
-    arm_move_group_->clearPoseTargets();
-    arm_move_group_->clearPathConstraints();
-  }
+static Offset load_offset(rclcpp::Node::SharedPtr node, const std::string & name)
+{
+  Offset o;
+  o.dx     = get_param(node, name + ".dx",     0.0);
+  o.dy     = get_param(node, name + ".dy",     0.0);
+  o.dz     = get_param(node, name + ".dz",     0.0);
+  o.droll  = get_param(node, name + ".droll",  0.0);
+  o.dpitch = get_param(node, name + ".dpitch", 0.0);
+  o.dyaw   = get_param(node, name + ".dyaw",   0.0);
+  return o;
+}
 
-  bool move_ptp(const geometry_msgs::msg::Pose& target_pose, const std::string& text,
-                const moveit::core::LinkModel* ee_link) {
-      std::cout << std::string(125, '*') << std::endl;
-      RCLCPP_INFO(*logger_, "Move absolute to `%s`", text.c_str());
+static MissionConfig load_mission(rclcpp::Node::SharedPtr node)
+{
+  MissionConfig cfg;
+  cfg.pre_grasp = load_offset(node, "pre_grasp");
+  cfg.grasp     = load_offset(node, "grasp");
+  cfg.lift      = load_offset(node, "lift");
+  cfg.place     = load_offset(node, "place");
+  return cfg;
+}
 
-      // Clear previous targets and constraints
-      clear_target_n_constraints();
+// ---------- State machine ----------
 
-      // Set Pilz Industrial Motion Planner with PTP planner for point-to-point motion
-      arm_move_group_->setPlannerId("PTP");
-
-      // Set velocity scaling for this motion
-      arm_move_group_->setMaxVelocityScalingFactor(params_->arm_max_velocity_scaling_factor);
-      arm_move_group_->setMaxAccelerationScalingFactor(params_->arm_max_acceleration_scaling_factor);
-
-      // Set the start state to the current state
-      auto current_state = arm_move_group_->getCurrentState();
-      arm_move_group_->setStartState(*current_state);
-      arm_move_group_->setPoseTarget(target_pose, params_->end_effector_link);  // planning in cartesian space
-
-      std::string text_lower = text;
-      std::transform(text_lower.begin(), text_lower.end(), text_lower.begin(), ::tolower);
-
-      // Plan the motion
-      auto plan_result = arm_move_group_->plan(plan_);
-      is_plan_success_ = plan_result == moveit::core::MoveItErrorCode::SUCCESS;
-      RCLCPP_INFO(*logger_, "Move PTP Planning: %s", is_plan_success_ ? "succeeded" : "failed");
-
-      // Visualize the target pose and trajectory
-      visual_tools_->publishAxisLabeled(target_pose, text_lower);
-      visual_tools_->publishText(text_pose_, text, rvt::WHITE, rvt::XLARGE);
-
-      is_execution_success_ = false;
-      if (is_plan_success_) {
-          visual_tools_->publishTrajectoryLine(plan_.trajectory_, ee_link, joint_model_group_);
-          visual_tools_->trigger();
-
-          // Use execute instead of move to ensure we use the validated plan
-          auto execution_result = arm_move_group_->execute(plan_);
-          is_execution_success_ = execution_result == moveit::core::MoveItErrorCode::SUCCESS;
-          RCLCPP_INFO(*logger_, "PTP trajectory execution: %s", is_execution_success_ ? "succeeded" : "failed");
-
-          if (!is_execution_success_) {
-              RCLCPP_ERROR(*logger_, "PTP trajectory execution failed with error code: %d (%s)", static_cast<int>(execution_result.val),
-                          moveit::core::error_code_to_string(execution_result).c_str());
-          }
-      } else {
-          RCLCPP_WARN(*logger_, "PTP path planning failed with error code: %d (%s)", static_cast<int>(plan_result.val),
-                      moveit::core::error_code_to_string(plan_result).c_str());
-      }
-
-      return is_plan_success_ && is_execution_success_;
-  }
-
-private:
-  std::shared_ptr<rclcpp::Logger> logger_;
-  MoveGroupInterface* arm_move_group_;
-  MoveGroupInterface* gripper_move_group_;
-  moveit_visual_tools::MoveItVisualTools* visual_tools_;
-  CommanderParams* params_;
-
-  MoveGroupInterface::Plan plan_;
-  bool is_plan_success_ = false;
-  bool is_execution_success_ = false;
-  Eigen::Isometry3d text_pose_;
-  const moveit::core::JointModelGroup* joint_model_group_;
+enum class State {
+  READY,
+  OPEN_GRIPPER,
+  PRE_GRASP,
+  GRASP,
+  CLOSE_GRIPPER,
+  LIFT,
+  PLACE,
+  RELEASE,
+  RETURN_READY,
+  DONE,
+  ERROR
 };
 
-int main(int argc, char* argv[])
+static const char * state_name(State s)
+{
+  switch (s) {
+    case State::READY:         return "READY";
+    case State::OPEN_GRIPPER:  return "OPEN_GRIPPER";
+    case State::PRE_GRASP:     return "PRE_GRASP";
+    case State::GRASP:         return "GRASP";
+    case State::CLOSE_GRIPPER: return "CLOSE_GRIPPER";
+    case State::LIFT:          return "LIFT";
+    case State::PLACE:         return "PLACE";
+    case State::RELEASE:       return "RELEASE";
+    case State::RETURN_READY:  return "RETURN_READY";
+    case State::DONE:          return "DONE";
+    case State::ERROR:         return "ERROR";
+    default:                   return "UNKNOWN";
+  }
+}
+
+// ---------- Main ----------
+
+int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  auto const node = std::make_shared<rclcpp::Node>(
+  auto node = std::make_shared<rclcpp::Node>(
     "commander1",
-    rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true)
-  );
-  auto const logger = rclcpp::get_logger("commander1");
+    rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
+  auto logger = rclcpp::get_logger("commander1");
 
   rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(node);
   auto spinner = std::thread([&executor]() { executor.spin(); });
 
-  auto move_group_interface = MoveGroupInterface(node, "arm");
-  auto gripper_group_interface = MoveGroupInterface(node, "gripper");
-  move_group_interface.setPlanningPipelineId("pilz_industrial_motion_planner");
-  move_group_interface.setPlannerId("PTP");
-  RCLCPP_INFO(logger, "Planning Pipeline: %s", move_group_interface.getPlanningPipelineId().c_str());
-  RCLCPP_INFO(logger, "Planner ID: %s", move_group_interface.getPlannerId().c_str());
+  auto cfg = load_mission(node);
 
-  auto visual_tools = moveit_visual_tools::MoveItVisualTools{
-    node, "base_link", rviz_visual_tools::RVIZ_MARKER_TOPIC,
-    move_group_interface.getRobotModel()};
-  visual_tools.deleteAllMarkers();
-  visual_tools.loadRemoteControl();
+  // Planner selection comes from poses.yaml (defaults to Pilz PTP if not set).
+  auto planner_pipeline = get_param(node, "planner_pipeline",
+                                    std::string("pilz_industrial_motion_planner"));
+  auto planner_id       = get_param(node, "planner_id", std::string("PTP"));
 
-  // Add floor collision object
-  {
-    moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
-    moveit_msgs::msg::CollisionObject floor;
-    floor.header.frame_id = move_group_interface.getPlanningFrame();
-    floor.id = "floor";
-    shape_msgs::msg::SolidPrimitive box;
-    box.type = box.BOX;
-    box.dimensions = {2.0, 2.0, 0.01};
-    geometry_msgs::msg::Pose floor_pose;
-    floor_pose.orientation.w = 1.0;
-    floor_pose.position.z = -0.01;
-    floor.primitives.push_back(box);
-    floor.primitive_poses.push_back(floor_pose);
-    floor.operation = floor.ADD;
-    planning_scene_interface.applyCollisionObject(floor);
-    RCLCPP_INFO(logger, "Floor collision object added");
+  ArmCommander commander(node);
+  commander.set_planner(planner_pipeline, planner_id);
+  RCLCPP_INFO(logger, "Mission planner from yaml -> pipeline: %s, planner: %s",
+    planner_pipeline.c_str(), planner_id.c_str());
+  commander.add_floor();
+
+  State state = State::READY;
+  bool  ok    = true;
+
+  // ref_pose tracks the previous step's achieved pose; each offset is applied on top of it.
+  geometry_msgs::msg::Pose ref_pose;
+
+  while (rclcpp::ok() && state != State::DONE && state != State::ERROR) {
+    RCLCPP_INFO(logger, "====== State: %s ======", state_name(state));
+
+    switch (state) {
+      case State::READY:
+        ok = commander.move_named("ready");
+        if (ok) {
+          ref_pose = commander.current_pose();
+          RCLCPP_INFO(logger, "Captured ready pose: pos=(%.3f, %.3f, %.3f) quat=(%.3f, %.3f, %.3f, %.3f)",
+            ref_pose.position.x, ref_pose.position.y, ref_pose.position.z,
+            ref_pose.orientation.x, ref_pose.orientation.y,
+            ref_pose.orientation.z, ref_pose.orientation.w);
+        }
+        state = ok ? State::OPEN_GRIPPER : State::ERROR;
+        break;
+
+      case State::OPEN_GRIPPER:
+        ok    = commander.move_gripper("open");
+        state = ok ? State::PRE_GRASP : State::ERROR;
+        break;
+
+      case State::PRE_GRASP:
+        ok = commander.move_to_pose(apply_offset(ref_pose, cfg.pre_grasp), "pre_grasp");
+        if (ok) ref_pose = commander.current_pose();
+        state = ok ? State::GRASP : State::ERROR;
+        break;
+
+      case State::GRASP:
+        ok = commander.move_to_pose(apply_offset(ref_pose, cfg.grasp), "grasp");
+        if (ok) ref_pose = commander.current_pose();
+        state = ok ? State::CLOSE_GRIPPER : State::ERROR;
+        break;
+
+      case State::CLOSE_GRIPPER:
+        ok    = commander.move_gripper("close");
+        state = ok ? State::LIFT : State::ERROR;
+        break;
+
+      case State::LIFT:
+        ok = commander.move_to_pose(apply_offset(ref_pose, cfg.lift), "lift");
+        if (ok) ref_pose = commander.current_pose();
+        state = ok ? State::PLACE : State::ERROR;
+        break;
+
+      case State::PLACE:
+        ok = commander.move_to_pose(apply_offset(ref_pose, cfg.place), "place");
+        if (ok) ref_pose = commander.current_pose();
+        state = ok ? State::RELEASE : State::ERROR;
+        break;
+
+      case State::RELEASE:
+        ok    = commander.move_gripper("open");
+        state = ok ? State::RETURN_READY : State::ERROR;
+        break;
+
+      case State::RETURN_READY:
+        ok    = commander.move_named("ready");
+        state = ok ? State::DONE : State::ERROR;
+        break;
+
+      default:
+        state = State::ERROR;
+        break;
+    }
   }
 
-  RCLCPP_INFO(logger, "Default EE link: %s", move_group_interface.getEndEffectorLink().c_str());
-  RCLCPP_INFO(logger, "Planning frame: %s", move_group_interface.getPlanningFrame().c_str());
-  RCLCPP_INFO(logger, "Pose reference frame: %s", move_group_interface.getPoseReferenceFrame().c_str());
-
-  auto current_pose = move_group_interface.getCurrentPose("ee_link").pose;
-  RCLCPP_INFO(logger, "Current pose (ee_link): pos=(%.4f, %.4f, %.4f) quat=(%.4f, %.4f, %.4f, %.4f)",
-    current_pose.position.x, current_pose.position.y, current_pose.position.z,
-    current_pose.orientation.x, current_pose.orientation.y,
-    current_pose.orientation.z, current_pose.orientation.w);
-
-  auto default_pose = move_group_interface.getCurrentPose().pose;
-  RCLCPP_INFO(logger, "Current pose (default): pos=(%.4f, %.4f, %.4f) quat=(%.4f, %.4f, %.4f, %.4f)",
-    default_pose.position.x, default_pose.position.y, default_pose.position.z,
-    default_pose.orientation.x, default_pose.orientation.y,
-    default_pose.orientation.z, default_pose.orientation.w);
-
-  CommanderParams params;
-  auto logger_ptr = std::make_shared<rclcpp::Logger>(logger);
-  Commander1 commander(logger_ptr, move_group_interface, gripper_group_interface, visual_tools, params);
-
-  geometry_msgs::msg::Pose target_pose;
-  target_pose.position.x = current_pose.position.x;
-  target_pose.position.y = current_pose.position.y + 0.02;
-  target_pose.position.z = current_pose.position.z;
-  target_pose.orientation.x = current_pose.orientation.x;
-  target_pose.orientation.y = current_pose.orientation.y;
-  target_pose.orientation.z = current_pose.orientation.z;
-  target_pose.orientation.w = current_pose.orientation.w;
-  // Sync the internal start state with the real-world state before planning,
-  // as per MoveIt best practice: prevents MoveIt from using the end of a stale
-  // previous plan as the start state, which creates "jumps" the planner can't resolve.
-  move_group_interface.setStartStateToCurrentState();
-
-  RCLCPP_INFO(logger, "Target pose: pos=(%.4f, %.4f, %.4f) quat=(%.4f, %.4f, %.4f, %.4f)",
-    target_pose.position.x, target_pose.position.y, target_pose.position.z,
-    target_pose.orientation.x, target_pose.orientation.y,
-    target_pose.orientation.z, target_pose.orientation.w);
-  auto const ee_link = move_group_interface.getRobotModel()->getLinkModel("ee_link");
-  commander.move_ptp(target_pose, "CurrentPose", ee_link);
+  if (state == State::DONE) {
+    RCLCPP_INFO(logger, "Pick and place complete!");
+  } else {
+    RCLCPP_ERROR(logger, "Pick and place FAILED. Check logs above for the failing state.");
+  }
 
   rclcpp::shutdown();
   spinner.join();
-  return 0;
+  return (state == State::DONE) ? 0 : 1;
 }
