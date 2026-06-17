@@ -11,8 +11,8 @@ commander1:
     # Ready pose (for reference): x=0.326 y=-0.004 z=0.412
 
     # Pre-grasp: above the object
-    pre_grasp.dx:  0.00
-    pre_grasp.dy:  0.00
+    pre_grasp.dx:  0.05
+    pre_grasp.dy:  0.1
     pre_grasp.dz: -0.05
     pre_grasp.droll:  0.00
     pre_grasp.dpitch: 0.00
@@ -20,7 +20,7 @@ commander1:
 
     # Grasp: lower to meet the object
     grasp.dx:  0.00
-    grasp.dy:  0.00
+    grasp.dy:  -0.2
     grasp.dz: -0.05
     grasp.droll:  0.00
     grasp.dpitch: 0.400
