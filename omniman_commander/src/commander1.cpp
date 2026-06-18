@@ -104,8 +104,12 @@ int main(int argc, char * argv[])
                                     std::string("pilz_industrial_motion_planner"));
   auto planner_id       = get_param(node, "planner_id", std::string("PTP"));
 
+  auto velocity_scale     = get_param(node, "velocity_scale",     0.3);
+  auto acceleration_scale = get_param(node, "acceleration_scale", 0.3);
+
   ArmCommander commander(node);
   commander.set_planner(planner_pipeline, planner_id);
+  commander.set_scaling(velocity_scale, acceleration_scale);
   RCLCPP_INFO(logger, "Mission planner from yaml -> pipeline: %s, planner: %s",
     planner_pipeline.c_str(), planner_id.c_str());
   commander.add_floor();

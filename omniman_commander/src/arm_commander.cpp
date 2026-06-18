@@ -42,10 +42,20 @@ ArmCommander::ArmCommander(const rclcpp::Node::SharedPtr & node,
 
 void ArmCommander::set_planner(const std::string & pipeline_id, const std::string & planner_id)
 {
-  arm_.setPlanningPipelineId(pipeline_id);
-  arm_.setPlannerId(planner_id);
+  pipeline_id_ = pipeline_id;
+  planner_id_  = planner_id;
+  arm_.setPlanningPipelineId(pipeline_id_);
+  arm_.setPlannerId(planner_id_);
   RCLCPP_INFO(logger_, "Planner selected — pipeline: %s, planner: %s",
     arm_.getPlanningPipelineId().c_str(), arm_.getPlannerId().c_str());
+}
+
+void ArmCommander::set_scaling(double velocity_scale, double acceleration_scale)
+{
+  velocity_scale_     = velocity_scale;
+  acceleration_scale_ = acceleration_scale;
+  RCLCPP_INFO(logger_, "Scaling set — velocity: %.2f, acceleration: %.2f",
+    velocity_scale_, acceleration_scale_);
 }
 
 bool ArmCommander::move_to_pose(const geometry_msgs::msg::Pose & target,
@@ -57,6 +67,12 @@ bool ArmCommander::move_to_pose(const geometry_msgs::msg::Pose & target,
     target.orientation.x, target.orientation.y,
     target.orientation.z, target.orientation.w);
 
+  // Re-apply planner and scaling every call — prevents any stale override.
+  arm_.setPlanningPipelineId(pipeline_id_);
+  arm_.setPlannerId(planner_id_);
+  arm_.setMaxVelocityScalingFactor(velocity_scale_);
+  arm_.setMaxAccelerationScalingFactor(acceleration_scale_);
+
   // Sync the internal start state with the real robot and clear any stale goals.
   arm_.setStartStateToCurrentState();
   arm_.clearPoseTargets();
@@ -64,15 +80,17 @@ bool ArmCommander::move_to_pose(const geometry_msgs::msg::Pose & target,
   arm_.setStartStateToCurrentState();
 
   // Cartesian pose goal — the planner solves IK while planning.
-  arm_.setPoseTarget(target);
+  arm_.setPoseTarget(target, "ee_link");
 
   // Direct IK check (diagnostic only, does not affect planning): separates
   // "unreachable" from "plan failed" in the logs.
   {
     auto test_state = *arm_.getCurrentState();
     auto const * jmg = test_state.getJointModelGroup(arm_.getName());
-    bool ik_ok = test_state.setFromIK(jmg, target, 0.1);
-    RCLCPP_INFO(logger_, "  Direct IK check (100ms): %s", ik_ok ? "reachable" : "NO SOLUTION");
+    // Same link ("ee_link") and same 5ms timeout as the planner (kinematics.yaml),
+    // so "reachable" actually predicts whether the plan will succeed.
+    bool ik_ok = test_state.setFromIK(jmg, target, "ee_link", 0.005);
+    RCLCPP_INFO(logger_, "  Direct IK check (5ms, ee_link): %s", ik_ok ? "reachable" : "NO SOLUTION");
   }
 
   // Plan
@@ -136,7 +154,9 @@ bool ArmCommander::move_gripper(const std::string & named_target)
 
 geometry_msgs::msg::Pose ArmCommander::current_pose()
 {
-  return arm_.getCurrentPose().pose;
+  // Use the same link we plan to ("ee_link") so the captured pose matches the
+  // frame used by move_to_pose / setPoseTarget.
+  return arm_.getCurrentPose("ee_link").pose;
 }
 
 void ArmCommander::add_floor()

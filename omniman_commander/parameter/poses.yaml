@@ -4,6 +4,10 @@ commander1:
     planner_pipeline: "pilz_industrial_motion_planner"
     planner_id: "PTP"
 
+    # Motion speed (0.0–1.0, fraction of joint_limits.yaml max). Edit without recompile.
+    velocity_scale:     0.3
+    acceleration_scale: 0.3
+
     # Offsets added to the "ready" pose. Edit freely — no recompile needed.
     #   dx/dy/dz         : position offset in meters (base frame)
     #   droll/dpitch/dyaw: orientation offset in radians, relative to the ready

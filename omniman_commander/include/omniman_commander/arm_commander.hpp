@@ -36,9 +36,13 @@ public:
                const std::string & gripper_group = "gripper");
 
   // Select which planning pipeline + planner the arm uses (e.g.
-  // "pilz_industrial_motion_planner" + "PTP"). The pipeline plugin itself is
-  // loaded by the move_group node at launch; this only chooses among the loaded ones.
+  // "pilz_industrial_motion_planner" + "PTP"). Stored and re-applied on every
+  // move_to_pose() call so no other code can silently override it.
   void set_planner(const std::string & pipeline_id, const std::string & planner_id);
+
+  // Set velocity and acceleration scaling factors (0.0–1.0) applied on every
+  // move_to_pose() call. Loaded from poses.yaml so no recompile needed.
+  void set_scaling(double velocity_scale, double acceleration_scale);
 
   // Plan + execute the arm to a Cartesian pose. The planner solves IK internally.
   // `label` is used only for log messages. Returns false on plan or execute failure.
@@ -61,6 +65,10 @@ private:
   rclcpp::Logger logger_;
   moveit::planning_interface::MoveGroupInterface arm_;
   moveit::planning_interface::MoveGroupInterface gripper_;
+  std::string pipeline_id_;
+  std::string planner_id_;
+  double velocity_scale_     = 1.0;
+  double acceleration_scale_ = 1.0;
 };
 
 }  // namespace omniman
