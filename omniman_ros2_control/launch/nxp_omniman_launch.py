@@ -1,3 +1,5 @@
+import os
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
@@ -229,6 +231,10 @@ def generate_launch_description():
         condition=UnlessCondition(LaunchConfiguration("use_sim")),
     )
 
+    calibration_url = 'file://' + os.path.join(
+        get_package_share_directory('omniman_ros2_control'),
+        'config', 'camera_calibration.yaml')
+
     usb_cam = Node(
         package="usb_cam",
         executable="usb_cam_node_exe",
@@ -236,6 +242,10 @@ def generate_launch_description():
             'video_device': '/dev/video_c930',
             'focus_auto': 0,
             'focus_absolute': 30,
+            # Fix frame_id so TF can transform ArUco detections to base_link.
+            'frame_id': 'camera_optical_frame',
+            # Load intrinsic calibration so /camera_info has real values (not zeros).
+            'camera_info_url': calibration_url,
         }]
     )
 

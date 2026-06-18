@@ -17,10 +17,12 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2_eigen REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(aruco_opencv_msgs REQUIRED)
 
 
 # Reusable arm/gripper control library (shared by mission nodes).
@@ -39,10 +41,13 @@ ament_target_dependencies(arm_commander
 add_executable(commander src/commander.cpp)
 add_executable(commander1 src/commander1.cpp)
 add_executable(commander2 src/commander2.cpp)
+add_executable(commander_aruco src/commander_aruco.cpp)
 add_executable(position src/position.cpp)
 
-# commander1 is the mission node — it drives the state machine and calls ArmCommander.
+# commander1 / commander_aruco are mission nodes — they drive a state machine and
+# call into the reusable ArmCommander library.
 target_link_libraries(commander1 arm_commander)
+target_link_libraries(commander_aruco arm_commander)
 
 ament_target_dependencies(commander
   rclcpp
@@ -59,6 +64,16 @@ ament_target_dependencies(commander1
   rclcpp
   moveit_ros_planning_interface
   geometry_msgs
+)
+
+ament_target_dependencies(commander_aruco
+  rclcpp
+  moveit_ros_planning_interface
+  geometry_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  aruco_opencv_msgs
 )
 
 ament_target_dependencies(commander2
@@ -97,6 +112,7 @@ install(TARGETS
   commander
   commander1
   commander2
+  commander_aruco
   position
   DESTINATION lib/${PROJECT_NAME}
 )

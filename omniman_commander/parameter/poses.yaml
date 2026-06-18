@@ -16,24 +16,24 @@ commander1:
 
     # Pre-grasp: above the object
     pre_grasp.dx:  0.05
-    pre_grasp.dy:  0.1
-    pre_grasp.dz: -0.05
+    pre_grasp.dy:  0.0
+    pre_grasp.dz: -0.1
     pre_grasp.droll:  0.00
-    pre_grasp.dpitch: 0.00
+    pre_grasp.dpitch: 0.200
     pre_grasp.dyaw:   0.00
 
     # Grasp: lower to meet the object
     grasp.dx:  0.00
-    grasp.dy:  -0.2
-    grasp.dz: -0.05
+    grasp.dy:  0.0
+    grasp.dz: -0.15
     grasp.droll:  0.00
-    grasp.dpitch: 0.400
+    grasp.dpitch: 0.800
     grasp.dyaw:   0.00
 
     # Lift: raise back up after closing gripper
     lift.dx:  0.00
     lift.dy:  0.00
-    lift.dz: -0.10
+    lift.dz: 0.10
     lift.droll:  0.00
     lift.dpitch: 0.00
     lift.dyaw:   0.00

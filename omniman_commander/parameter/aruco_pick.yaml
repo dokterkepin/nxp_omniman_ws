@@ -1,0 +1,51 @@
+commander_aruco:
+  ros__parameters:
+    # Planner selection (move_group must have this pipeline loaded at launch).
+    planner_pipeline: "pilz_industrial_motion_planner"
+    planner_id: "PTP"
+
+    # Motion speed (0.0–1.0, fraction of joint_limits.yaml max).
+    velocity_scale:     0.3
+    acceleration_scale: 0.3
+
+    # The MoveGroup planning frame — marker poses are transformed into this frame
+    # before being used as goals. On this robot it is the URDF root "base_footprint".
+    planning_frame: "base_footprint"
+
+    # Which ArUco marker to pick (the id printed on the marker).
+    marker_id: 0
+
+    # How long DETECT waits for the marker to appear before failing (seconds).
+    detect_timeout: 10.0
+
+    # false = grasp with the READY orientation + the offset's RPY (reliable on this
+    #         6-DOF arm). true = grasp using the marker's own detected orientation.
+    use_marker_orientation: false
+
+    # ---- Offsets relative to the DETECTED marker position (meters / radians) ----
+    # The marker gives X/Y/Z; these offsets say how to approach and grasp it.
+    # droll/dpitch/dyaw overlay the chosen orientation (+dpitch tilts gripper DOWN).
+
+    # Approach: hover above the marker before descending.
+    approach.dx:  0.00
+    approach.dy:  0.00
+    approach.dz:  0.10
+    approach.droll:  0.00
+    approach.dpitch: 0.00
+    approach.dyaw:   0.00
+
+    # Grasp: descend onto the marker.
+    grasp.dx:  0.00
+    grasp.dy:  0.00
+    grasp.dz:  0.02
+    grasp.droll:  0.00
+    grasp.dpitch: 0.00
+    grasp.dyaw:   0.00
+
+    # ---- Place: fixed drop location, offset from the READY pose (not the marker) ----
+    place.dx:  0.00
+    place.dy: -0.15
+    place.dz:  0.00
+    place.droll:  0.00
+    place.dpitch: 0.00
+    place.dyaw:   0.00
