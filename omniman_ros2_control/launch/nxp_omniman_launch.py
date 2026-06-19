@@ -244,7 +244,7 @@ def generate_launch_description():
             'focus_absolute': 30,
             'frame_id': 'camera_optical_frame',
             'camera_info_url': calibration_url,
-            'pixel_format': 'yuyv2bgr',
+            'pixel_format': 'mjpeg',
         }]
     )
 
