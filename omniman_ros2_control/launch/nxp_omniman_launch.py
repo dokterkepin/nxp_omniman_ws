@@ -248,6 +248,22 @@ def generate_launch_description():
         }]
     )
 
+    aruco_tracker = Node(
+        package="aruco_opencv",
+        executable="aruco_tracker_autostart",
+        name="aruco_tracker",
+        output="screen",
+        parameters=[{
+            "cam_base_topic": "image_raw",
+            "marker_size": 0.04,
+            "marker_dict": "4X4_50",
+            "image_is_rectified": False,
+        }],
+        remappings=[
+            ("/image_raw/camera_info", "/camera_info"),
+        ],
+    )
+
     return LaunchDescription(
         [
             use_sim_arg,
@@ -267,6 +283,7 @@ def generate_launch_description():
             move_group_node,
             # rviz_node,
             usb_cam,
+            aruco_tracker,
             # rplidar_node
         ]
     )
