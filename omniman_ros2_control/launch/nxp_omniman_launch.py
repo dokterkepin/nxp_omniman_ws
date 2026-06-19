@@ -242,10 +242,9 @@ def generate_launch_description():
             'video_device': '/dev/video_c930',
             'focus_auto': 0,
             'focus_absolute': 30,
-            # Fix frame_id so TF can transform ArUco detections to base_link.
             'frame_id': 'camera_optical_frame',
-            # Load intrinsic calibration so /camera_info has real values (not zeros).
             'camera_info_url': calibration_url,
+            'pixel_format': 'yuyv2bgr',
         }]
     )
 

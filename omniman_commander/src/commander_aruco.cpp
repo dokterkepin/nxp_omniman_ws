@@ -26,7 +26,7 @@ struct MissionConfig {
   int    marker_id              = 0;
   double detect_timeout         = 10.0;   // seconds to wait for a marker
   bool   use_marker_orientation = false;  // false = grasp with ready-orientation + offset
-  Offset approach, grasp, place;
+  Offset look, approach, grasp, place;
 };
 
 template<typename T>
@@ -56,6 +56,7 @@ static MissionConfig load_mission(rclcpp::Node::SharedPtr node)
   cfg.marker_id              = get_param(node, "marker_id", 0);
   cfg.detect_timeout         = get_param(node, "detect_timeout", 10.0);
   cfg.use_marker_orientation = get_param(node, "use_marker_orientation", false);
+  cfg.look     = load_offset(node, "look");
   cfg.approach = load_offset(node, "approach");
   cfg.grasp    = load_offset(node, "grasp");
   cfg.place    = load_offset(node, "place");
@@ -67,6 +68,7 @@ static MissionConfig load_mission(rclcpp::Node::SharedPtr node)
 enum class State {
   READY,
   OPEN_GRIPPER,
+  LOOK,
   DETECT,
   APPROACH,
   GRASP,
@@ -84,6 +86,7 @@ static const char * state_name(State s)
   switch (s) {
     case State::READY:         return "READY";
     case State::OPEN_GRIPPER:  return "OPEN_GRIPPER";
+    case State::LOOK:          return "LOOK";
     case State::DETECT:        return "DETECT";
     case State::APPROACH:      return "APPROACH";
     case State::GRASP:         return "GRASP";
@@ -208,6 +211,11 @@ int main(int argc, char * argv[])
 
       case State::OPEN_GRIPPER:
         ok    = commander.move_gripper("open");
+        state = ok ? State::LOOK : State::ERROR;
+        break;
+
+      case State::LOOK:
+        ok = commander.move_to_pose(apply_offset(ready_pose, cfg.look), "look");
         state = ok ? State::DETECT : State::ERROR;
         break;
 

@@ -46,6 +46,9 @@ def generate_launch_description():
             "image_is_rectified": False,
             "output_frame": "",
         }],
+        remappings=[
+            ("/image_raw/camera_info", "/camera_info"),
+        ],
     )
 
     commander_aruco = Node(

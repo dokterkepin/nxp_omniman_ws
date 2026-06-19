@@ -22,9 +22,16 @@ commander_aruco:
     #         6-DOF arm). true = grasp using the marker's own detected orientation.
     use_marker_orientation: false
 
-    # ---- Offsets relative to the DETECTED marker position (meters / radians) ----
-    # The marker gives X/Y/Z; these offsets say how to approach and grasp it.
+    # ---- Offsets (meters / radians) ----
     # droll/dpitch/dyaw overlay the chosen orientation (+dpitch tilts gripper DOWN).
+
+    # Look: tilt wrist down from ready pose so the camera can see the marker.
+    look.dx:  -0.05
+    look.dy:  0.00
+    look.dz:  -0.05
+    look.droll:  0.00
+    look.dpitch: 0.300
+    look.dyaw:   0.00
 
     # Approach: hover above the marker before descending.
     approach.dx:  0.00
