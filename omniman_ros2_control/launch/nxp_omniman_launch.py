@@ -255,12 +255,13 @@ def generate_launch_description():
     image_throttle = Node(
         package="topic_tools",
         executable="throttle",
-        arguments=["messages", "/image_raw", "10.0", "/image_raw_throttled"],
+        arguments=["messages", "/image_raw", "5.0", "/image_raw_throttled"],
     )
 
     image_rectify = Node(
         package="image_proc",
         executable="rectify_node",
+        ros_arguments=['--log-level', 'ERROR'],
         remappings=[
             ("image",       "/image_raw_throttled"),
             ("camera_info", "/camera_info"),
