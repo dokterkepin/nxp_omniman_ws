@@ -192,7 +192,8 @@ int main(int argc, char * argv[])
   State state = State::READY;
   bool  ok    = true;
 
-  geometry_msgs::msg::Pose ready_pose;   // captured at READY; supplies grasp orientation
+  geometry_msgs::msg::Pose ready_pose;   // captured at READY; supplies the PLACE reference
+  geometry_msgs::msg::Pose look_pose;    // captured at LOOK; supplies the grasp orientation (tilted down)
   geometry_msgs::msg::Pose object_pose;  // marker position in the planning frame
 
   while (rclcpp::ok() && state != State::DONE && state != State::ERROR) {
@@ -216,6 +217,11 @@ int main(int argc, char * argv[])
 
       case State::LOOK:
         ok = commander.move_to_pose(apply_offset(ready_pose, cfg.look), "look");
+        if (ok) {
+          // Capture the tilted-down orientation here — this is the natural grasp
+          // orientation (gripper angled at the object), used by APPROACH/GRASP below.
+          look_pose = commander.current_pose();
+        }
         state = ok ? State::DETECT : State::ERROR;
         break;
 
@@ -263,12 +269,12 @@ int main(int argc, char * argv[])
 
       case State::APPROACH: {
         // Reference = detected object position + the orientation we want to grasp with.
-        // Default: keep the ready orientation (overlaid with the offset's RPY); set
+        // Default: use the LOOK orientation (gripper tilted down at the object); set
         // use_marker_orientation:=true to grasp using the marker's own orientation.
         geometry_msgs::msg::Pose ref;
         ref.position    = object_pose.position;
         ref.orientation = cfg.use_marker_orientation ? object_pose.orientation
-                                                      : ready_pose.orientation;
+                                                      : look_pose.orientation;
         ok = commander.move_to_pose(apply_offset(ref, cfg.approach), "approach");
         state = ok ? State::GRASP : State::ERROR;
         break;
@@ -278,7 +284,7 @@ int main(int argc, char * argv[])
         geometry_msgs::msg::Pose ref;
         ref.position    = object_pose.position;
         ref.orientation = cfg.use_marker_orientation ? object_pose.orientation
-                                                      : ready_pose.orientation;
+                                                      : look_pose.orientation;
         ok = commander.move_to_pose(apply_offset(ref, cfg.grasp), "grasp");
         state = ok ? State::CLOSE_GRIPPER : State::ERROR;
         break;

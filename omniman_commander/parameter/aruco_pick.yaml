@@ -26,28 +26,33 @@ commander_aruco:
     # droll/dpitch/dyaw overlay the chosen orientation (+dpitch tilts gripper DOWN).
 
     # Look: tilt wrist down from ready pose so the camera can see the marker.
-    look.dx:  -0.05
+    look.dx:  0.00
     look.dy:  0.00
-    look.dz:  -0.05
+    look.dz:  0.00
     look.droll:  0.00
-    look.dpitch: 0.300
+    look.dpitch: 0.500
     look.dyaw:   0.00
 
-    # Approach: hover above the marker before descending.
-    approach.dx:  0.00
-    approach.dy:  0.00
-    approach.dz:  0.10
+    # Offsets below are marker -> WRIST (ee_link), measured by hand: the marker is
+    # detected at its face, but the wrist must sit below/behind it for the tilted
+    # gripper fingers to reach the cube. Calibrated from a manual grasp:
+    #   marker (0.384, -0.012, 0.347) -> wrist (0.357, -0.009, 0.257)
+
+    # Approach: hover 10cm above the grasp point, same x/y.
+    approach.dx: -0.10
+    approach.dy:  0.000
+    approach.dz:  -0.03
     approach.droll:  0.00
-    approach.dpitch: 0.00
+    approach.dpitch: -0.700
     approach.dyaw:   0.00
 
-    # Grasp: descend onto the marker.
-    grasp.dx:  0.00
+    # Grasp: wrist 9cm below the marker so the tilted fingers reach the cube.
+    grasp.dx: 0.000
     grasp.dy:  0.00
-    grasp.dz:  0.02
-    grasp.droll:  0.00
-    grasp.dpitch: 0.00
-    grasp.dyaw:   0.00
+    grasp.dz: 0.00
+    grasp.droll:  0.000
+    grasp.dpitch: 0.000
+    grasp.dyaw:   0.000
 
     # ---- Place: fixed drop location, offset from the READY pose (not the marker) ----
     place.dx:  0.00

@@ -240,11 +240,12 @@ def generate_launch_description():
         executable="usb_cam_node_exe",
         parameters=[{
             'video_device': '/dev/video_c930',
+            'camera_name': 'narrow_stereo',
             'focus_auto': 0,
             'focus_absolute': 30,
             'frame_id': 'camera_optical_frame',
             'camera_info_url': calibration_url,
-            'pixel_format': 'mjpeg2rgb',
+            'pixel_format': 'yuyv2rgb',
         }]
     )
 
@@ -258,6 +259,7 @@ def generate_launch_description():
             "marker_size": 0.04,
             "marker_dict": "4X4_50",
             "image_is_rectified": False,
+            "publish_tf": False,
         }],
         remappings=[
             ("/image_raw/camera_info", "/camera_info"),
