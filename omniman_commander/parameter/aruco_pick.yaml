@@ -39,19 +39,19 @@ commander_aruco:
     #   marker (0.384, -0.012, 0.347) -> wrist (0.357, -0.009, 0.257)
 
     # Approach: hover 10cm above the grasp point, same x/y.
-    approach.dx: -0.10
-    approach.dy:  0.000
+    approach.dx: -0.12
+    approach.dy:  0.01
     approach.dz:  -0.03
     approach.droll:  0.00
-    approach.dpitch: -0.700
+    approach.dpitch: -0.650
     approach.dyaw:   0.00
 
     # Grasp: wrist 9cm below the marker so the tilted fingers reach the cube.
-    grasp.dx: 0.000
+    grasp.dx: -0.03
     grasp.dy:  0.00
-    grasp.dz: 0.00
+    grasp.dz: -0.05
     grasp.droll:  0.000
-    grasp.dpitch: 0.000
+    grasp.dpitch: -0.500
     grasp.dyaw:   0.000
 
     # ---- Place: fixed drop location, offset from the READY pose (not the marker) ----
