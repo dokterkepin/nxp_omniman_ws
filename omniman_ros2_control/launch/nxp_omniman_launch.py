@@ -252,11 +252,17 @@ def generate_launch_description():
     # Rectify raw camera images using image_proc so that aruco_tracker receives
     # an undistorted image without triggering the stack-overflow bug in
     # aruco_opencv 2.4.2's internal undistortion code path.
+    image_throttle = Node(
+        package="topic_tools",
+        executable="throttle",
+        arguments=["messages", "/image_raw", "10.0", "/image_raw_throttled"],
+    )
+
     image_rectify = Node(
         package="image_proc",
         executable="rectify_node",
         remappings=[
-            ("image",       "/image_raw"),
+            ("image",       "/image_raw_throttled"),
             ("camera_info", "/camera_info"),
             ("image_rect",  "/image_rect"),
         ],
@@ -267,12 +273,14 @@ def generate_launch_description():
         executable="aruco_tracker_autostart",
         name="aruco_tracker",
         output="screen",
+        prefix="bash -c 'ulimit -s unlimited; exec \"$@\"' --",
         parameters=[{
             "cam_base_topic": "image_rect",
             "marker_size": 0.04,
             "marker_dict": "4X4_50",
             "image_is_rectified": True,
             "publish_tf": False,
+            "debug_publish_period": 0.0,
         }],
         remappings=[
             ("/image_rect/camera_info", "/camera_info"),
@@ -298,6 +306,7 @@ def generate_launch_description():
             move_group_node,
             # rviz_node,
             usb_cam,
+            image_throttle,
             image_rectify,
             aruco_tracker,
             # rplidar_node
