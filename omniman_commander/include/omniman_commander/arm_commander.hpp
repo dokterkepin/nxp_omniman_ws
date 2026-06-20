@@ -2,6 +2,7 @@
 #define OMNIMAN_COMMANDER_ARM_COMMANDER_HPP
 
 #include <string>
+#include <vector>
 
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
@@ -47,6 +48,17 @@ public:
   // Plan + execute the arm to a Cartesian pose. The planner solves IK internally.
   // `label` is used only for log messages. Returns false on plan or execute failure.
   bool move_to_pose(const geometry_msgs::msg::Pose & target, const std::string & label);
+
+  // Quick IK feasibility check for `target` (same link + timeout the planner uses),
+  // seeded from the current robot state. Predicts whether move_to_pose will plan.
+  bool is_reachable(const geometry_msgs::msg::Pose & target);
+
+  // Try candidates in order: skip any that fail the IK check, then plan + execute
+  // the first reachable one (advancing to the next if planning/execution fails).
+  // Lets the caller offer small pose variations so a single unreachable grasp pose
+  // no longer fails the whole mission. Returns false only if none succeed.
+  bool move_to_first_reachable(const std::vector<geometry_msgs::msg::Pose> & candidates,
+                               const std::string & label);
 
   // Plan + execute the arm to a named SRDF group state (e.g. "ready").
   bool move_named(const std::string & named_target);

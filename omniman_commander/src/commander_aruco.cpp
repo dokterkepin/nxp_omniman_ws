@@ -3,6 +3,8 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -49,6 +51,32 @@ static Offset load_offset(rclcpp::Node::SharedPtr node, const std::string & name
   o.dpitch = get_param(node, name + ".dpitch", 0.0);
   o.dyaw   = get_param(node, name + ".dyaw",   0.0);
   return o;
+}
+
+// Generate grasp-pose candidates ordered from the nominal offset outward, so the
+// first reachable one stays closest to the hand-tuned target. Small variations in
+// wrist tilt (dpitch) and height (dz) let APPROACH/GRASP recover when ArUco noise
+// pushes the nominal pose just across this 6-DOF arm's tight IK workspace boundary.
+static std::vector<Offset> make_candidates(const Offset & base)
+{
+  // {dpitch, dz} deltas added on top of the nominal offset, smallest first.
+  static const std::pair<double, double> deltas[] = {
+    { 0.00,  0.00},   // nominal — try the calibrated offset first
+    { 0.05,  0.00}, {-0.05,  0.00},
+    { 0.00,  0.01}, { 0.00, -0.01},
+    { 0.10,  0.00}, {-0.10,  0.00},
+    { 0.05,  0.01}, {-0.05, -0.01},
+    { 0.15,  0.00}, {-0.15,  0.00},
+    { 0.00,  0.02}, { 0.00, -0.02},
+  };
+  std::vector<Offset> out;
+  for (const auto & d : deltas) {
+    Offset o = base;
+    o.dpitch += d.first;
+    o.dz     += d.second;
+    out.push_back(o);
+  }
+  return out;
 }
 
 static MissionConfig load_mission(rclcpp::Node::SharedPtr node)
@@ -239,7 +267,7 @@ int main(int argc, char * argv[])
 
         std::vector<geometry_msgs::msg::Point> samples;
         geometry_msgs::msg::Quaternion last_orientation;
-        uint64_t last_stamp_ns = 0;
+        int64_t last_stamp_ns = 0;  // matches rclcpp::Time::nanoseconds() return type
 
         while (rclcpp::ok() && node->now() < deadline &&
                static_cast<int>(samples.size()) < cfg.detect_samples) {
@@ -297,7 +325,13 @@ int main(int argc, char * argv[])
         ref.position    = object_pose.position;
         ref.orientation = cfg.use_marker_orientation ? object_pose.orientation
                                                       : look_pose.orientation;
-        ok = commander.move_to_pose(apply_offset(ref, cfg.approach), "approach");
+        // Offer small pose variations so a single unreachable approach pose (from
+        // ArUco noise near the IK boundary) no longer fails the mission outright.
+        std::vector<geometry_msgs::msg::Pose> candidates;
+        for (const auto & off : make_candidates(cfg.approach)) {
+          candidates.push_back(apply_offset(ref, off));
+        }
+        ok = commander.move_to_first_reachable(candidates, "approach");
         state = ok ? State::GRASP : State::ERROR;
         break;
       }
@@ -307,7 +341,11 @@ int main(int argc, char * argv[])
         ref.position    = object_pose.position;
         ref.orientation = cfg.use_marker_orientation ? object_pose.orientation
                                                       : look_pose.orientation;
-        ok = commander.move_to_pose(apply_offset(ref, cfg.grasp), "grasp");
+        std::vector<geometry_msgs::msg::Pose> candidates;
+        for (const auto & off : make_candidates(cfg.grasp)) {
+          candidates.push_back(apply_offset(ref, off));
+        }
+        ok = commander.move_to_first_reachable(candidates, "grasp");
         state = ok ? State::CLOSE_GRIPPER : State::ERROR;
         break;
       }

@@ -84,14 +84,8 @@ bool ArmCommander::move_to_pose(const geometry_msgs::msg::Pose & target,
 
   // Direct IK check (diagnostic only, does not affect planning): separates
   // "unreachable" from "plan failed" in the logs.
-  {
-    auto test_state = *arm_.getCurrentState();
-    auto const * jmg = test_state.getJointModelGroup(arm_.getName());
-    // Same link ("ee_link") and same 5ms timeout as the planner (kinematics.yaml),
-    // so "reachable" actually predicts whether the plan will succeed.
-    bool ik_ok = test_state.setFromIK(jmg, target, "ee_link", 0.005);
-    RCLCPP_INFO(logger_, "  Direct IK check (5ms, ee_link): %s", ik_ok ? "reachable" : "NO SOLUTION");
-  }
+  RCLCPP_INFO(logger_, "  Direct IK check (5ms, ee_link): %s",
+    is_reachable(target) ? "reachable" : "NO SOLUTION");
 
   // Plan
   moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -118,6 +112,38 @@ bool ArmCommander::move_to_pose(const geometry_msgs::msg::Pose & target,
   }
   RCLCPP_INFO(logger_, "  [%s] done", label.c_str());
   return true;
+}
+
+bool ArmCommander::is_reachable(const geometry_msgs::msg::Pose & target)
+{
+  auto test_state = *arm_.getCurrentState();
+  auto const * jmg = test_state.getJointModelGroup(arm_.getName());
+  // Same link ("ee_link") and same 5ms timeout as the planner (kinematics.yaml),
+  // so "reachable" actually predicts whether the plan will succeed.
+  return test_state.setFromIK(jmg, target, "ee_link", 0.005);
+}
+
+bool ArmCommander::move_to_first_reachable(
+  const std::vector<geometry_msgs::msg::Pose> & candidates,
+  const std::string & label)
+{
+  for (size_t i = 0; i < candidates.size(); ++i) {
+    if (!is_reachable(candidates[i])) {
+      RCLCPP_WARN(logger_, "[%s] candidate %zu/%zu: NO IK — skipping",
+        label.c_str(), i + 1, candidates.size());
+      continue;
+    }
+    RCLCPP_INFO(logger_, "[%s] candidate %zu/%zu reachable — planning",
+      label.c_str(), i + 1, candidates.size());
+    if (move_to_pose(candidates[i], label)) {
+      return true;
+    }
+    RCLCPP_WARN(logger_, "[%s] candidate %zu/%zu plan/exec failed — trying next",
+      label.c_str(), i + 1, candidates.size());
+  }
+  RCLCPP_ERROR(logger_, "[%s] no usable candidate among %zu",
+    label.c_str(), candidates.size());
+  return false;
 }
 
 bool ArmCommander::move_named(const std::string & named_target)
