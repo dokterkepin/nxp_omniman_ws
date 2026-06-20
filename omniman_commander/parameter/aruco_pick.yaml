@@ -21,6 +21,10 @@ commander_aruco:
     # Unique frames to average in DETECT (~0.1s per frame at 10Hz camera).
     detect_samples: 5
 
+    # If DETECT/APPROACH/GRASP fails (e.g. all IK candidates unreachable), back off
+    # to LOOK and re-detect this many times before aborting the mission.
+    max_retries: 3
+
     # false = grasp with the READY orientation + the offset's RPY (reliable on this
     #         6-DOF arm). true = grasp using the marker's own detected orientation.
     use_marker_orientation: false

@@ -28,6 +28,7 @@ struct MissionConfig {
   int    marker_id              = 0;
   double detect_timeout         = 10.0;   // seconds to wait for a marker
   int    detect_samples         = 5;      // frames to average for stable pose
+  int    max_retries            = 3;      // re-observe + retry on detect/approach/grasp failure
   bool   use_marker_orientation = false;  // false = grasp with ready-orientation + offset
   Offset look, approach, grasp, place;
 };
@@ -85,6 +86,7 @@ static MissionConfig load_mission(rclcpp::Node::SharedPtr node)
   cfg.marker_id              = get_param(node, "marker_id", 0);
   cfg.detect_timeout         = get_param(node, "detect_timeout", 10.0);
   cfg.detect_samples         = get_param(node, "detect_samples", 5);
+  cfg.max_retries            = get_param(node, "max_retries", 3);
   cfg.use_marker_orientation = get_param(node, "use_marker_orientation", false);
   cfg.look     = load_offset(node, "look");
   cfg.approach = load_offset(node, "approach");
@@ -226,6 +228,23 @@ int main(int argc, char * argv[])
   geometry_msgs::msg::Pose look_pose;    // captured at LOOK; supplies the grasp orientation (tilted down)
   geometry_msgs::msg::Pose object_pose;  // marker position in the planning frame
 
+  // Mission-level retry: if DETECT/APPROACH/GRASP fails (e.g. all IK candidates
+  // unreachable), back off to LOOK and take a fresh averaged detection rather than
+  // aborting — a re-observation often lands in a reachable spot. Capped so a marker
+  // that is genuinely out of reach still fails instead of looping forever.
+  int retry_count = 0;
+  auto on_failure = [&](const char * where) -> State {
+    if (retry_count < cfg.max_retries) {
+      ++retry_count;
+      RCLCPP_WARN(logger, "[%s] failed — retry %d/%d: re-observing marker from LOOK",
+        where, retry_count, cfg.max_retries);
+      return State::LOOK;
+    }
+    RCLCPP_ERROR(logger, "[%s] failed — exhausted %d retries, aborting",
+      where, cfg.max_retries);
+    return State::ERROR;
+  };
+
   while (rclcpp::ok() && state != State::DONE && state != State::ERROR) {
     RCLCPP_INFO(logger, "====== State: %s ======", state_name(state));
 
@@ -313,7 +332,7 @@ int main(int argc, char * argv[])
           RCLCPP_ERROR(logger, "  Marker %d not detected within %.1fs",
             cfg.marker_id, cfg.detect_timeout);
         }
-        state = ok ? State::APPROACH : State::ERROR;
+        state = ok ? State::APPROACH : on_failure("detect");
         break;
       }
 
@@ -332,7 +351,7 @@ int main(int argc, char * argv[])
           candidates.push_back(apply_offset(ref, off));
         }
         ok = commander.move_to_first_reachable(candidates, "approach");
-        state = ok ? State::GRASP : State::ERROR;
+        state = ok ? State::GRASP : on_failure("approach");
         break;
       }
 
@@ -346,7 +365,7 @@ int main(int argc, char * argv[])
           candidates.push_back(apply_offset(ref, off));
         }
         ok = commander.move_to_first_reachable(candidates, "grasp");
-        state = ok ? State::CLOSE_GRIPPER : State::ERROR;
+        state = ok ? State::CLOSE_GRIPPER : on_failure("grasp");
         break;
       }
 
