@@ -25,6 +25,7 @@ using namespace std::chrono_literals;
 struct MissionConfig {
   int    marker_id              = 0;
   double detect_timeout         = 10.0;   // seconds to wait for a marker
+  int    detect_samples         = 5;      // frames to average for stable pose
   bool   use_marker_orientation = false;  // false = grasp with ready-orientation + offset
   Offset look, approach, grasp, place;
 };
@@ -55,6 +56,7 @@ static MissionConfig load_mission(rclcpp::Node::SharedPtr node)
   MissionConfig cfg;
   cfg.marker_id              = get_param(node, "marker_id", 0);
   cfg.detect_timeout         = get_param(node, "detect_timeout", 10.0);
+  cfg.detect_samples         = get_param(node, "detect_samples", 5);
   cfg.use_marker_orientation = get_param(node, "use_marker_orientation", false);
   cfg.look     = load_offset(node, "look");
   cfg.approach = load_offset(node, "approach");
@@ -226,40 +228,60 @@ int main(int argc, char * argv[])
         break;
 
       case State::DETECT: {
-        // Poll the cache until the target marker appears or detect_timeout elapses.
+        // Collect cfg.detect_samples unique frames and average the position to
+        // reduce the ~1cm ArUco measurement noise that can push the approach
+        // target across the IK workspace boundary.
         ok = false;
         auto deadline = node->now() + rclcpp::Duration::from_seconds(cfg.detect_timeout);
         geometry_msgs::msg::Pose marker_pose;
         std::string marker_frame;
-        rclcpp::Time  marker_stamp;
+        rclcpp::Time marker_stamp;
 
-        while (rclcpp::ok() && node->now() < deadline) {
+        std::vector<geometry_msgs::msg::Point> samples;
+        geometry_msgs::msg::Quaternion last_orientation;
+        uint64_t last_stamp_ns = 0;
+
+        while (rclcpp::ok() && node->now() < deadline &&
+               static_cast<int>(samples.size()) < cfg.detect_samples) {
           if (cache->find_marker(cfg.marker_id, marker_pose, marker_frame, marker_stamp)) {
-            // Transform the marker pose from the camera frame into the planning frame.
-            geometry_msgs::msg::PoseStamped in, out;
-            in.header.frame_id = marker_frame;
-            in.header.stamp    = marker_stamp;
-            in.pose            = marker_pose;
-            try {
-              out = tf_buffer->transform(in, planning_frame, 200ms);
-            } catch (const tf2::TransformException & ex) {
-              RCLCPP_WARN(logger, "  TF %s -> %s failed: %s — retrying",
-                marker_frame.c_str(), planning_frame.c_str(), ex.what());
-              std::this_thread::sleep_for(100ms);
-              continue;
+            if (marker_stamp.nanoseconds() != last_stamp_ns) {
+              last_stamp_ns = marker_stamp.nanoseconds();
+              geometry_msgs::msg::PoseStamped in, out;
+              in.header.frame_id = marker_frame;
+              in.header.stamp    = marker_stamp;
+              in.pose            = marker_pose;
+              try {
+                out = tf_buffer->transform(in, planning_frame, 200ms);
+                samples.push_back(out.pose.position);
+                last_orientation = out.pose.orientation;
+                RCLCPP_INFO(logger, "  Sample %zu/%d: pos=(%.3f, %.3f, %.3f)",
+                  samples.size(), cfg.detect_samples,
+                  out.pose.position.x, out.pose.position.y, out.pose.position.z);
+              } catch (const tf2::TransformException & ex) {
+                RCLCPP_WARN(logger, "  TF %s -> %s failed: %s — retrying",
+                  marker_frame.c_str(), planning_frame.c_str(), ex.what());
+              }
             }
-            object_pose = out.pose;
-            RCLCPP_INFO(logger,
-              "Marker %d found. Object in %s: pos=(%.3f, %.3f, %.3f)",
-              cfg.marker_id, planning_frame.c_str(),
-              object_pose.position.x, object_pose.position.y, object_pose.position.z);
-            ok = true;
-            break;
           }
           std::this_thread::sleep_for(100ms);
         }
 
-        if (!ok) {
+        ok = !samples.empty();
+        if (ok) {
+          geometry_msgs::msg::Point avg{};
+          for (const auto & p : samples) {
+            avg.x += p.x; avg.y += p.y; avg.z += p.z;
+          }
+          avg.x /= samples.size();
+          avg.y /= samples.size();
+          avg.z /= samples.size();
+          object_pose.position    = avg;
+          object_pose.orientation = last_orientation;
+          RCLCPP_INFO(logger,
+            "Marker %d: averaged %zu/%d frames in %s: pos=(%.3f, %.3f, %.3f)",
+            cfg.marker_id, samples.size(), cfg.detect_samples, planning_frame.c_str(),
+            object_pose.position.x, object_pose.position.y, object_pose.position.z);
+        } else {
           RCLCPP_ERROR(logger, "  Marker %d not detected within %.1fs",
             cfg.marker_id, cfg.detect_timeout);
         }

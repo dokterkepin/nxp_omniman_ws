@@ -258,7 +258,7 @@ def generate_launch_description():
             "cam_base_topic": "image_raw",
             "marker_size": 0.04,
             "marker_dict": "4X4_50",
-            "image_is_rectified": False,
+            "image_is_rectified": True,
             "publish_tf": False,
         }],
         remappings=[
