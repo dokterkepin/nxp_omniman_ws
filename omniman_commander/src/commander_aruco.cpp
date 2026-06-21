@@ -348,6 +348,8 @@ int main(int argc, char * argv[])
         // ArUco noise near the IK boundary) no longer fails the mission outright.
         std::vector<geometry_msgs::msg::Pose> candidates;
         for (const auto & off : make_candidates(cfg.approach)) {
+          RCLCPP_INFO(logger, "  [approach candidate] dpitch=%.3f dz=%.3f",
+            off.dpitch, off.dz);
           candidates.push_back(apply_offset(ref, off));
         }
         ok = commander.move_to_first_reachable(candidates, "approach");
