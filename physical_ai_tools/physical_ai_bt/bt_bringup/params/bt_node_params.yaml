@@ -1,0 +1,5 @@
+bt_node:
+  ros__parameters:
+    robot_type: 'ffw_sg2_rev1'
+    tree_xml: 'ffw_sg2_rev1.xml'
+    tick_rate: 30.0
