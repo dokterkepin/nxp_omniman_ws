@@ -1,0 +1,179 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+    Leader arm hardware in CURRENT (torque) control mode for gravity compensation.
+    Modeled on open_manipulator omy_l100_current.ros2_control.xacro.
+
+    - One ros2_control system for all 7 XM430-W350 motors (single sync read/write cycle)
+    - Joint command interface: effort  -> GPIO "Goal Current" (raw units, 2.69 mA/unit)
+    - Operating Mode 0 = current control (EEPROM, written at init while torque is off)
+    - Drive Modes preserved from the previous position-mode setup: 1,0,1,1,1,0,0
+    - Current Limit caps motor torque during tuning (raw units; 400 ~= 1.08 A ~= 1.9 Nm)
+  -->
+  <xacro:macro name="leader_system" params="name port_name:=/dev/ttyUSB1">
+    <ros2_control name="${name}" type="system">
+      <hardware>
+        <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
+        <param name="port_name">${port_name}</param>
+        <param name="baud_rate">1000000</param>
+        <param name="error_timeout_ms">500</param>
+        <param name="dynamixel_model_folder">/param/dxl_model</param>
+        <param name="number_of_joints">7</param>
+        <param name="number_of_transmissions">7</param>
+        <param name="disable_torque_at_init">true</param>
+        <param name="transmission_to_joint_matrix">
+          1, 0, 0, 0, 0, 0, 0,
+          0, 1, 0, 0, 0, 0, 0,
+          0, 0, 1, 0, 0, 0, 0,
+          0, 0, 0, 1, 0, 0, 0,
+          0, 0, 0, 0, 1, 0, 0,
+          0, 0, 0, 0, 0, 1, 0,
+          0, 0, 0, 0, 0, 0, 1
+        </param>
+        <param name="joint_to_transmission_matrix">
+          1, 0, 0, 0, 0, 0, 0,
+          0, 1, 0, 0, 0, 0, 0,
+          0, 0, 1, 0, 0, 0, 0,
+          0, 0, 0, 1, 0, 0, 0,
+          0, 0, 0, 0, 1, 0, 0,
+          0, 0, 0, 0, 0, 1, 0,
+          0, 0, 0, 0, 0, 0, 1
+        </param>
+        <param name="dynamixel_state_pub_msg_name">dynamixel_hardware_interface/dxl_state</param>
+        <param name="get_dynamixel_data_srv_name">dynamixel_hardware_interface/get_dxl_data</param>
+        <param name="set_dynamixel_data_srv_name">dynamixel_hardware_interface/set_dxl_data</param>
+        <param name="reboot_dxl_srv_name">dynamixel_hardware_interface/reboot_dxl</param>
+        <param name="set_dxl_torque_srv_name">dynamixel_hardware_interface/set_dxl_torque</param>
+      </hardware>
+
+      <joint name="shoulder_yaw_joint">
+        <command_interface name="effort"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="upper_shoulder_pitch_joint">
+        <command_interface name="effort"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="arm_yaw_joint">
+        <command_interface name="effort"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="forearm_pitch_joint">
+        <command_interface name="effort"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="wrist_pitch_joint">
+        <command_interface name="effort"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="palm_yaw_joint">
+        <command_interface name="effort"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+      <joint name="gripper_prismatic_joint">
+        <command_interface name="effort"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+
+      <gpio name="dxl1">
+        <param name="type">dxl</param>
+        <param name="ID">1</param>
+        <command_interface name="Goal Current"/>
+        <state_interface name="Present Position"/>
+        <state_interface name="Present Velocity"/>
+        <state_interface name="Present Current"/>
+        <param name="Drive Mode">1</param>
+        <param name="Operating Mode">0</param>
+        <param name="Return Delay Time">0</param>
+        <param name="Current Limit">400</param>
+      </gpio>
+      <gpio name="dxl2">
+        <param name="type">dxl</param>
+        <param name="ID">2</param>
+        <command_interface name="Goal Current"/>
+        <state_interface name="Present Position"/>
+        <state_interface name="Present Velocity"/>
+        <state_interface name="Present Current"/>
+        <param name="Drive Mode">0</param>
+        <param name="Operating Mode">0</param>
+        <param name="Return Delay Time">0</param>
+        <param name="Current Limit">400</param>
+      </gpio>
+      <gpio name="dxl3">
+        <param name="type">dxl</param>
+        <param name="ID">3</param>
+        <command_interface name="Goal Current"/>
+        <state_interface name="Present Position"/>
+        <state_interface name="Present Velocity"/>
+        <state_interface name="Present Current"/>
+        <param name="Drive Mode">1</param>
+        <param name="Operating Mode">0</param>
+        <param name="Return Delay Time">0</param>
+        <param name="Current Limit">400</param>
+      </gpio>
+      <gpio name="dxl4">
+        <param name="type">dxl</param>
+        <param name="ID">4</param>
+        <command_interface name="Goal Current"/>
+        <state_interface name="Present Position"/>
+        <state_interface name="Present Velocity"/>
+        <state_interface name="Present Current"/>
+        <param name="Drive Mode">1</param>
+        <param name="Operating Mode">0</param>
+        <param name="Return Delay Time">0</param>
+        <param name="Current Limit">400</param>
+      </gpio>
+      <gpio name="dxl5">
+        <param name="type">dxl</param>
+        <param name="ID">5</param>
+        <command_interface name="Goal Current"/>
+        <state_interface name="Present Position"/>
+        <state_interface name="Present Velocity"/>
+        <state_interface name="Present Current"/>
+        <param name="Drive Mode">1</param>
+        <param name="Operating Mode">0</param>
+        <param name="Return Delay Time">0</param>
+        <param name="Current Limit">400</param>
+      </gpio>
+      <gpio name="dxl6">
+        <param name="type">dxl</param>
+        <param name="ID">6</param>
+        <command_interface name="Goal Current"/>
+        <state_interface name="Present Position"/>
+        <state_interface name="Present Velocity"/>
+        <state_interface name="Present Current"/>
+        <param name="Drive Mode">0</param>
+        <param name="Operating Mode">0</param>
+        <param name="Return Delay Time">0</param>
+        <param name="Current Limit">400</param>
+      </gpio>
+      <gpio name="dxl7">
+        <param name="type">dxl</param>
+        <param name="ID">7</param>
+        <command_interface name="Goal Current"/>
+        <state_interface name="Present Position"/>
+        <state_interface name="Present Velocity"/>
+        <state_interface name="Present Current"/>
+        <param name="Drive Mode">0</param>
+        <param name="Operating Mode">0</param>
+        <param name="Return Delay Time">0</param>
+        <param name="Current Limit">200</param>
+      </gpio>
+
+    </ros2_control>
+  </xacro:macro>
+</robot>

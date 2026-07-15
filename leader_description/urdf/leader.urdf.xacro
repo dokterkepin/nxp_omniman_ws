@@ -1,0 +1,243 @@
+<?xml version="1.0" ?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <material name="grey">
+        <color rgba="0.5 0.5 0.5 1.0" />
+    </material>
+
+    <xacro:macro name="leader" >
+        <link name="base_link">
+            <visual>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Base_link.STL" />
+                </geometry>
+                <material name="grey" />
+            </visual>
+            <collision>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Base_link.STL" />
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.760315" />
+                <origin xyz="0.011296 -0.000093 0.017421" rpy="0 0 0" />
+                <inertia ixx="0.001892" ixy="-0.000004" ixz="0.000251" 
+                        iyy="0.003009" iyz="-0.000002" 
+                        izz="0.004372" />
+            </inertial>
+        </link>
+
+
+        <joint name="shoulder_yaw_joint" type="revolute">
+            <parent link="base_link" />
+            <child link="shoulder_link" />
+            <origin xyz="0.045 0.000 0.073" rpy="0 0 0" />
+            <axis xyz="0 0 -1" />
+            <limit effort="10" velocity="3.0" lower="-3.14" upper="3.14" />
+        </joint>
+
+        <link name="shoulder_link">
+            <visual>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Shoulder_link.STL" />
+                </geometry>
+                <material name="grey" />
+            </visual>
+            <collision>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Shoulder_link.STL" />
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.067330" />
+                <origin xyz="-0.011831 -0.004951 0.018905" rpy="0 0 0" />
+                <inertia ixx="0.000015" ixy="0.000000" ixz="0.0000000"
+                        iyy="0.000026" iyz="0.000000" 
+                        izz="0.000024" />
+            </inertial>
+        </link>
+
+        <joint name="upper_shoulder_pitch_joint" type="revolute">
+            <parent link="shoulder_link" />
+            <child link="upper_shoulder_link" />
+            <origin xyz="-0.012 -0.026 0.026" rpy="0 0 0" />
+            <axis xyz="0 -1 0" />
+            <limit effort="10" velocity="3.0" lower="-1.70" upper="1.70" />
+        </joint>
+
+        <link name="upper_shoulder_link">
+            <visual>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Upper_shoulder_link.STL" />
+                </geometry>
+                <material name="grey" />
+            </visual>
+            <collision>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Upper_shoulder_link.STL" />
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.060696" />
+                <origin xyz="0.000023 -0.018562 0.018781" rpy="0 0 0" />
+                <inertia ixx="0.000025" ixy="0.000000" ixz="0.000000" 
+                        iyy="0.000021" iyz="0.000000" 
+                        izz="0.000012" />
+            </inertial>
+        </link>
+
+        <joint name="arm_yaw_joint" type="revolute">
+            <parent link="upper_shoulder_link" />
+            <child link="arm_link" />
+            <origin xyz="0.000 -0.019 0.048" rpy="0 0 0" />
+            <axis xyz="0 0 -1" />
+            <limit effort="10" velocity="3.0" lower="-3.14" upper="3.14" />
+        </joint>
+
+        <link name="arm_link">
+            <visual>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Arm_link.STL" />
+                </geometry>
+                <material name="grey" />
+            </visual>
+            <collision>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Arm_link.STL" />
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.161017" />
+                <origin xyz="0.127050 0.000149 0.018851" rpy="0 0 0" />
+                <inertia ixx="0.000024" ixy="0.000003" ixz="0.000003" 
+                        iyy="0.001502" iyz="0.000000" 
+                        izz="0.001502" />
+            </inertial>
+        </link>
+
+        <joint name="forearm_pitch_joint" type="revolute">
+            <parent link="arm_link" />
+            <child link="forearm_link" />
+            <origin xyz="0.254 0.019 0.019" rpy="0 0 0" />
+            <axis xyz="0 -1 0" />
+            <limit effort="10" velocity="3.0" lower="-2.33" upper="2.4" />
+        </joint>
+
+        <link name="forearm_link">
+            <visual>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Forearm_link.STL" />
+                </geometry>
+                <material name="grey" />
+            </visual>
+            <collision>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Forearm_link.STL" />
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.126166" />
+                <origin xyz="0.137015 0.016972 -0.000011" rpy="0 0 0" />
+                <inertia ixx="0.000018" ixy="0.000004" ixz="0.000000" 
+                        iyy="0.000810" iyz="0.000000" 
+                        izz="0.000814" />
+            </inertial>
+        </link>
+
+        <joint name="wrist_pitch_joint" type="revolute">
+            <parent link="forearm_link" />
+            <child link="wrist_link" />
+            <origin xyz="0.225 -0.002 0.000" rpy="0 0 0" />
+            <axis xyz="0 1 0" />
+            <limit effort="10" velocity="3.0" lower="-1.86" upper="1.69" />
+        </joint>
+
+        <link name="wrist_link">
+            <visual>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Wrist_link.STL" />
+                </geometry>
+                <material name="grey" />
+            </visual>
+            <collision>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Wrist_link.STL" />
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.047237" />
+                <origin xyz="-0.000029 -0.027699 0.000563" rpy="0 0 0" />
+                <inertia ixx="0.000015" ixy="0.000000" ixz="0.000000" 
+                        iyy="0.000008" iyz="0.000000" 
+                        izz="0.000013" />
+            </inertial>
+        </link>
+
+        <joint name="palm_yaw_joint" type="revolute">
+            <parent link="wrist_link" />
+            <child link="palm_link" />
+            <origin xyz="0.000 -0.041 0.019" rpy="0 0 0" />
+            <axis xyz="0 0 1" />
+            <limit effort="10" velocity="3.0" lower="-3.14" upper="3.14" />
+        </joint>
+
+        <link name="palm_link">
+            <visual>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Palm_link.STL" />
+                </geometry>
+                <material name="grey" />
+            </visual>
+            <collision>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Palm_link.STL" />
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.141693" />
+                <origin xyz="0.028024 0.008156 0.079739" rpy="0 0 0" />
+                <inertia ixx="0.000288" ixy="-0.000010" ixz="0.000010" 
+                        iyy="0.000385" iyz="0.000054" 
+                        izz="0.000158" />
+            </inertial>
+        </link>
+
+        <joint name="gripper_prismatic_joint" type="revolute">
+            <parent link="palm_link" />
+            <child link="gripper_link" />
+            <origin xyz="0.033 0.004 0.127" rpy="0 0 0" />
+            <axis xyz="0 -1 0" />
+            <limit effort="1" velocity="4.8" lower="-0.4" upper="1" />
+        </joint>
+
+        <link name="gripper_link">
+            <visual>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Gripper_link.STL" />
+                </geometry>
+                <material name="grey" />
+            </visual>
+            <collision>
+                <geometry>
+                    <mesh filename="package://leader_description/meshes/Gripper_link.STL" />
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.006201" />
+                <origin xyz="0.017052 -0.003500 0.004139" rpy="0 0 0" />
+                <inertia ixx="0.000001" ixy="0.000000" ixz="0.000000" 
+                        iyy="0.000002" iyz="0.000000" 
+                        izz="0.000001" />
+            </inertial>
+        </link>
+
+        <joint name="ee_joint" type="fixed">
+            <parent link="palm_link" />
+            <child link="ee_link" />
+            <origin xyz="0.060 0.000 0.135" rpy="0 0 0" />
+        </joint>
+
+        <link name="ee_link" />
+
+    </xacro:macro>
+
+</robot>
