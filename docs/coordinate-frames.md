@@ -39,6 +39,69 @@ If any of these are wrong on the real robot, a motor direction is flipped.
 
 ---
 
+## Optical Frame Convention (Cameras / OpenCV)
+
+Cameras do **not** use the REP 103 body convention. Computer vision libraries (OpenCV,
+MediaPipe, image pipelines) use the **optical frame convention**, where the axes are defined
+from the camera's point of view looking out through the lens:
+
+```
+        +------ X (right)
+       /|
+      / |
+     Z  Y (down)
+   (forward,
+   into scene)
+```
+
+- **X** → right (across the image, same as image column `u`)
+- **Y** → down (down the image, same as image row `v`)
+- **Z** → forward (out of the lens, into the scene = depth)
+
+This is also right-handed, but it is rotated relative to the body convention. The contrast:
+
+| Axis | REP 103 body (`base_link`) | Optical frame (camera) |
+|---|---|---|
+| X | forward | right |
+| Y | left | down |
+| Z | up | forward (depth) |
+
+### Why two conventions exist
+
+The optical convention matches how an image is stored: the origin is the top-left pixel, `X`
+increases to the right (column `u`), `Y` increases downward (row `v`), and `Z` is depth into the
+scene. This makes the pinhole camera projection math clean — a 3D point projects to pixel
+coordinates with no axis juggling.
+
+### How ROS bridges the two
+
+ROS keeps **both** frames per camera and connects them with a fixed static transform:
+
+- **`camera_link`** — REP 103 body-style frame (X forward), used for mounting the camera in the
+  robot's TF tree
+- **`camera_optical_frame`** (or `*_rgb_optical_frame`) — optical convention (Z forward), the
+  frame that image data and detections are actually expressed in
+
+The static transform between them is a pure rotation, conventionally:
+
+```bash
+# rpy = (-pi/2, 0, -pi/2)  →  rotates body-style axes into optical axes
+ros2 run tf2_ros static_transform_publisher \
+  0 0 0  -1.5708 0 -1.5708  camera_link  camera_optical_frame
+```
+
+### Why this matters for hand teleop
+
+The MediaPipe hand tracker (see [hand-teleop.md](hand-teleop.md)) reports landmarks in **image
+space** — `u` to the right, `v` down, and an apparent-size depth proxy. Before those values can
+drive the arm, they must be mapped from the optical convention into the robot's `base_link`
+(REP 103) frame. That mapping is exactly the X↔Z, Y↔(down/left) swap shown in the table above:
+image-right becomes robot-left/right, image-up becomes robot-up, and apparent depth becomes
+robot-forward. Getting this swap wrong is the usual cause of an arm that moves "sideways when you
+expect forward."
+
+---
+
 ## Why the Arm (MoveIt) Doesn't Need `axis_direction` Correction
 
 MoveIt uses a **kinematic solver** (KDL, IKFast, etc.) that works entirely in the URDF's

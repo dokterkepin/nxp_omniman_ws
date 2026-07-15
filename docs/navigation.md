@@ -45,7 +45,7 @@ In RViz:
 2. Send goals with **2D Goal Pose**
 
 > **Note:** Nav2's DWB controller sends `geometry_msgs/TwistStamped`, but teleop_twist_joy sends
-> plain `Twist`. A relay node (`twist_to_twist_stamped.py`) bridges this gap when needed.
+> plain `Twist`. A relay node (`twist_to_twist_stamped.py`) bridges this gap when user would like to teleoperate with joystick (use_joy:=true).
 
 ![Nav2 Navigation](images/nav2.png)
 
@@ -58,14 +58,12 @@ The robot PC runs all hardware and navigation; the remote PC handles visualizati
 
 **Robot PC:**
 ```bash
-ros2 launch omniman_ros2_control nxp_omniman_launch.py use_joy:=true
 ros2 launch omniman_navigation slam_launch.py
 ```
 
-**Remote PC (RViz + joystick):**
+**Remote PC (RViz):**
 ```bash
 ros2 launch omniman_navigation rviz_launch.py
-ros2 run joy joy_node
 ```
 
 See [remote-access.md](remote-access.md) for SSH and DDS domain setup.

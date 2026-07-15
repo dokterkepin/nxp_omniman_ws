@@ -55,6 +55,24 @@ frame = packet_->createPositionCommand(axis_direction_ * joint_commands_[HIF_POS
 ```
 So if ros2_control sends +2 rad/s velocity and axis_direction_ = -1, the actual CAN command sent to the motor is -2 rad/s.
 
+## How to use it in the URDF
+
+Pass `axis_direction` when calling the macro in the URDF. The value is either `1` (normal) or `-1` (reversed):
+
+[nxp_omniman.urdf.xacro:128-137](../omniman_ros2_control/description/nxp_omniman.urdf.xacro#L128-L137)
+```xml
+<!-- Left wheels: mirror-mounted, need inversion -->
+<xacro:mecanum_wheel_ros2_control ... device_id="3" axis_direction="-1" joint_name="Front_left_plate_continuous_joint"/>
+<xacro:mecanum_wheel_ros2_control ... device_id="1" axis_direction="-1" joint_name="Rear_left_plate_continuous_joint"/>
+
+<!-- Right wheels: normal orientation -->
+<xacro:mecanum_wheel_ros2_control ... device_id="4" axis_direction="1" joint_name="Front_right_plate_continuous_joint"/>
+<xacro:mecanum_wheel_ros2_control ... device_id="2" axis_direction="1" joint_name="Rear_right_plate_continuous_joint"/>
+
+<!-- Arm joints: always 1, MoveIt handles direction via URDF kinematics -->
+<xacro:robstride_ros2_control ... device_id="5" joint_name="shoulder_yaw_joint" axis_direction="1"/>
+```
+
 ## How it works as a whole
 The trick is that the inversion is applied symmetrically on both sides:
 ```
@@ -66,3 +84,36 @@ The sign flip cancels out from the perspective of any higher-level controller. t
 Multiplying by -1 on both read and write transparently corrects.
 
 > **Note:** `axis_direction` is only relevant for wheel motors. Arm joints always use `1` because MoveIt's kinematic solver handles axis orientation through the URDF model — see [coordinate-frames.md](coordinate-frames.md).
+
+---
+
+## Dynamixel: the same feature, built-in
+
+Dynamixel servos have direction inversion as an official firmware feature called **Drive Mode**
+(control table address 10). Bit 0 of the register controls rotation direction:
+
+| `Drive Mode` bit 0 | Direction |
+|---|---|
+| `0` (default) | CCW — normal |
+| `1` | CW — reversed |
+
+It is configured in the xacro via the `driver_mode` parameter, which writes directly to the
+motor's control table register at startup:
+
+[dynamixel_motor.ros2_control.xacro:49](../dynamixel_hardware/dynamixel_hardware_interface/ros2_control/dynamixel_motor.ros2_control.xacro#L49)
+```xml
+<param name="Drive Mode">${driver_mode}</param>
+```
+
+To reverse a Dynamixel joint, pass `driver_mode:=1` when calling the macro in the URDF:
+```xml
+<xacro:dynamixel_ros2_control name="PalmYaw" ... driver_mode:="1" />
+```
+
+All three Dynamixel joints on this robot currently use `driver_mode:=0` (no inversion needed).
+
+**`axis_direction` on CyberGear is a manual port of this same concept.** Robstride motors have
+no equivalent firmware register, so the sign flip was implemented in software inside the
+ros2_control hardware plugin — applied symmetrically on both `read()` and `write()` as described
+above. The end result is identical: ros2_control and all higher-level stacks see a consistent
+positive direction regardless of how the motor is physically mounted.
