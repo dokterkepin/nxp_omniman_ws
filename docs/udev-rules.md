@@ -24,7 +24,7 @@ sudo nano /etc/udev/rules.d/99-manipulator-cdc.rules
 
 put this inside and save
 ```
-KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", MODE="0666", SYMLINK+="dynamixel"
+KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ATTRS{serial}=="FT9HD25J" MODE="0666", SYMLINK+="dynamixel"
 ```
 
 reload and verify
