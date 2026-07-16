@@ -1,0 +1,92 @@
+/**:
+  controller_manager:
+    ros__parameters:
+      update_rate: 200  # Hz
+
+      joint_state_broadcaster:
+        type: joint_state_broadcaster/JointStateBroadcaster
+
+      gravity_compensation_controller:
+        type: gravity_compensation_controller/GravityCompensationController
+
+      spring_actuator_controller:
+        type: spring_actuator_controller/SpringActuatorController
+
+      joint_trajectory_command_broadcaster:
+        type: joint_trajectory_command_broadcaster/JointTrajectoryCommandBroadcaster
+
+/**:
+  gravity_compensation_controller:
+    ros__parameters:
+      joints:
+        - shoulder_yaw_joint
+        - upper_shoulder_pitch_joint
+        - arm_yaw_joint
+        - forearm_pitch_joint
+        - wrist_pitch_joint
+        - palm_yaw_joint
+      command_interfaces:
+        - effort
+      state_interfaces:
+        - position
+        - velocity
+      kinetic_friction_scalars:
+        - 0.8
+        - 0.8
+        - 0.8
+        - 0.1
+        - 0.1
+        - 0.1
+      # KDL torques are in N*m; Goal Current on XM430-W350 is raw units of 2.69 mA.
+      # Torque constant ~1.78 N*m/A  ->  ~209 raw units per N*m. Start slightly
+      # under-compensated (arm sags gently) and tune upward per joint.
+      torque_scaling_factors:
+        - 180.0
+        - 180.0
+        - 180.0
+        - 180.0
+        - 180.0
+        - 180.0
+      enable_spring_effect: false
+
+/**:
+  spring_actuator_controller:
+    ros__parameters:
+      joints:
+        - gripper_prismatic_joint
+      command_interfaces:
+        - effort
+      state_interfaces:
+        - position
+        - velocity
+      trigger_spring_stiffness:
+        - 0.06
+      trigger_neutral_position:
+        - 0.0
+      trigger_damping:
+        - 0.004
+      # same N*m -> Goal Current raw conversion as the arm joints
+      torque_scaling_factors:
+        - 200.0
+
+/**:
+  joint_trajectory_command_broadcaster:
+    ros__parameters:
+      joints:
+        - shoulder_yaw_joint
+        - upper_shoulder_pitch_joint
+        - arm_yaw_joint
+        - forearm_pitch_joint
+        - wrist_pitch_joint
+        - palm_yaw_joint
+        - gripper_prismatic_joint
+      interfaces:
+        - position
+      offsets:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.0

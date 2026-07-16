@@ -225,6 +225,20 @@ bool JointTrajectoryCommandBroadcaster::init_joint_data()
     name_if_value_mapping_[si->get_prefix_name()][interface_name] = kUninitializedValue;
   }
 
+  // Populate joint_names_ from the configured joints (preserving parameter order so
+  // offsets/reverse_joints line up), falling back to all discovered state interfaces.
+  if (!params_.joints.empty()) {
+    for (const auto & joint_name : params_.joints) {
+      if (name_if_value_mapping_.count(joint_name) > 0) {
+        joint_names_.push_back(joint_name);
+      }
+    }
+  } else {
+    for (const auto & name_if : name_if_value_mapping_) {
+      joint_names_.push_back(name_if.first);
+    }
+  }
+
   // Add extra joints if needed
   rclcpp::Parameter extra_joints;
   if (get_node()->get_parameter("extra_joints", extra_joints)) {

@@ -19,7 +19,7 @@ def generate_launch_description():
     declared_arguments = [
         DeclareLaunchArgument(
             'port_name',
-            default_value='/dev/ttyUSB1',
+            default_value='/dev/dynamixel_leader',
             description='Serial port for the leader dynamixel chain.',
         ),
     ]
@@ -29,7 +29,7 @@ def generate_launch_description():
     pkg_path = FindPackageShare('leader_ros2_control')
 
     robot_controllers = PathJoinSubstitution(
-        [pkg_path, 'config', 'controllers.yaml']
+        [pkg_path, 'config', 'controllers_gravity.yaml']
     )
 
     robot_description_content = Command(
@@ -37,7 +37,7 @@ def generate_launch_description():
             PathJoinSubstitution([FindExecutable(name='xacro')]),
             ' ',
             PathJoinSubstitution(
-                [pkg_path, 'description', 'leader.urdf.xacro']
+                [pkg_path, 'description', 'leader.gravity.xacro']
             ),
             ' ',
             'port_name:=',

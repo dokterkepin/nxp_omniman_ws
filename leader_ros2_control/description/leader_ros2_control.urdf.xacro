@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<robot name="leader" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- Include the leader arm URDF -->
+    <xacro:include filename="$(find leader_description)/urdf/leader.urdf.xacro" />
+
+    <!-- Launch arguments -->
+    <xacro:property name="serial_port" default="/dev/dynamixel_leader" />
+    <xacro:leader />
+
+    <!-- ============================================================
+         Position-mode (JGPC) hardware, one ros2_control system per motor.
+         Same layout as dynamixel_hardware_interface's dynamixel_motor macro,
+         plus "Operating Mode 3" so motors are switched back to position mode
+         after a gravity-comp session left them in current mode (0).
+         Drive Modes match leader.gravity.xacro: 1,0,1,1,1,0,0
+         ============================================================ -->
+    <xacro:macro name="leader_dynamixel_ros2_control" params="name device_id joint_name driver_mode:=0 position_p_gain:=800">
+        <ros2_control name="${name}" type="system">
+            <hardware>
+                <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
+                <param name="port_name">${serial_port}</param>
+                <param name="baud_rate">1000000</param>
+                <param name="error_timeout_ms">500</param>
+                <param name="disable_torque_at_init">true</param>
+                <param name="dynamixel_model_folder">/param/dxl_model</param>
+                <param name="number_of_joints">1</param>
+                <param name="number_of_transmissions">1</param>
+                <param name="dynamixel_state_pub_msg_name">dynamixel_hardware_interface/dxl_state</param>
+                <param name="get_dynamixel_data_srv_name">dynamixel_hardware_interface/get_dxl_data</param>
+                <param name="set_dynamixel_data_srv_name">dynamixel_hardware_interface/set_dxl_data</param>
+                <param name="reboot_dxl_srv_name">dynamixel_hardware_interface/reboot_dxl</param>
+                <param name="set_dxl_torque_srv_name">dynamixel_hardware_interface/set_dxl_torque</param>
+            </hardware>
+
+            <joint name="${joint_name}">
+                <command_interface name="position"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+                <state_interface name="effort"/>
+            </joint>
+
+            <gpio name="dxl_${device_id}">
+                <param name="type">dxl</param>
+                <param name="ID">${device_id}</param>
+                <command_interface name="Goal Position"/>
+                <state_interface name="Present Position"/>
+                <state_interface name="Present Velocity"/>
+                <state_interface name="Present Current"/>
+                <state_interface name="Torque Enable"/>
+                <state_interface name="Present Input Voltage"/>
+                <param name="Position P Gain">${position_p_gain}</param>
+                <param name="Drive Mode">${driver_mode}</param>
+                <param name="Operating Mode">3</param>
+                <param name="Return Delay Time">2</param>
+            </gpio>
+
+            <transmission name="${joint_name}_transmission">
+                <plugin>transmission_interface/SimpleTransmission</plugin>
+                <actuator name="${joint_name}_motor" role="${joint_name}_motor"/>
+                <joint name="${joint_name}" role="${joint_name}">
+                    <mechanical_reduction>1</mechanical_reduction>
+                </joint>
+            </transmission>
+        </ros2_control>
+    </xacro:macro>
+
+    <xacro:leader_dynamixel_ros2_control name="ShoulderYaw" device_id="1" joint_name="shoulder_yaw_joint" driver_mode="1"/>
+    <xacro:leader_dynamixel_ros2_control name="UpperShoulderPitch" device_id="2" joint_name="upper_shoulder_pitch_joint" driver_mode="0"/>
+    <xacro:leader_dynamixel_ros2_control name="ArmYaw" device_id="3" joint_name="arm_yaw_joint" driver_mode="1"/>
+    <xacro:leader_dynamixel_ros2_control name="ForearmPitch" device_id="4" joint_name="forearm_pitch_joint" driver_mode="1"/>
+    <xacro:leader_dynamixel_ros2_control name="WristPitch" device_id="5" joint_name="wrist_pitch_joint" driver_mode="1"/>
+    <xacro:leader_dynamixel_ros2_control name="PalmYaw" device_id="6" joint_name="palm_yaw_joint" driver_mode="0"/>
+    <xacro:leader_dynamixel_ros2_control name="GripperPrismatic" device_id="7" joint_name="gripper_prismatic_joint" driver_mode="0"/>
+</robot>

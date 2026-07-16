@@ -1,5 +1,13 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+<robot name="leader" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- Include the leader arm URDF -->
+  <xacro:include filename="$(find leader_description)/urdf/leader.urdf.xacro"/>
+
+  <!-- Launch arguments -->
+  <xacro:arg name="port_name" default="/dev/dynamixel_leader"/>
+
+  <xacro:leader />
+
   <!--
     Leader arm hardware in CURRENT (torque) control mode for gravity compensation.
     Modeled on open_manipulator omy_l100_current.ros2_control.xacro.
@@ -10,7 +18,7 @@
     - Drive Modes preserved from the previous position-mode setup: 1,0,1,1,1,0,0
     - Current Limit caps motor torque during tuning (raw units; 400 ~= 1.08 A ~= 1.9 Nm)
   -->
-  <xacro:macro name="leader_system" params="name port_name:=/dev/ttyUSB1">
+  <xacro:macro name="leader_system" params="name port_name:=/dev/dynamixel_leader">
     <ros2_control name="${name}" type="system">
       <hardware>
         <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
@@ -100,6 +108,7 @@
         <param name="Operating Mode">0</param>
         <param name="Return Delay Time">0</param>
         <param name="Current Limit">400</param>
+        <param name="Goal Current">0</param>
       </gpio>
       <gpio name="dxl2">
         <param name="type">dxl</param>
@@ -112,6 +121,7 @@
         <param name="Operating Mode">0</param>
         <param name="Return Delay Time">0</param>
         <param name="Current Limit">400</param>
+        <param name="Goal Current">0</param>
       </gpio>
       <gpio name="dxl3">
         <param name="type">dxl</param>
@@ -124,6 +134,7 @@
         <param name="Operating Mode">0</param>
         <param name="Return Delay Time">0</param>
         <param name="Current Limit">400</param>
+        <param name="Goal Current">0</param>
       </gpio>
       <gpio name="dxl4">
         <param name="type">dxl</param>
@@ -136,6 +147,7 @@
         <param name="Operating Mode">0</param>
         <param name="Return Delay Time">0</param>
         <param name="Current Limit">400</param>
+        <param name="Goal Current">0</param>
       </gpio>
       <gpio name="dxl5">
         <param name="type">dxl</param>
@@ -148,6 +160,7 @@
         <param name="Operating Mode">0</param>
         <param name="Return Delay Time">0</param>
         <param name="Current Limit">400</param>
+        <param name="Goal Current">0</param>
       </gpio>
       <gpio name="dxl6">
         <param name="type">dxl</param>
@@ -160,6 +173,7 @@
         <param name="Operating Mode">0</param>
         <param name="Return Delay Time">0</param>
         <param name="Current Limit">400</param>
+        <param name="Goal Current">0</param>
       </gpio>
       <gpio name="dxl7">
         <param name="type">dxl</param>
@@ -172,8 +186,12 @@
         <param name="Operating Mode">0</param>
         <param name="Return Delay Time">0</param>
         <param name="Current Limit">200</param>
+        <param name="Goal Current">0</param>
       </gpio>
 
     </ros2_control>
   </xacro:macro>
+
+  <!-- single dynamixel system: all 7 motors, effort command (Goal Current) -->
+  <xacro:leader_system name="leader_system" port_name="$(arg port_name)"/>
 </robot>
