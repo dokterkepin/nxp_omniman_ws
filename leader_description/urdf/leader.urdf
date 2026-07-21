@@ -47,11 +47,11 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.067330" />
-            <origin xyz="-0.011831 -0.004951 0.018905" rpy="0 0 0" />
-            <inertia ixx="0.000015" ixy="0.000000" ixz="0.0000000"
-                     iyy="0.000026" iyz="0.000000" 
-                     izz="0.000024" />
+            <mass value="0.104932" />
+            <origin xyz="-0.011744 -0.003190 0.018889" rpy="0 0 0" />
+            <inertia ixx="0.000022" ixy="0.000000" ixz="0.0000000"
+                     iyy="0.000036" iyz="0.000000" 
+                     izz="0.000034" />
         </inertial>
     </link>
 
@@ -76,11 +76,11 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.060696" />
-            <origin xyz="0.000023 -0.018562 0.018781" rpy="0 0 0" />
-            <inertia ixx="0.000025" ixy="0.000000" ixz="0.000000" 
-                     iyy="0.000021" iyz="0.000000" 
-                     izz="0.000012" />
+            <mass value="0.098298" />
+            <origin xyz="0.000000 -0.018677 0.016030" rpy="0 0 0" />
+            <inertia ixx="0.000037" ixy="0.000000" ixz="0.000000" 
+                     iyy="0.000032" iyz="0.000000" 
+                     izz="0.000018" />
         </inertial>
     </link>
 
@@ -105,18 +105,18 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.161017" />
-            <origin xyz="0.127050 0.000149 0.018851" rpy="0 0 0" />
-            <inertia ixx="0.000024" ixy="0.000003" ixz="0.000003" 
-                     iyy="0.001502" iyz="0.000000" 
-                     izz="0.001502" />
+            <mass value="0.198517" />
+            <origin xyz="0.004663 0.000160 0.082369" rpy="0 0 0" />
+            <inertia ixx="0.000775" ixy="0.000000" ixz="-0.000059" 
+                     iyy="0.000786" iyz="0.000002" 
+                     izz="0.000047" />
         </inertial>
     </link>
 
     <joint name="forearm_pitch_joint" type="revolute">
         <parent link="arm_link" />
         <child link="forearm_link" />
-        <origin xyz="0.254 0.019 0.019" rpy="0 0 0" />
+        <origin xyz="0.000 0.019 0.159" rpy="0 0 0" />
         <axis xyz="0 -1 0" />
         <limit effort="10" velocity="3.0" lower="-2.33" upper="2.4" />
     </joint>
@@ -134,18 +134,18 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.126166" />
-            <origin xyz="0.137015 0.016972 -0.000011" rpy="0 0 0" />
-            <inertia ixx="0.000018" ixy="0.000004" ixz="0.000000" 
-                     iyy="0.000810" iyz="0.000000" 
-                     izz="0.000814" />
+            <mass value="0.120758" />
+            <origin xyz="0.000000 0.016998 0.099892" rpy="0 0 0" />
+            <inertia ixx="0.000231" ixy="0.000000" ixz="0.000000" 
+                     iyy="0.000226" iyz="0.000002" 
+                     izz="0.000021" />
         </inertial>
     </link>
 
     <joint name="wrist_pitch_joint" type="revolute">
         <parent link="forearm_link" />
         <child link="wrist_link" />
-        <origin xyz="0.225 -0.002 0.000" rpy="0 0 0" />
+        <origin xyz="0.000 -0.002 0.135" rpy="0 0 0" />
         <axis xyz="0 1 0" />
         <limit effort="10" velocity="3.0" lower="-1.86" upper="1.69" />
     </joint>
@@ -163,11 +163,11 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.047237" />
-            <origin xyz="-0.000029 -0.027699 0.000563" rpy="0 0 0" />
-            <inertia ixx="0.000015" ixy="0.000000" ixz="0.000000" 
-                     iyy="0.000008" iyz="0.000000" 
-                     izz="0.000013" />
+            <mass value="0.091000" />
+            <origin xyz="0.000000 -0.027250 0.000360" rpy="0 0 0" />
+            <inertia ixx="0.000028" ixy="0.000000" ixz="0.000000" 
+                     iyy="0.000015" iyz="0.000000" 
+                     izz="0.000024" />
         </inertial>
     </link>
 
@@ -192,11 +192,11 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.141693" />
-            <origin xyz="0.028024 0.008156 0.079739" rpy="0 0 0" />
-            <inertia ixx="0.000288" ixy="-0.000010" ixz="0.000010" 
-                     iyy="0.000385" iyz="0.000054" 
-                     izz="0.000158" />
+            <mass value="0.167758" />
+            <origin xyz="0.025752 0.013110 0.095377" rpy="0 0 0" />
+            <inertia ixx="0.000295" ixy="-0.000011" ixz="-0.000004" 
+                     iyy="0.000363" iyz="0.000062" 
+                     izz="0.000136" />
         </inertial>
     </link>
 

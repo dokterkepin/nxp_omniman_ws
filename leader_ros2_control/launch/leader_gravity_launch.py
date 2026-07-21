@@ -31,6 +31,9 @@ def generate_launch_description():
     robot_controllers = PathJoinSubstitution(
         [pkg_path, 'config', 'controllers_gravity.yaml']
     )
+    rviz_config_file = PathJoinSubstitution(
+        [pkg_path, "config", "gravity_config.rviz"]
+    )
 
     robot_description_content = Command(
         [
@@ -53,12 +56,14 @@ def generate_launch_description():
         output='both',
     )
 
-    # frame_prefix avoids TF collision with the follower (omniman) links
+    # frame_prefix avoids TF collision with the follower (omniman) links.
+    # Trailing '/' (not '_') matches rviz's RobotModel "TF Prefix" field, which
+    # always inserts its own '/' separator before the link name.
     robot_state_publisher_node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
         output='both',
-        parameters=[robot_description, {'frame_prefix': 'leader_'}],
+        parameters=[robot_description, {'frame_prefix': 'leader/'}],
     )
 
     controller_spawner = Node(
@@ -73,6 +78,21 @@ def generate_launch_description():
         parameters=[robot_description],
     )
 
+    # Kept outside the 'leader' namespace push: rviz2's own 'tf'/'tf_static'
+    # subscriptions must resolve to the real global /tf topic (robot_state_publisher
+    # broadcasts TF on the absolute /tf, not a namespaced one). Only
+    # /robot_description needs remapping since that one *is* namespaced.
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='log',
+        remappings=[
+            ('/robot_description', '/leader/robot_description'),
+        ],
+        arguments=['-d', rviz_config_file,],
+    )
+
     leader_with_namespace = GroupAction(
         actions=[
             PushRosNamespace('leader'),
@@ -82,4 +102,4 @@ def generate_launch_description():
         ]
     )
 
-    return LaunchDescription(declared_arguments + [leader_with_namespace])
+    return LaunchDescription(declared_arguments + [leader_with_namespace, rviz_node])

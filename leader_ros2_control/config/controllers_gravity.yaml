@@ -34,19 +34,19 @@
         - 0.8
         - 0.8
         - 0.8
-        - 0.1
-        - 0.1
-        - 0.1
+        - 0.8
+        - 0.8
+        - 0.8
       # KDL torques are in N*m; Goal Current on XM430-W350 is raw units of 2.69 mA.
       # Torque constant ~1.78 N*m/A  ->  ~209 raw units per N*m. Start slightly
       # under-compensated (arm sags gently) and tune upward per joint.
       torque_scaling_factors:
-        - 180.0
-        - 180.0
-        - 180.0
-        - 180.0
-        - 180.0
-        - 180.0
+        - 80.0
+        - 130.0
+        - 80.0
+        - 130.0
+        - 90.0
+        - 80.0
       enable_spring_effect: false
 
 /**:
