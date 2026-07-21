@@ -11,6 +11,14 @@
 
   <depend>rclcpp</depend>
 
+  <!-- gripper_teleop_bridge.py -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>control_msgs</exec_depend>
+
+  <!-- leader->follower teleop bridges in leader_gravity_launch.py -->
+  <exec_depend>topic_tools</exec_depend>
+
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>joint_state_broadcaster</exec_depend>
   <exec_depend>joint_trajectory_controller</exec_depend>

@@ -102,4 +102,13 @@ def generate_launch_description():
         ]
     )
 
-    return LaunchDescription(declared_arguments + [leader_with_namespace, rviz_node])
+    # Leader stack only. The leader->follower teleop bridges live in
+    # teleop_bridges_launch.py, started separately as a deliberate step once
+    # both robots are up and poses are confirmed safe.
+    return LaunchDescription(
+        declared_arguments
+        + [
+            leader_with_namespace,
+            rviz_node,
+        ]
+    )

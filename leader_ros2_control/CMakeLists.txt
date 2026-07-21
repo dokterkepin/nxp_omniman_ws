@@ -15,6 +15,12 @@ install (DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Python teleop node (leader trigger -> follower gripper action).
+install(PROGRAMS
+  scripts/gripper_teleop_bridge.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

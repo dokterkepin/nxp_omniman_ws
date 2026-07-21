@@ -44,7 +44,7 @@
         - 80.0
         - 130.0
         - 80.0
-        - 130.0
+        - 125.0
         - 90.0
         - 80.0
       enable_spring_effect: false
@@ -60,7 +60,7 @@
         - position
         - velocity
       trigger_spring_stiffness:
-        - 0.06
+        - 0.2
       trigger_neutral_position:
         - 0.0
       trigger_damping:
@@ -72,6 +72,10 @@
 /**:
   joint_trajectory_command_broadcaster:
     ros__parameters:
+      # Arm-only teleop: 6 joints, matching omniman's arm_controller exactly.
+      # gripper_prismatic_joint is intentionally NOT broadcast to the follower —
+      # a JTC rejects a whole trajectory if it contains a joint it doesn't own.
+      # The leader gripper still works locally via spring_actuator_controller.
       joints:
         - shoulder_yaw_joint
         - upper_shoulder_pitch_joint
@@ -79,11 +83,9 @@
         - forearm_pitch_joint
         - wrist_pitch_joint
         - palm_yaw_joint
-        - gripper_prismatic_joint
       interfaces:
         - position
       offsets:
-        - 0.0
         - 0.0
         - 0.0
         - 0.0
