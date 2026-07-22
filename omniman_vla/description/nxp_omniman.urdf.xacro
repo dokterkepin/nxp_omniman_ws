@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <robot name="nxp_omniman" xmlns:xacro="http://www.ros.org/wiki/xacro">
     <!-- Include the combined static URDF (base + arm) -->
-    <xacro:include filename="$(find omniman_vla)/urdf/omniman_vla.urdf.xacro"/>
+    <xacro:include filename="$(find omniman_vla)/urdf/omniman.urdf.xacro"/>
 
     <!-- Include ros2_control hardware macros -->
     <xacro:include filename="$(find cybergear_control)/description/ros2_control/robstride.ros2_control.urdf.xacro"/>
