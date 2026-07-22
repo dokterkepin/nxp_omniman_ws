@@ -11,15 +11,8 @@
     <xacro:property name="canbus_arm" default="can_arm"/>
     <xacro:property name="serial_port" default="/dev/dynamixel"/>
 
-    <!-- ============================================================
-         Real Hardware (VLA is real-hardware only — no sim block).
-
-         The mecanum base is omitted: the wheels are not part of the dataset
-         (no base teleop from the leader) and dropping them removes the can_base
-         hardware dependency. The wheel links stay in the URDF (still shown in
-         TF/RViz at rest) — ros2_control simply ignores URDF joints that are not
-         inside a <ros2_control> block, so they cause no error.
-         ============================================================ -->
+    <!-- Instantiate the robot links/joints before adding ros2_control macros. -->
+    <xacro:nxp_omniman/>
 
     <!-- ========== Arm Joints (CyberGear on canbus_arm) ========== -->
     <xacro:robstride_ros2_control name="ShoulderYaw" canbus="${canbus_arm}" device_id="5" joint_name="shoulder_yaw_joint" axis_direction="1"/>
@@ -33,7 +26,7 @@
                                   />
     <xacro:dynamixel_ros2_control name="PalmYaw" serial_device="${serial_port}" device_id="10" joint_name="palm_yaw_joint"
                                   />
-    <xacro:dynamixel_ros2_control name="LeftFingerPrismatic" serial_device="${serial_port}" device_id="11"
+    <xacro:dynamixel_ros2_control name="GripperPrismatic" serial_device="${serial_port}" device_id="11"
                                   joint_name="gripper_prismatic_joint"
                                   use_prismatic="1"
                                   revolute_max="0.0" revolute_min="-2.5"

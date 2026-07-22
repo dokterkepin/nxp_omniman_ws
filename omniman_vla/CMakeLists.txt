@@ -11,6 +11,7 @@ install(DIRECTORY
   urdf
   config
   launch
+  description
   DESTINATION share/${PROJECT_NAME}
 )
 

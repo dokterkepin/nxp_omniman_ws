@@ -1,20 +1,3 @@
-#!/usr/bin/env python3
-#
-# omniman FOLLOWER bringup for the VLA / physical_ai_tools data-collection setup.
-#
-# This is a focused variant of omniman_ros2_control/launch/nxp_omniman_launch.py:
-#   - loads the VLA URDF (omniman_vla/urdf/nxp_omniman_vla.urdf.xacro) whose gripper
-#     joint is renamed 'gripper_prismatic_joint' to match the leader
-#   - arm_controller is a 7-joint JTC (6 arm + gripper), no GripperActionController
-#   - brings up ONLY what physical_ai_tools needs: ros2_control, joint states,
-#     robot_state_publisher, and the (full-rate, rectified) camera
-#   - NO MoveIt / joystick / keyboard / aruco / lidar
-#
-# The old nxp_omniman_launch.py and its URDF are untouched.
-#
-# Workflow: launch this (follower) -> home it -> launch the leader -> confirm poses
-# -> start teleop_bridges_launch.py (arm+gripper relay) -> record with physical_ai.
-
 import os
 
 from ament_index_python.packages import get_package_share_directory
