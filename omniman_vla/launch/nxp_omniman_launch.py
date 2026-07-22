@@ -25,7 +25,7 @@ def generate_launch_description():
             PathJoinSubstitution([FindExecutable(name='xacro')]),
             ' ',
             PathJoinSubstitution(
-                [pkg_path, 'urdf', 'omniman.urdf.xacro']
+                [pkg_path, 'description', 'nxp_omniman.urdf.xacro']
             ),
         ]
     )
