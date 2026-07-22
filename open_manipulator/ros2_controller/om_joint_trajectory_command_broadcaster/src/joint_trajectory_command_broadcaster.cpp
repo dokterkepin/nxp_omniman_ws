@@ -167,6 +167,34 @@ controller_interface::CallbackReturn JointTrajectoryCommandBroadcaster::on_activ
       // If joint not found in params_.joints, offset remains 0.0
     }
   }
+
+  // Check scales and create mapping based on params_.joints order.
+  // Default 1.0 (identity) so omitting the parameter changes nothing.
+  joint_scales_.clear();
+  joint_scales_.resize(params_.joints.size(), 1.0);
+
+  if (!params_.scales.empty()) {
+    if (params_.scales.size() != params_.joints.size()) {
+      RCLCPP_ERROR(
+        get_node()->get_logger(),
+        "The number of provided scales (%zu) does not match the number of joints in params (%zu).",
+        params_.scales.size(), params_.joints.size());
+      return CallbackReturn::ERROR;
+    }
+
+    std::unordered_map<std::string, double> joint_scale_map;
+    for (size_t i = 0; i < params_.joints.size(); ++i) {
+      joint_scale_map[params_.joints[i]] = params_.scales[i];
+    }
+
+    for (size_t i = 0; i < joint_names_.size(); ++i) {
+      auto it = joint_scale_map.find(joint_names_[i]);
+      if (it != joint_scale_map.end()) {
+        joint_scales_[i] = it->second;
+      }
+      // If joint not found in params_.joints, scale remains 1.0
+    }
+  }
   // No need to init JointState or DynamicJointState messages, only JointTrajectory
   // will be published. We'll construct it on-the-fly in update()
 
@@ -317,7 +345,9 @@ controller_interface::return_type JointTrajectoryCommandBroadcaster::update(
         pos_value = -pos_value;
       }
 
-      // Apply offset
+      // Apply scale (unit conversion), then offset:
+      //   published = scale * (reversed?) position + offset
+      pos_value *= joint_scales_[i];
       pos_value += joint_offsets_[i];
 
       traj_msg.points[0].positions[i] = pos_value;

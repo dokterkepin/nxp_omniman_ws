@@ -103,6 +103,7 @@ protected:
 
   std::vector<std::string> joint_names_;
   std::vector<double> joint_offsets_;
+  std::vector<double> joint_scales_;
   std::shared_ptr<rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>>
   joint_trajectory_publisher_;
   std::shared_ptr<realtime_tools::RealtimePublisher<trajectory_msgs::msg::JointTrajectory>>

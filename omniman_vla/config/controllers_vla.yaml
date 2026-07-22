@@ -1,0 +1,38 @@
+# Controllers for the omniman VLA (leader-follower data collection) setup.
+#
+# Difference from omniman_ros2_control/config/controllers.yaml:
+#   - arm_controller is now 7 joints: the 6 arm joints PLUS gripper_prismatic_joint.
+#     The gripper is driven through the SAME JointTrajectory the arm relay carries,
+#     so physical_ai_server can both record it (action) and replay it (deployment).
+#   - No gripper_controller (GripperActionController) — that action interface can't be
+#     recorded/replayed by physical_ai_server. The separate gripper_teleop_bridge is
+#     no longer needed either.
+#   - No arm_group_position_controller (VLA only uses the JTC path).
+#   - No mecanum base: the wheels aren't part of the dataset (no base teleop from
+#     the leader), so the mecanum_drive_controller and its hardware are omitted.
+controller_manager:
+  ros__parameters:
+    update_rate: 500
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+arm_controller:
+  ros__parameters:
+    joints:
+      - shoulder_yaw_joint
+      - upper_shoulder_pitch_joint
+      - arm_yaw_joint
+      - forearm_pitch_joint
+      - wrist_pitch_joint
+      - palm_yaw_joint
+      - gripper_prismatic_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_start: true

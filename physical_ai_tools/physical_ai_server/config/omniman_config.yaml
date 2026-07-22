@@ -1,0 +1,47 @@
+# physical_ai_server config for the omniman_vla leader-follower teleop setup.
+#
+# Data model (see physical_ai_server/data_processing/data_converter.py):
+#   action                   <- leader   /leader/joint_trajectory  (JointTrajectory)
+#   observation.state        <- follower  /joint_states  (JointState, filtered to the
+#                                          same joint_order names by joint name)
+#   observation.images.<cam> <- a CompressedImage topic
+#
+# Every name in joint_order.leader must exist in BOTH the leader trajectory (action
+# source) AND the follower /joint_states (state source). This requires the omniman_vla
+# follower (gripper renamed to gripper_prismatic_joint + a 7-joint arm_controller JTC),
+# NOT the old omniman_ros2_control follower.
+#
+# GRIPPER (7th joint): the leader broadcaster scales the trigger (rad) into the
+# follower finger command (m) via scales/offsets, and the gripper rides the same
+# trajectory relay as the arm -- so it's a normal recordable/deployable action/state
+# joint here. Both action (leader traj) and state (follower /joint_states) report the
+# gripper in metres, consistent for training and deployment.
+#
+# Camera: /image_rect/compressed is the rectified (checkerboard-calibrated) feed,
+# preferred over /image_raw/compressed for learning.
+physical_ai_server:
+  ros__parameters:
+    omniman:
+      observation_list:
+        - cam
+        - state
+
+      camera_topic_list:
+        - cam:/image_rect/compressed
+
+      joint_topic_list:
+        - follower:/joint_states
+        - leader:/leader/joint_trajectory
+
+      joint_list:
+        - leader
+
+      joint_order:
+        leader:
+          - shoulder_yaw_joint
+          - upper_shoulder_pitch_joint
+          - arm_yaw_joint
+          - forearm_pitch_joint
+          - wrist_pitch_joint
+          - palm_yaw_joint
+          - gripper_prismatic_joint

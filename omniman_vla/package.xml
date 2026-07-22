@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>omniman_vla</name>
+  <version>0.0.0</version>
+  <description>
+    Dedicated omniman follower bringup for the VLA / physical_ai_tools
+    leader-follower data-collection setup. Reuses omniman_description meshes but
+    renames the gripper joint to gripper_prismatic_joint and drives it through a
+    7-joint arm_controller (JTC) so physical_ai_server can record and replay it.
+    The original omniman_description / omniman_ros2_control packages are untouched.
+  </description>
+  <maintainer email="jiaokevinzhang@gmail.com">dokterkepin</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>omniman_description</exec_depend>
+  <exec_depend>cybergear_control</exec_depend>
+  <exec_depend>dynamixel_hardware_interface</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>joint_trajectory_controller</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>usb_cam</exec_depend>
+  <exec_depend>image_proc</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

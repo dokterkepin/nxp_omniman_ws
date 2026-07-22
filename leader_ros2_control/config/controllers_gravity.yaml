@@ -72,10 +72,23 @@
 /**:
   joint_trajectory_command_broadcaster:
     ros__parameters:
-      # Arm-only teleop: 6 joints, matching omniman's arm_controller exactly.
-      # gripper_prismatic_joint is intentionally NOT broadcast to the follower —
-      # a JTC rejects a whole trajectory if it contains a joint it doesn't own.
-      # The leader gripper still works locally via spring_actuator_controller.
+      # VLA teleop: 7 joints = 6 arm + gripper, matching the omniman_vla
+      # arm_controller (which now includes gripper_prismatic_joint as a JTC joint).
+      # NOTE: this publishes 7 joints, so it drives the omniman_vla follower only.
+      # The old 6-joint arm_controller would reject the extra gripper joint.
+      #
+      # The gripper is scaled from the leader trigger (radians) into the follower
+      # finger command (metres): published = scale * position + offset. This
+      # replaces the old gripper_teleop_bridge, so the gripper now flows through
+      # the same trajectory relay as the arm (recordable + deployable by
+      # physical_ai_server).
+      #
+      # scale/offset below reproduce the tuned bridge map
+      #   leader [-0.4, 0.0] rad  ->  follower [-0.010, 0.019] m  (invert=false):
+      #     scale  = (0.019 - (-0.010)) / (0.0 - (-0.4)) = 0.0725
+      #     offset = -0.010 - 0.0725 * (-0.4)            = 0.019
+      # Re-derive these if your final tuned trigger range differs (unlike the
+      # bridge, these are read at controller configure, so relaunch to change).
       joints:
         - shoulder_yaw_joint
         - upper_shoulder_pitch_joint
@@ -83,6 +96,7 @@
         - forearm_pitch_joint
         - wrist_pitch_joint
         - palm_yaw_joint
+        - gripper_prismatic_joint
       interfaces:
         - position
       offsets:
@@ -92,3 +106,12 @@
         - 0.0
         - 0.0
         - 0.0
+        - 0.019
+      scales:
+        - 1.0
+        - 1.0
+        - 1.0
+        - 1.0
+        - 1.0
+        - 1.0
+        - 0.0725

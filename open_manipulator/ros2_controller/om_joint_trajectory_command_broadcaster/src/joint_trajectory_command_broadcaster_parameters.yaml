@@ -36,6 +36,14 @@ joint_trajectory_command_broadcaster:
     default_value: [],
     description: "Offsets of joints to be added to the joint positions."
   }
+  scales: {
+    type: double_array,
+    default_value: [],
+    description: "Per-joint multiplicative scale applied to the position before the
+    offset (published = scale * (reversed?) position + offset). Used to convert a
+    leader joint into the follower's units, e.g. a revolute gripper trigger (rad)
+    into a prismatic finger command (m). Default 1.0 per joint when omitted."
+  }
   map_interface_to_joint_state:
     position: {
       type: string,

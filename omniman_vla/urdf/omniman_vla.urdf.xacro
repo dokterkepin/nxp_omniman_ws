@@ -27,7 +27,7 @@
                 </geometry>
             </collision>
             <inertial>
-                <mass value="11.60351" />
+                <mass value="11.503663" />
                 <origin xyz="0.007471 -0.002650 0.013517" rpy="0 0 0" />
                 <inertia ixx="0.130641" ixy="-0.005256" ixz="0.002401"
                         iyy="0.100394" iyz="-0.001007"
@@ -1515,7 +1515,7 @@
         
         <link name="camera_optical_frame" />
 
-        <joint name="left_finger_prismatic_joint" type="prismatic">
+        <joint name="gripper_prismatic_joint" type="prismatic">
             <parent link="palm_link" />
             <child link="left_finger_link" />
             <origin xyz="-0.016 -0.040 0.038" rpy="0 0 0" />
@@ -1524,7 +1524,7 @@
         </joint>
 
         <joint name="right_finger_prismatic_joint" type="prismatic">
-            <mimic joint="left_finger_prismatic_joint" multiplier="-1.0" offset="0.0" />
+            <mimic joint="gripper_prismatic_joint" multiplier="-1.0" offset="0.0" />
             <parent link="palm_link" />
             <child link="right_finger_link" />
             <origin xyz="-0.016 0.040 0.038" rpy="0 0 0" />
