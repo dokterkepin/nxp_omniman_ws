@@ -17,6 +17,7 @@ def generate_launch_description():
         executable="rviz2",
         name="rviz2",
         output="log",
+        arguments=["-d", rviz_config_file],
     )
 
     return LaunchDescription([rviz_node])       

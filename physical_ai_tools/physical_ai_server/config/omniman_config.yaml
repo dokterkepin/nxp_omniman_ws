@@ -17,8 +17,11 @@
 # joint here. Both action (leader traj) and state (follower /joint_states) report the
 # gripper in metres, consistent for training and deployment.
 #
-# Camera: /image_rect/compressed is the rectified (checkerboard-calibrated) feed,
-# preferred over /image_raw/compressed for learning.
+# Camera: /image_raw/compressed -- matches Robotis' own plain-camera config
+# (physical_ai_server/config/omx_f_config.yaml uses /camera1/image_raw/compressed).
+# Robotis only ever records driver-native rectified feeds (RealSense image_rect_raw,
+# ZED image_rect_color); a plain usb_cam has no such feed, so we record raw, exactly
+# like omx_f. (No separate image_proc rectify_node -- Robotis never uses one.)
 physical_ai_server:
   ros__parameters:
     omniman:
@@ -27,7 +30,7 @@ physical_ai_server:
         - state
 
       camera_topic_list:
-        - cam:/image_rect/compressed
+        - cam:/image_raw/compressed
 
       joint_topic_list:
         - follower:/joint_states
