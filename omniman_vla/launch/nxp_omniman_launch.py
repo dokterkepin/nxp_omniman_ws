@@ -77,8 +77,10 @@ def generate_launch_description():
             'pixel_format': 'mjpeg2rgb',
             'focus_auto': 0,
             'focus_absolute': 30,
+            'brightness': 128,
         }],
     )
+
 
     return LaunchDescription(
         [
