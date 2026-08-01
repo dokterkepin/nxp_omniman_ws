@@ -109,6 +109,6 @@ def generate_launch_description():
         declared_arguments
         + [
             leader_with_namespace,
-            rviz_node,
+            # rviz_node,
         ]
     )
