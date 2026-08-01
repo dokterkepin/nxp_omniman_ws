@@ -1,6 +1,3 @@
-import os
-
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import RegisterEventHandler
 from launch.event_handlers import OnProcessExit
@@ -66,37 +63,21 @@ def generate_launch_description():
         )
     )
 
-    # ---- Camera (full frame rate, rectified) ----
-    calibration_url = 'file://' + os.path.join(
-        get_package_share_directory('omniman_vla'),
-        'config', 'camera_calibration.yaml')
 
+    # Wrist camera (mounted on palm_link, moves with the arm). The workspace/top
+    # camera is a separate device brought up by physical_ai_server_bringup.launch.py
+    # -- do not duplicate it here, or two usb_cam nodes will fight over the same
+    # /dev/video_workspace device.
     usb_cam = Node(
         package='usb_cam',
         executable='usb_cam_node_exe',
+        name='usb_cam_wrist',
         parameters=[{
             'video_device': '/dev/video_c930',
-            'camera_name': 'narrow_stereo',
+            'pixel_format': 'mjpeg2rgb',
             'focus_auto': 0,
             'focus_absolute': 30,
-            'frame_id': 'camera_optical_frame',
-            'camera_info_url': calibration_url,
-            'pixel_format': 'yuyv2rgb',
         }],
-    )
-
-    # Rectify at full rate straight from /image_raw (no throttling — VLA wants every
-    # frame). image_proc republishes via image_transport, so /image_rect/compressed
-    # (the topic physical_ai_server records) is produced automatically.
-    image_rectify = Node(
-        package='image_proc',
-        executable='rectify_node',
-        ros_arguments=['--log-level', 'ERROR'],
-        remappings=[
-            ('image', '/image_raw'),
-            ('camera_info', '/camera_info'),
-            ('image_rect', '/image_rect'),
-        ],
     )
 
     return LaunchDescription(
@@ -106,6 +87,5 @@ def generate_launch_description():
             joint_state_broadcaster_spawner,
             delay_arm_controller,
             usb_cam,
-            image_rectify,
         ]
     )
