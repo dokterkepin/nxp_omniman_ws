@@ -181,3 +181,62 @@ Then in the **Inference** tab: select the policy path
 (`checkpoints/100000/pretrained_model`), enter the same task instruction, and press Start.
 
 > **First autonomous run:** hand on the e-stop, workspace clear, nothing fragile in reach.
+
+---
+
+## 5. Train on a different machine — no physical_ai_tools needed
+
+Training is plain PyTorch reading a folder of parquet/mp4 files — it never touches ROS,
+`physical_ai_server`, or the web UI. That means it can run on **any machine with a GPU**,
+independent of this project's ROS distro
+
+**Install PyTorch via pip, in conda environment** — im using miniconda to setup my environment, the workflow we should do is exactly the same in the first time we clone the physical_ai_tools and install all the dependencies. after that we can install torch because torch is packed with cuda
+```bash
+pip3 install torch torchvision
+```
+
+Then get the dataset and LeRobot source onto the remote machine and install the rest:
+```
+cd ~/lerobot
+pip install -e .
+pip install 'datasets<=3.6.0'   # same version that used by physical_ai_tools 
+```
+
+### 5.2 The training command
+```bash
+cat > ~/train_cmd.sh << 'EOF'
+python3 -m lerobot.scripts.train \
+    --policy.type=act \
+    --policy.push_to_hub=false \
+    --dataset.repo_id=dokterkepin/omniman_pick_and_place \
+    --dataset.root=/home/dokterkepin/dataset/omniman_pick_and_place \
+    --dataset.image_transforms.enable=true \
+    --batch_size=16 \
+    --num_workers=12 \
+    --steps=100000 \
+    --save_freq=10000 \
+    --output_dir=/home/dokterkepin/output/omniman_pick_and_place \
+    --wandb.enable=true \
+    --wandb.project=lerobot_train
+EOF
+bash ~/train_cmd.sh
+```
+
+### 5.3 Live monitoring with Weights & Biases (optional)
+The UI's live loss graph comes from `physical_ai_server` always setting `wandb.enable: false`
+internally — calling the CLI directly, you can turn it on for the same kind of live browser
+dashboard:
+
+```bash
+pip install wandb
+wandb login          # free account, one-time
+```
+Add `--wandb.enable=true --wandb.project=<name>` (already in the command above). The run prints
+a `https://wandb.ai/...` URL — open it for live `train/loss`, `train/lr`, GPU utilization, etc.
+
+> This uploads metrics to a third-party cloud service by default. Use `--wandb.mode=offline` to
+> log locally instead, at the cost of the live browser view.
+>
+> The `eval/*` panels seen in LeRobot's own example dashboards (success rate, reward, video)
+> only populate for datasets trained against a simulated `env` — real-robot runs like this one
+> have `env: None`, so those panels simply never appear here. Not a bug.

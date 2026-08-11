@@ -67,7 +67,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             'name': 'cam_workspace',
-            'video_device': '/dev/video_workspace',
+            'video_device': '/dev/video_c920',
         }.items(),
     )
 
