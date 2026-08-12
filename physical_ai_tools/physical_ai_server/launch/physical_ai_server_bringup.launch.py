@@ -59,22 +59,9 @@ def generate_launch_description():
         output='screen'
     )
 
-    workspace_camera_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(
-                get_package_share_directory('open_manipulator_bringup'),
-                'launch', 'camera_usb_cam.launch.py')
-        ),
-        launch_arguments={
-            'name': 'cam_workspace',
-            'video_device': '/dev/video_c920',
-        }.items(),
-    )
-
     return LaunchDescription([
         physical_ai_server_launch,
         rosbridge_websocket_node,
         rosbag_recorder_node,
         web_video_server_node,
-        workspace_camera_launch,
     ])

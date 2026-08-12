@@ -64,10 +64,7 @@ def generate_launch_description():
     )
 
 
-    # Wrist camera (mounted on palm_link, moves with the arm). The workspace/top
-    # camera is a separate device brought up by physical_ai_server_bringup.launch.py
-    # -- do not duplicate it here, or two usb_cam nodes will fight over the same
-    # /dev/video_workspace device.
+    # Wrist camera (mounted on palm_link, moves with the arm).
     usb_cam = Node(
         package='usb_cam',
         executable='usb_cam_node_exe',
@@ -81,6 +78,17 @@ def generate_launch_description():
         }],
     )
 
+    # Workspace (fixed top-down) camera. Lives here rather than in
+    workspace_cam = Node(
+        package='usb_cam',
+        executable='usb_cam_node_exe',
+        name='usb_cam_workspace',
+        parameters=[{
+            'video_device': '/dev/video_c920',
+            'pixel_format': 'mjpeg2rgb',
+        }],
+        namespace='cam_workspace',
+    )
 
     return LaunchDescription(
         [
@@ -89,5 +97,6 @@ def generate_launch_description():
             joint_state_broadcaster_spawner,
             delay_arm_controller,
             usb_cam,
+            workspace_cam,
         ]
     )
