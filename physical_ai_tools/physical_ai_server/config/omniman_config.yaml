@@ -27,12 +27,12 @@ physical_ai_server:
     omniman:
       observation_list:
         - cam
-        - cam_workspace
+        # - cam_workspace
         - state
 
       camera_topic_list:
         - cam:/image_raw/compressed
-        - cam_workspace:/cam_workspace/image_raw/compressed
+        # - cam_workspace:/cam_workspace/image_raw/compressed
 
       joint_topic_list:
         - follower:/joint_states

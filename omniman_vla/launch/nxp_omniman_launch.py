@@ -128,16 +128,16 @@ def generate_launch_description():
     )
 
     # Workspace (fixed top-down) camera. Lives here rather than in
-    workspace_cam = Node(
-        package='usb_cam',
-        executable='usb_cam_node_exe',
-        name='usb_cam_workspace',
-        parameters=[{
-            'video_device': '/dev/video_c920',
-            'pixel_format': 'mjpeg2rgb',
-        }],
-        namespace='cam_workspace',
-    )
+    # workspace_cam = Node(
+    #     package='usb_cam',
+    #     executable='usb_cam_node_exe',
+    #     name='usb_cam_workspace',
+    #     parameters=[{
+    #         'video_device': '/dev/video_c920',
+    #         'pixel_format': 'mjpeg2rgb',
+    #     }],
+    #     namespace='cam_workspace',
+    # )
 
     return LaunchDescription(
         [
@@ -150,6 +150,6 @@ def generate_launch_description():
             joy_node,
             teleop_joy_node,
             usb_cam,
-            workspace_cam,
+            # workspace_cam,
         ]
     )
