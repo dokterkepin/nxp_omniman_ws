@@ -1,56 +1,52 @@
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+
+#include <aruco_opencv_msgs/msg/aruco_detection.hpp>
 #include <chrono>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <memory>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
 #include <string>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <thread>
 #include <utility>
 #include <vector>
 
-#include <rclcpp/rclcpp.hpp>
-
-#include <geometry_msgs/msg/pose_stamped.hpp>
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_listener.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-
-#include <aruco_opencv_msgs/msg/aruco_detection.hpp>
-
 #include "omniman_commander/arm_commander.hpp"
 
+using omniman::apply_offset;
 using omniman::ArmCommander;
 using omniman::Offset;
-using omniman::apply_offset;
 using namespace std::chrono_literals;
 
 // ---------- Mission config loaded from aruco_pick.yaml (no recompile to change) ----------
 
 struct MissionConfig {
-  int    marker_id              = 0;
-  double detect_timeout         = 10.0;   // seconds to wait for a marker
-  int    detect_samples         = 5;      // frames to average for stable pose
-  int    max_retries            = 3;      // re-observe + retry on detect/approach/grasp failure
-  bool   use_marker_orientation = false;  // false = grasp with ready-orientation + offset
+  int marker_id = 0;
+  double detect_timeout = 10.0;         // seconds to wait for a marker
+  int detect_samples = 5;               // frames to average for stable pose
+  int max_retries = 3;                  // re-observe + retry on detect/approach/grasp failure
+  bool use_marker_orientation = false;  // false = grasp with ready-orientation + offset
   Offset look, approach, grasp, place;
 };
 
-template<typename T>
-static T get_param(rclcpp::Node::SharedPtr node, const std::string & name, T default_val)
-{
+template <typename T>
+static T get_param(rclcpp::Node::SharedPtr node, const std::string& name, T default_val) {
   if (!node->has_parameter(name)) {
     node->declare_parameter(name, default_val);
   }
   return node->get_parameter(name).get_value<T>();
 }
 
-static Offset load_offset(rclcpp::Node::SharedPtr node, const std::string & name)
-{
+static Offset load_offset(rclcpp::Node::SharedPtr node, const std::string& name) {
   Offset o;
-  o.dx     = get_param(node, name + ".dx",     0.0);
-  o.dy     = get_param(node, name + ".dy",     0.0);
-  o.dz     = get_param(node, name + ".dz",     0.0);
-  o.droll  = get_param(node, name + ".droll",  0.0);
+  o.dx = get_param(node, name + ".dx", 0.0);
+  o.dy = get_param(node, name + ".dy", 0.0);
+  o.dz = get_param(node, name + ".dz", 0.0);
+  o.droll = get_param(node, name + ".droll", 0.0);
   o.dpitch = get_param(node, name + ".dpitch", 0.0);
-  o.dyaw   = get_param(node, name + ".dyaw",   0.0);
+  o.dyaw = get_param(node, name + ".dyaw", 0.0);
   return o;
 }
 
@@ -58,40 +54,34 @@ static Offset load_offset(rclcpp::Node::SharedPtr node, const std::string & name
 // first reachable one stays closest to the hand-tuned target. Small variations in
 // wrist tilt (dpitch) and height (dz) let APPROACH/GRASP recover when ArUco noise
 // pushes the nominal pose just across this 6-DOF arm's tight IK workspace boundary.
-static std::vector<Offset> make_candidates(const Offset & base)
-{
+static std::vector<Offset> make_candidates(const Offset& base) {
   // {dpitch, dz} deltas added on top of the nominal offset, smallest first.
   static const std::pair<double, double> deltas[] = {
-    { 0.00,  0.00},   // nominal — try the calibrated offset first
-    { 0.05,  0.00}, {-0.05,  0.00},
-    { 0.00,  0.01}, { 0.00, -0.01},
-    { 0.10,  0.00}, {-0.10,  0.00},
-    { 0.05,  0.01}, {-0.05, -0.01},
-    { 0.15,  0.00}, {-0.15,  0.00},
-    { 0.00,  0.02}, { 0.00, -0.02},
+      {0.00, 0.00},  // nominal — try the calibrated offset first
+      {0.05, 0.00}, {-0.05, 0.00},  {0.00, 0.01}, {0.00, -0.01}, {0.10, 0.00}, {-0.10, 0.00},
+      {0.05, 0.01}, {-0.05, -0.01}, {0.15, 0.00}, {-0.15, 0.00}, {0.00, 0.02}, {0.00, -0.02},
   };
   std::vector<Offset> out;
-  for (const auto & d : deltas) {
+  for (const auto& d : deltas) {
     Offset o = base;
     o.dpitch += d.first;
-    o.dz     += d.second;
+    o.dz += d.second;
     out.push_back(o);
   }
   return out;
 }
 
-static MissionConfig load_mission(rclcpp::Node::SharedPtr node)
-{
+static MissionConfig load_mission(rclcpp::Node::SharedPtr node) {
   MissionConfig cfg;
-  cfg.marker_id              = get_param(node, "marker_id", 0);
-  cfg.detect_timeout         = get_param(node, "detect_timeout", 10.0);
-  cfg.detect_samples         = get_param(node, "detect_samples", 5);
-  cfg.max_retries            = get_param(node, "max_retries", 3);
+  cfg.marker_id = get_param(node, "marker_id", 0);
+  cfg.detect_timeout = get_param(node, "detect_timeout", 10.0);
+  cfg.detect_samples = get_param(node, "detect_samples", 5);
+  cfg.max_retries = get_param(node, "max_retries", 3);
   cfg.use_marker_orientation = get_param(node, "use_marker_orientation", false);
-  cfg.look     = load_offset(node, "look");
+  cfg.look = load_offset(node, "look");
   cfg.approach = load_offset(node, "approach");
-  cfg.grasp    = load_offset(node, "grasp");
-  cfg.place    = load_offset(node, "place");
+  cfg.grasp = load_offset(node, "grasp");
+  cfg.place = load_offset(node, "place");
   return cfg;
 }
 
@@ -113,23 +103,36 @@ enum class State {
   ERROR
 };
 
-static const char * state_name(State s)
-{
+static const char* state_name(State s) {
   switch (s) {
-    case State::READY:         return "READY";
-    case State::OPEN_GRIPPER:  return "OPEN_GRIPPER";
-    case State::LOOK:          return "LOOK";
-    case State::DETECT:        return "DETECT";
-    case State::APPROACH:      return "APPROACH";
-    case State::GRASP:         return "GRASP";
-    case State::CLOSE_GRIPPER: return "CLOSE_GRIPPER";
-    case State::LIFT:          return "LIFT";
-    case State::PLACE:         return "PLACE";
-    case State::RELEASE:       return "RELEASE";
-    case State::RETURN_READY:  return "RETURN_READY";
-    case State::DONE:          return "DONE";
-    case State::ERROR:         return "ERROR";
-    default:                   return "UNKNOWN";
+    case State::READY:
+      return "READY";
+    case State::OPEN_GRIPPER:
+      return "OPEN_GRIPPER";
+    case State::LOOK:
+      return "LOOK";
+    case State::DETECT:
+      return "DETECT";
+    case State::APPROACH:
+      return "APPROACH";
+    case State::GRASP:
+      return "GRASP";
+    case State::CLOSE_GRIPPER:
+      return "CLOSE_GRIPPER";
+    case State::LIFT:
+      return "LIFT";
+    case State::PLACE:
+      return "PLACE";
+    case State::RELEASE:
+      return "RELEASE";
+    case State::RETURN_READY:
+      return "RETURN_READY";
+    case State::DONE:
+      return "DONE";
+    case State::ERROR:
+      return "ERROR";
+    default:
+      return "UNKNOWN";
   }
 }
 
@@ -137,28 +140,23 @@ static const char * state_name(State s)
 // The aruco_tracker node publishes /aruco_detections. We cache the newest message
 // (under a mutex) from the subscription callback; the DETECT state reads it.
 
-class DetectionCache
-{
-public:
-  void update(const aruco_opencv_msgs::msg::ArucoDetection::SharedPtr msg)
-  {
+class DetectionCache {
+ public:
+  void update(const aruco_opencv_msgs::msg::ArucoDetection::SharedPtr msg) {
     std::lock_guard<std::mutex> lk(mtx_);
     latest_ = *msg;
-    have_   = true;
+    have_ = true;
   }
 
   // Returns true and fills `pose_out` + `frame_out` + `stamp_out` if a marker with
   // `marker_id` is present in the most recent detection message.
-  bool find_marker(int marker_id,
-                   geometry_msgs::msg::Pose & pose_out,
-                   std::string & frame_out,
-                   rclcpp::Time & stamp_out)
-  {
+  bool find_marker(int marker_id, geometry_msgs::msg::Pose& pose_out, std::string& frame_out,
+                   rclcpp::Time& stamp_out) {
     std::lock_guard<std::mutex> lk(mtx_);
     if (!have_) return false;
-    for (const auto & m : latest_.markers) {
+    for (const auto& m : latest_.markers) {
       if (m.marker_id == marker_id) {
-        pose_out  = m.pose;
+        pose_out = m.pose;
         frame_out = latest_.header.frame_id;
         stamp_out = latest_.header.stamp;
         return true;
@@ -167,7 +165,7 @@ public:
     return false;
   }
 
-private:
+ private:
   std::mutex mtx_;
   aruco_opencv_msgs::msg::ArucoDetection latest_;
   bool have_ = false;
@@ -175,12 +173,11 @@ private:
 
 // ---------- Main ----------
 
-int main(int argc, char * argv[])
-{
+int main(int argc, char* argv[]) {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<rclcpp::Node>(
-    "commander_aruco",
-    rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
+      "commander_aruco",
+      rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
   auto logger = rclcpp::get_logger("commander_aruco");
 
   rclcpp::executors::SingleThreadedExecutor executor;
@@ -189,10 +186,10 @@ int main(int argc, char * argv[])
 
   auto cfg = load_mission(node);
 
-  auto planner_pipeline = get_param(node, "planner_pipeline",
-                                    std::string("pilz_industrial_motion_planner"));
-  auto planner_id       = get_param(node, "planner_id", std::string("PTP"));
-  auto velocity_scale     = get_param(node, "velocity_scale",     0.3);
+  auto planner_pipeline =
+      get_param(node, "planner_pipeline", std::string("pilz_industrial_motion_planner"));
+  auto planner_id = get_param(node, "planner_id", std::string("PTP"));
+  auto velocity_scale = get_param(node, "velocity_scale", 0.3);
   auto acceleration_scale = get_param(node, "acceleration_scale", 0.3);
 
   // The frame that Cartesian goals (setPoseTarget) are expressed in — the MoveGroup
@@ -202,30 +199,28 @@ int main(int argc, char * argv[])
 
   // TF: marker poses arrive in the camera optical frame; we transform them into the
   // MoveGroup planning frame so they can be used as Cartesian goals.
-  auto tf_buffer   = std::make_shared<tf2_ros::Buffer>(node->get_clock());
+  auto tf_buffer = std::make_shared<tf2_ros::Buffer>(node->get_clock());
   auto tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
 
   // ArUco detections subscription.
   auto cache = std::make_shared<DetectionCache>();
   auto sub = node->create_subscription<aruco_opencv_msgs::msg::ArucoDetection>(
-    "/aruco_detections", rclcpp::SensorDataQoS(),
-    [cache](const aruco_opencv_msgs::msg::ArucoDetection::SharedPtr msg) {
-      cache->update(msg);
-    });
+      "/aruco_detections", rclcpp::SensorDataQoS(),
+      [cache](const aruco_opencv_msgs::msg::ArucoDetection::SharedPtr msg) { cache->update(msg); });
 
   ArmCommander commander(node);
   commander.set_planner(planner_pipeline, planner_id);
   commander.set_scaling(velocity_scale, acceleration_scale);
   commander.add_floor();
   RCLCPP_INFO(logger, "ArUco pick mission — target marker id: %d", cfg.marker_id);
-  RCLCPP_INFO(logger, "Transforming marker poses into planning frame: %s",
-    planning_frame.c_str());
+  RCLCPP_INFO(logger, "Transforming marker poses into planning frame: %s", planning_frame.c_str());
 
   State state = State::READY;
-  bool  ok    = true;
+  bool ok = true;
 
-  geometry_msgs::msg::Pose ready_pose;   // captured at READY; supplies the PLACE reference
-  geometry_msgs::msg::Pose look_pose;    // captured at LOOK; supplies the grasp orientation (tilted down)
+  geometry_msgs::msg::Pose ready_pose;  // captured at READY; supplies the PLACE reference
+  geometry_msgs::msg::Pose
+      look_pose;  // captured at LOOK; supplies the grasp orientation (tilted down)
   geometry_msgs::msg::Pose object_pose;  // marker position in the planning frame
 
   // Mission-level retry: if DETECT/APPROACH/GRASP fails (e.g. all IK candidates
@@ -233,15 +228,14 @@ int main(int argc, char * argv[])
   // aborting — a re-observation often lands in a reachable spot. Capped so a marker
   // that is genuinely out of reach still fails instead of looping forever.
   int retry_count = 0;
-  auto on_failure = [&](const char * where) -> State {
+  auto on_failure = [&](const char* where) -> State {
     if (retry_count < cfg.max_retries) {
       ++retry_count;
-      RCLCPP_WARN(logger, "[%s] failed — retry %d/%d: re-observing marker from LOOK",
-        where, retry_count, cfg.max_retries);
+      RCLCPP_WARN(logger, "[%s] failed — retry %d/%d: re-observing marker from LOOK", where,
+                  retry_count, cfg.max_retries);
       return State::LOOK;
     }
-    RCLCPP_ERROR(logger, "[%s] failed — exhausted %d retries, aborting",
-      where, cfg.max_retries);
+    RCLCPP_ERROR(logger, "[%s] failed — exhausted %d retries, aborting", where, cfg.max_retries);
     return State::ERROR;
   };
 
@@ -254,13 +248,13 @@ int main(int argc, char * argv[])
         if (ok) {
           ready_pose = commander.current_pose();
           RCLCPP_INFO(logger, "Ready pose (observation): pos=(%.3f, %.3f, %.3f)",
-            ready_pose.position.x, ready_pose.position.y, ready_pose.position.z);
+                      ready_pose.position.x, ready_pose.position.y, ready_pose.position.z);
         }
         state = ok ? State::OPEN_GRIPPER : State::ERROR;
         break;
 
       case State::OPEN_GRIPPER:
-        ok    = commander.move_gripper("open");
+        ok = commander.move_gripper("open");
         state = ok ? State::LOOK : State::ERROR;
         break;
 
@@ -295,18 +289,18 @@ int main(int argc, char * argv[])
               last_stamp_ns = marker_stamp.nanoseconds();
               geometry_msgs::msg::PoseStamped in, out;
               in.header.frame_id = marker_frame;
-              in.header.stamp    = marker_stamp;
-              in.pose            = marker_pose;
+              in.header.stamp = marker_stamp;
+              in.pose = marker_pose;
               try {
                 out = tf_buffer->transform(in, planning_frame, 200ms);
                 samples.push_back(out.pose.position);
                 last_orientation = out.pose.orientation;
-                RCLCPP_INFO(logger, "  Sample %zu/%d: pos=(%.3f, %.3f, %.3f)",
-                  samples.size(), cfg.detect_samples,
-                  out.pose.position.x, out.pose.position.y, out.pose.position.z);
-              } catch (const tf2::TransformException & ex) {
-                RCLCPP_WARN(logger, "  TF %s -> %s failed: %s — retrying",
-                  marker_frame.c_str(), planning_frame.c_str(), ex.what());
+                RCLCPP_INFO(logger, "  Sample %zu/%d: pos=(%.3f, %.3f, %.3f)", samples.size(),
+                            cfg.detect_samples, out.pose.position.x, out.pose.position.y,
+                            out.pose.position.z);
+              } catch (const tf2::TransformException& ex) {
+                RCLCPP_WARN(logger, "  TF %s -> %s failed: %s — retrying", marker_frame.c_str(),
+                            planning_frame.c_str(), ex.what());
               }
             }
           }
@@ -316,21 +310,22 @@ int main(int argc, char * argv[])
         ok = !samples.empty();
         if (ok) {
           geometry_msgs::msg::Point avg{};
-          for (const auto & p : samples) {
-            avg.x += p.x; avg.y += p.y; avg.z += p.z;
+          for (const auto& p : samples) {
+            avg.x += p.x;
+            avg.y += p.y;
+            avg.z += p.z;
           }
           avg.x /= samples.size();
           avg.y /= samples.size();
           avg.z /= samples.size();
-          object_pose.position    = avg;
+          object_pose.position = avg;
           object_pose.orientation = last_orientation;
-          RCLCPP_INFO(logger,
-            "Marker %d: averaged %zu/%d frames in %s: pos=(%.3f, %.3f, %.3f)",
-            cfg.marker_id, samples.size(), cfg.detect_samples, planning_frame.c_str(),
-            object_pose.position.x, object_pose.position.y, object_pose.position.z);
+          RCLCPP_INFO(logger, "Marker %d: averaged %zu/%d frames in %s: pos=(%.3f, %.3f, %.3f)",
+                      cfg.marker_id, samples.size(), cfg.detect_samples, planning_frame.c_str(),
+                      object_pose.position.x, object_pose.position.y, object_pose.position.z);
         } else {
-          RCLCPP_ERROR(logger, "  Marker %d not detected within %.1fs",
-            cfg.marker_id, cfg.detect_timeout);
+          RCLCPP_ERROR(logger, "  Marker %d not detected within %.1fs", cfg.marker_id,
+                       cfg.detect_timeout);
         }
         state = ok ? State::APPROACH : on_failure("detect");
         break;
@@ -341,15 +336,14 @@ int main(int argc, char * argv[])
         // Default: use the LOOK orientation (gripper tilted down at the object); set
         // use_marker_orientation:=true to grasp using the marker's own orientation.
         geometry_msgs::msg::Pose ref;
-        ref.position    = object_pose.position;
-        ref.orientation = cfg.use_marker_orientation ? object_pose.orientation
-                                                      : look_pose.orientation;
+        ref.position = object_pose.position;
+        ref.orientation =
+            cfg.use_marker_orientation ? object_pose.orientation : look_pose.orientation;
         // Offer small pose variations so a single unreachable approach pose (from
         // ArUco noise near the IK boundary) no longer fails the mission outright.
         std::vector<geometry_msgs::msg::Pose> candidates;
-        for (const auto & off : make_candidates(cfg.approach)) {
-          RCLCPP_INFO(logger, "  [approach candidate] dpitch=%.3f dz=%.3f",
-            off.dpitch, off.dz);
+        for (const auto& off : make_candidates(cfg.approach)) {
+          RCLCPP_INFO(logger, "  [approach candidate] dpitch=%.3f dz=%.3f", off.dpitch, off.dz);
           candidates.push_back(apply_offset(ref, off));
         }
         ok = commander.move_to_first_reachable(candidates, "approach");
@@ -359,11 +353,11 @@ int main(int argc, char * argv[])
 
       case State::GRASP: {
         geometry_msgs::msg::Pose ref;
-        ref.position    = object_pose.position;
-        ref.orientation = cfg.use_marker_orientation ? object_pose.orientation
-                                                      : look_pose.orientation;
+        ref.position = object_pose.position;
+        ref.orientation =
+            cfg.use_marker_orientation ? object_pose.orientation : look_pose.orientation;
         std::vector<geometry_msgs::msg::Pose> candidates;
-        for (const auto & off : make_candidates(cfg.grasp)) {
+        for (const auto& off : make_candidates(cfg.grasp)) {
           candidates.push_back(apply_offset(ref, off));
         }
         ok = commander.move_to_first_reachable(candidates, "grasp");
@@ -372,12 +366,12 @@ int main(int argc, char * argv[])
       }
 
       case State::CLOSE_GRIPPER:
-        ok    = commander.move_gripper("close");
+        ok = commander.move_gripper("close");
         state = ok ? State::LIFT : State::ERROR;
         break;
 
       case State::LIFT:
-        ok    = commander.move_named("ready");
+        ok = commander.move_named("ready");
         state = ok ? State::PLACE : State::ERROR;
         break;
 
@@ -388,12 +382,12 @@ int main(int argc, char * argv[])
         break;
 
       case State::RELEASE:
-        ok    = commander.move_gripper("open");
+        ok = commander.move_gripper("open");
         state = ok ? State::RETURN_READY : State::ERROR;
         break;
 
       case State::RETURN_READY:
-        ok    = commander.move_named("ready");
+        ok = commander.move_named("ready");
         state = ok ? State::DONE : State::ERROR;
         break;
 

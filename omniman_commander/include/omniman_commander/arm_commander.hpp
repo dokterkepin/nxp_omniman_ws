@@ -1,21 +1,19 @@
 #ifndef OMNIMAN_COMMANDER_ARM_COMMANDER_HPP
 #define OMNIMAN_COMMANDER_ARM_COMMANDER_HPP
 
+#include <moveit/move_group_interface/move_group_interface.h>
+
+#include <geometry_msgs/msg/pose.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <string>
 #include <vector>
 
-#include <rclcpp/rclcpp.hpp>
-#include <moveit/move_group_interface/move_group_interface.h>
-#include <geometry_msgs/msg/pose.hpp>
-
-namespace omniman
-{
+namespace omniman {
 
 // Position + orientation offset relative to a reference pose.
 //   dx/dy/dz         : position offset in meters
 //   droll/dpitch/dyaw: orientation offset in radians (applied in the reference's local frame)
-struct Offset
-{
+struct Offset {
   double dx = 0.0, dy = 0.0, dz = 0.0;
   double droll = 0.0, dpitch = 0.0, dyaw = 0.0;
 };
@@ -23,23 +21,21 @@ struct Offset
 // Build a pose by adding an offset to a reference pose: position adds (dx,dy,dz);
 // orientation is the reference orientation composed with the RPY offset in the
 // reference's local frame. All-zero offset returns the reference pose unchanged.
-geometry_msgs::msg::Pose apply_offset(const geometry_msgs::msg::Pose & reference,
-                                      const Offset & offset);
+geometry_msgs::msg::Pose apply_offset(const geometry_msgs::msg::Pose& reference,
+                                      const Offset& offset);
 
 // Thin reusable wrapper over MoveIt's MoveGroupInterface for the arm + gripper.
 // Mission nodes (pick-and-place, ArUco, etc.) construct one of these and call its
 // methods; the motion/planning details live here, not in every mission file.
-class ArmCommander
-{
-public:
-  ArmCommander(const rclcpp::Node::SharedPtr & node,
-               const std::string & arm_group = "arm",
-               const std::string & gripper_group = "gripper");
+class ArmCommander {
+ public:
+  ArmCommander(const rclcpp::Node::SharedPtr& node, const std::string& arm_group = "arm",
+               const std::string& gripper_group = "gripper");
 
   // Select which planning pipeline + planner the arm uses (e.g.
   // "pilz_industrial_motion_planner" + "PTP"). Stored and re-applied on every
   // move_to_pose() call so no other code can silently override it.
-  void set_planner(const std::string & pipeline_id, const std::string & planner_id);
+  void set_planner(const std::string& pipeline_id, const std::string& planner_id);
 
   // Set velocity and acceleration scaling factors (0.0–1.0) applied on every
   // move_to_pose() call. Loaded from poses.yaml so no recompile needed.
@@ -47,24 +43,24 @@ public:
 
   // Plan + execute the arm to a Cartesian pose. The planner solves IK internally.
   // `label` is used only for log messages. Returns false on plan or execute failure.
-  bool move_to_pose(const geometry_msgs::msg::Pose & target, const std::string & label);
+  bool move_to_pose(const geometry_msgs::msg::Pose& target, const std::string& label);
 
   // Quick IK feasibility check for `target` (same link + timeout the planner uses),
   // seeded from the current robot state. Predicts whether move_to_pose will plan.
-  bool is_reachable(const geometry_msgs::msg::Pose & target);
+  bool is_reachable(const geometry_msgs::msg::Pose& target);
 
   // Try candidates in order: skip any that fail the IK check, then plan + execute
   // the first reachable one (advancing to the next if planning/execution fails).
   // Lets the caller offer small pose variations so a single unreachable grasp pose
   // no longer fails the whole mission. Returns false only if none succeed.
-  bool move_to_first_reachable(const std::vector<geometry_msgs::msg::Pose> & candidates,
-                               const std::string & label);
+  bool move_to_first_reachable(const std::vector<geometry_msgs::msg::Pose>& candidates,
+                               const std::string& label);
 
   // Plan + execute the arm to a named SRDF group state (e.g. "ready").
-  bool move_named(const std::string & named_target);
+  bool move_named(const std::string& named_target);
 
   // Plan + execute the gripper to a named SRDF group state (e.g. "open" / "close").
-  bool move_gripper(const std::string & named_target);
+  bool move_gripper(const std::string& named_target);
 
   // Current end-effector pose, using the group's default end-effector link.
   geometry_msgs::msg::Pose current_pose();
@@ -72,14 +68,14 @@ public:
   // Add a large floor collision object so plans don't route through the table.
   void add_floor();
 
-private:
+ private:
   rclcpp::Node::SharedPtr node_;
   rclcpp::Logger logger_;
   moveit::planning_interface::MoveGroupInterface arm_;
   moveit::planning_interface::MoveGroupInterface gripper_;
   std::string pipeline_id_;
   std::string planner_id_;
-  double velocity_scale_     = 1.0;
+  double velocity_scale_ = 1.0;
   double acceleration_scale_ = 1.0;
 };
 

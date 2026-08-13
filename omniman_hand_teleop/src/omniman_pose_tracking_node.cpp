@@ -12,40 +12,37 @@
  * BSD 3-Clause License (inherited from moveit_servo)
  *******************************************************************************/
 
+#include <moveit/robot_state/robot_state.h>
+#include <moveit_servo/make_shared_from_pool.h>
+#include <moveit_servo/pose_tracking.h>
+#include <moveit_servo/servo_parameters.h>
+#include <moveit_servo/status_codes.h>
+
+#include <atomic>
+#include <chrono>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/int8.hpp>
 #include <std_msgs/msg/string.hpp>
-#include <geometry_msgs/msg/transform_stamped.hpp>
-#include <geometry_msgs/msg/pose_stamped.hpp>
-#include <trajectory_msgs/msg/joint_trajectory.hpp>
-#include <moveit/robot_state/robot_state.h>
-#include <moveit_servo/pose_tracking.h>
-#include <moveit_servo/status_codes.h>
-#include <moveit_servo/servo_parameters.h>
-#include <moveit_servo/make_shared_from_pool.h>
 #include <thread>
-#include <atomic>
-#include <chrono>
+#include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("omniman_pose_tracking_node");
 
 // Logs moveit_servo status whenever it changes.
-class StatusMonitor
-{
-public:
-  StatusMonitor(const rclcpp::Node::SharedPtr& node, const std::string& topic)
-  {
+class StatusMonitor {
+ public:
+  StatusMonitor(const rclcpp::Node::SharedPtr& node, const std::string& topic) {
     sub_ = node->create_subscription<std_msgs::msg::Int8>(
         topic, rclcpp::SystemDefaultsQoS(),
         [this](const std_msgs::msg::Int8::ConstSharedPtr& msg) { return statusCB(msg); });
   }
 
-private:
-  void statusCB(const std_msgs::msg::Int8::ConstSharedPtr& msg)
-  {
+ private:
+  void statusCB(const std_msgs::msg::Int8::ConstSharedPtr& msg) {
     moveit_servo::StatusCode latest_status = static_cast<moveit_servo::StatusCode>(msg->data);
-    if (latest_status != status_)
-    {
+    if (latest_status != status_) {
       status_ = latest_status;
       const auto& status_str = moveit_servo::SERVO_STATUS_CODE_MAP.at(status_);
       RCLCPP_INFO_STREAM(LOGGER, "Servo status: " << status_str);
@@ -56,23 +53,28 @@ private:
   rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr sub_;
 };
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
   rclcpp::init(argc, argv);
   rclcpp::Node::SharedPtr node = rclcpp::Node::make_shared("omniman_pose_tracking_node");
 
   // ---- Parameters (all tunable from the launch file) ----------------------
-  const std::string hand_pose_topic = node->declare_parameter<std::string>("hand_pose_topic", "/hand_target_pose");
-  const double lin_tolerance = node->declare_parameter<double>("linear_tolerance", 0.01);     // [m]
-  const double rot_tolerance = node->declare_parameter<double>("rotational_tolerance", 0.1);  // [rad]
-  const double target_pose_timeout = node->declare_parameter<double>("target_pose_timeout", 0.5);  // [s] per moveToPose call
-  const double no_pose_timeout = node->declare_parameter<double>("no_pose_timeout", 5.0);     // [s] stop tracking if idle
+  const std::string hand_pose_topic =
+      node->declare_parameter<std::string>("hand_pose_topic", "/hand_target_pose");
+  const double lin_tolerance = node->declare_parameter<double>("linear_tolerance", 0.01);  // [m]
+  const double rot_tolerance =
+      node->declare_parameter<double>("rotational_tolerance", 0.1);  // [rad]
+  const double target_pose_timeout =
+      node->declare_parameter<double>("target_pose_timeout", 0.5);  // [s] per moveToPose call
+  const double no_pose_timeout =
+      node->declare_parameter<double>("no_pose_timeout", 5.0);  // [s] stop tracking if idle
   // Named-pose reset (e.g. "ready"): a left-hand gesture publishes a group state
   // name here, and we send the arm there via the trajectory controller.
-  const std::string named_pose_topic = node->declare_parameter<std::string>("named_pose_topic", "/arm_named_pose");
-  const std::string arm_controller_topic =
-      node->declare_parameter<std::string>("arm_controller_topic", "/arm_controller/joint_trajectory");
-  const double named_pose_time = node->declare_parameter<double>("named_pose_time", 3.0);  // [s] move duration
+  const std::string named_pose_topic =
+      node->declare_parameter<std::string>("named_pose_topic", "/arm_named_pose");
+  const std::string arm_controller_topic = node->declare_parameter<std::string>(
+      "arm_controller_topic", "/arm_controller/joint_trajectory");
+  const double named_pose_time =
+      node->declare_parameter<double>("named_pose_time", 3.0);  // [s] move duration
   // Generous safety box (planning frame, metres). The Python node already
   // clamps to the reachable workspace; this just rejects NaN / absurd targets.
   const double ws_xy_limit = node->declare_parameter<double>("workspace_xy_limit", 2.0);
@@ -85,17 +87,17 @@ int main(int argc, char** argv)
 
   // ---- Servo parameters ---------------------------------------------------
   auto servo_parameters = moveit_servo::ServoParameters::makeServoParameters(node);
-  if (servo_parameters == nullptr)
-  {
-    RCLCPP_FATAL(LOGGER, "Could not get servo parameters! Check the launch file loads the omniman servo config.");
+  if (servo_parameters == nullptr) {
+    RCLCPP_FATAL(
+        LOGGER,
+        "Could not get servo parameters! Check the launch file loads the omniman servo config.");
     return EXIT_FAILURE;
   }
 
   // ---- Planning scene monitor --------------------------------------------
   auto planning_scene_monitor =
       std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node, "robot_description");
-  if (!planning_scene_monitor->getPlanningScene())
-  {
+  if (!planning_scene_monitor->getPlanningScene()) {
     RCLCPP_FATAL(LOGGER, "Error setting up the PlanningSceneMonitor.");
     return EXIT_FAILURE;
   }
@@ -105,11 +107,13 @@ int main(int argc, char** argv)
       planning_scene_monitor::PlanningSceneMonitor::DEFAULT_COLLISION_OBJECT_TOPIC,
       planning_scene_monitor::PlanningSceneMonitor::DEFAULT_PLANNING_SCENE_WORLD_TOPIC, false);
   planning_scene_monitor->startStateMonitor(servo_parameters->joint_topic);
-  planning_scene_monitor->startPublishingPlanningScene(planning_scene_monitor::PlanningSceneMonitor::UPDATE_SCENE);
+  planning_scene_monitor->startPublishingPlanningScene(
+      planning_scene_monitor::PlanningSceneMonitor::UPDATE_SCENE);
 
-  if (!planning_scene_monitor->waitForCurrentRobotState(node->now(), 5.0))
-  {
-    RCLCPP_FATAL(LOGGER, "Timed out waiting for /joint_states. Is the robot (or sim) publishing joint states?");
+  if (!planning_scene_monitor->waitForCurrentRobotState(node->now(), 5.0)) {
+    RCLCPP_FATAL(
+        LOGGER,
+        "Timed out waiting for /joint_states. Is the robot (or sim) publishing joint states?");
     return EXIT_FAILURE;
   }
 
@@ -125,12 +129,12 @@ int main(int argc, char** argv)
   RCLCPP_INFO(LOGGER, "============================");
 
   // Republish target poses onto the tracker's "target_pose" topic.
-  auto target_pose_pub =
-      node->create_publisher<geometry_msgs::msg::PoseStamped>("target_pose", rclcpp::SystemDefaultsQoS());
+  auto target_pose_pub = node->create_publisher<geometry_msgs::msg::PoseStamped>(
+      "target_pose", rclcpp::SystemDefaultsQoS());
 
   StatusMonitor status_monitor(node, servo_parameters->status_topic);
 
-  const Eigen::Vector3d lin_tol{ lin_tolerance, lin_tolerance, lin_tolerance };
+  const Eigen::Vector3d lin_tol{lin_tolerance, lin_tolerance, lin_tolerance};
 
   // In position-only mode, hold the EE orientation captured at startup.
   geometry_msgs::msg::TransformStamped current_ee_tf;
@@ -139,8 +143,8 @@ int main(int argc, char** argv)
   RCLCPP_INFO(LOGGER, "Holding STARTUP EE orientation [x=%.3f y=%.3f z=%.3f w=%.3f]",
               held_orientation.x, held_orientation.y, held_orientation.z, held_orientation.w);
 
-  std::atomic<bool> tracking_active{ false };
-  std::atomic<bool> executing_named_pose{ false };
+  std::atomic<bool> tracking_active{false};
+  std::atomic<bool> executing_named_pose{false};
   rclcpp::Time named_pose_end_time = node->now();
   std::shared_ptr<std::thread> move_to_pose_thread;
   rclcpp::Time last_pose_time = node->now();
@@ -157,8 +161,7 @@ int main(int argc, char** argv)
         const double z = msg->pose.position.z;
 
         if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) ||
-            std::abs(x) > ws_xy_limit || std::abs(y) > ws_xy_limit || std::abs(z) > ws_z_limit)
-        {
+            std::abs(x) > ws_xy_limit || std::abs(y) > ws_xy_limit || std::abs(z) > ws_z_limit) {
           RCLCPP_WARN_THROTTLE(LOGGER, *node->get_clock(), 2000,
                                "Target outside safety box, ignoring: [%.3f, %.3f, %.3f]", x, y, z);
           return;
@@ -167,8 +170,7 @@ int main(int argc, char** argv)
         // (Re)start of tracking: hold whatever EE orientation the arm has right
         // now -- startup, or wherever a named/reset pose just left it. This is
         // what lets a "ready" reset also reset the locked orientation.
-        if (!tracking_active.load())
-        {
+        if (!tracking_active.load()) {
           geometry_msgs::msg::TransformStamped ee_tf;
           tracker.getCommandFrameTransform(ee_tf);
           held_orientation = ee_tf.transform.rotation;
@@ -183,24 +185,21 @@ int main(int argc, char** argv)
         last_pose_time = node->now();
 
         // Spin up the tracking loop on the first valid pose.
-        if (!tracking_active.load())
-        {
-          if (move_to_pose_thread && move_to_pose_thread->joinable())
-            move_to_pose_thread->join();
+        if (!tracking_active.load()) {
+          if (move_to_pose_thread && move_to_pose_thread->joinable()) move_to_pose_thread->join();
 
           tracking_active = true;
           tracker.resetTargetPose();
           move_to_pose_thread = std::make_shared<std::thread>([&]() {
             RCLCPP_INFO(LOGGER, "Pose tracking started");
-            while (tracking_active.load() && rclcpp::ok())
-            {
+            while (tracking_active.load() && rclcpp::ok()) {
               moveit_servo::PoseTrackingStatusCode status =
                   tracker.moveToPose(lin_tol, rot_tolerance, target_pose_timeout);
-              if (status != moveit_servo::PoseTrackingStatusCode::SUCCESS)
-              {
-                RCLCPP_WARN_STREAM_THROTTLE(LOGGER, *node->get_clock(), 2000,
-                                            "Pose tracking status: "
-                                                << moveit_servo::POSE_TRACKING_STATUS_CODE_MAP.at(status));
+              if (status != moveit_servo::PoseTrackingStatusCode::SUCCESS) {
+                RCLCPP_WARN_STREAM_THROTTLE(
+                    LOGGER, *node->get_clock(), 2000,
+                    "Pose tracking status: "
+                        << moveit_servo::POSE_TRACKING_STATUS_CODE_MAP.at(status));
               }
             }
             RCLCPP_INFO(LOGGER, "Pose tracking stopped");
@@ -219,25 +218,23 @@ int main(int argc, char** argv)
 
   auto named_pose_sub = node->create_subscription<std_msgs::msg::String>(
       named_pose_topic, 10, [&](const std_msgs::msg::String::SharedPtr msg) {
-        if (executing_named_pose.load())
-        {
+        if (executing_named_pose.load()) {
           RCLCPP_DEBUG(LOGGER, "Already moving to a named pose, ignoring '%s'", msg->data.c_str());
           return;  // debounce repeat triggers (e.g. finger-count flicker on the left hand)
         }
 
         const std::string pose_name = msg->data;
-        const auto* jmg =
-            planning_scene_monitor->getRobotModel()->getJointModelGroup(servo_parameters->move_group_name);
-        if (jmg == nullptr)
-        {
-          RCLCPP_ERROR(LOGGER, "Unknown move group '%s'", servo_parameters->move_group_name.c_str());
+        const auto* jmg = planning_scene_monitor->getRobotModel()->getJointModelGroup(
+            servo_parameters->move_group_name);
+        if (jmg == nullptr) {
+          RCLCPP_ERROR(LOGGER, "Unknown move group '%s'",
+                       servo_parameters->move_group_name.c_str());
           return;
         }
 
         moveit::core::RobotState goal_state(planning_scene_monitor->getRobotModel());
         goal_state.setToDefaultValues();
-        if (!goal_state.setToDefaultValues(jmg, pose_name))
-        {
+        if (!goal_state.setToDefaultValues(jmg, pose_name)) {
           RCLCPP_ERROR(LOGGER, "No SRDF named pose '%s' for group '%s' -- check your .srdf.",
                        pose_name.c_str(), servo_parameters->move_group_name.c_str());
           return;
@@ -273,30 +270,29 @@ int main(int argc, char** argv)
       });
 
   RCLCPP_INFO(LOGGER, "Ready. Listening for target poses on: %s", hand_pose_topic.c_str());
-  RCLCPP_INFO(LOGGER, "Named-pose reset on %s (needs use_trajectory:=true).", named_pose_topic.c_str());
-  RCLCPP_INFO(LOGGER, "Run the MediaPipe node and show your RIGHT hand to the camera to start tracking.");
+  RCLCPP_INFO(LOGGER, "Named-pose reset on %s (needs use_trajectory:=true).",
+              named_pose_topic.c_str());
+  RCLCPP_INFO(LOGGER,
+              "Run the MediaPipe node and show your RIGHT hand to the camera to start tracking.");
 
   // ---- Idle watchdog: stop tracking when no poses arrive ------------------
   rclcpp::WallRate loop_rate(50);
-  while (rclcpp::ok())
-  {
+  while (rclcpp::ok()) {
     // Release the named-pose lock once the move has had time to finish.
-    if (executing_named_pose.load() && node->now() >= named_pose_end_time)
-    {
+    if (executing_named_pose.load() && node->now() >= named_pose_end_time) {
       tracker.servo_->setPaused(false);  // re-enable servo for Cartesian tracking
       executing_named_pose = false;
-      RCLCPP_INFO(LOGGER, "Named-pose move complete -- servo resumed; show your RIGHT hand to resume tracking.");
+      RCLCPP_INFO(
+          LOGGER,
+          "Named-pose move complete -- servo resumed; show your RIGHT hand to resume tracking.");
     }
 
     const bool active = pose_received && (node->now() - last_pose_time).seconds() < no_pose_timeout;
-    if (!active && tracking_active.load())
-    {
+    if (!active && tracking_active.load()) {
       tracking_active = false;
       tracker.stopMotion();
       RCLCPP_INFO(LOGGER, "No target poses received - stopping tracking");
-    }
-    else if (!active)
-    {
+    } else if (!active) {
       RCLCPP_INFO_THROTTLE(LOGGER, *node->get_clock(), 5000, "Waiting for target poses on %s ...",
                            hand_pose_topic.c_str());
     }
@@ -304,8 +300,7 @@ int main(int argc, char** argv)
   }
 
   tracking_active = false;
-  if (move_to_pose_thread && move_to_pose_thread->joinable())
-    move_to_pose_thread->join();
+  if (move_to_pose_thread && move_to_pose_thread->joinable()) move_to_pose_thread->join();
   executor->cancel();
   executor_thread.join();
   rclcpp::shutdown();

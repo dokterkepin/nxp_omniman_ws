@@ -18,7 +18,7 @@ It's a private int member on CybergearActuator. Default is 1 (no inversion). The
 ```cpp
 axis_direction_ = std::stoi(info_.hardware_parameters["axis_direction"]);
 ```
-When ros2_control loads the hardware plugin, it calls on_configure(). The info_ struct (from ActuatorInterface) contains every <param> you declared in the URDF <hardware> block. 
+When ros2_control loads the hardware plugin, it calls on_configure(). The info_ struct (from ActuatorInterface) contains every <param> you declared in the URDF <hardware> block.
 So std::stoi(info_.hardware_parameters["axis_direction"]) converts the string "1" or "-1" from your xacro into the integer.
 
 ## Step 3 — Applied on read() (motor feedback → ros2_control)
@@ -79,8 +79,8 @@ The trick is that the inversion is applied symmetrically on both sides:
 ros2_control command → × axis_direction_ → CAN to motor (write)
 motor CAN feedback   → × axis_direction_ → ros2_control state (read)
 ```
-This means the entire ros2_control stack (controllers, URDF kinematics, Nav2, etc.) sees a consistent positive direction — it never knows the physical motor is spinning the other way. 
-The sign flip cancels out from the perspective of any higher-level controller. the left-side wheels (-1) are mirror-mounted, so their physical "positive" rotation is opposite to what the kinematics expect. 
+This means the entire ros2_control stack (controllers, URDF kinematics, Nav2, etc.) sees a consistent positive direction — it never knows the physical motor is spinning the other way.
+The sign flip cancels out from the perspective of any higher-level controller. the left-side wheels (-1) are mirror-mounted, so their physical "positive" rotation is opposite to what the kinematics expect.
 Multiplying by -1 on both read and write transparently corrects.
 
 > **Note:** `axis_direction` is only relevant for wheel motors. Arm joints always use `1` because MoveIt's kinematic solver handles axis orientation through the URDF model — see [coordinate-frames.md](coordinate-frames.md).

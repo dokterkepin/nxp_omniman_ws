@@ -82,7 +82,9 @@ def generate_launch_description():
     # subscriptions must resolve to the real global /tf topic (robot_state_publisher
     # broadcasts TF on the absolute /tf, not a namespaced one). Only
     # /robot_description needs remapping since that one *is* namespaced.
-    rviz_node = Node(
+    # Currently commented out of the LaunchDescription below; kept so RViz can
+    # be re-enabled without rebuilding the remapping.
+    rviz_node = Node(  # noqa: F841
         package='rviz2',
         executable='rviz2',
         name='rviz2',

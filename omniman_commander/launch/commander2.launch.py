@@ -5,9 +5,9 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
     # Load the nxp_omniman MoveIt Configuration.
-    moveit_config = (
-        MoveItConfigsBuilder("nxp_omniman", package_name="omniman_moveit_config").to_moveit_configs()
-    )
+    moveit_config = MoveItConfigsBuilder(
+        "nxp_omniman", package_name="omniman_moveit_config"
+    ).to_moveit_configs()
 
     # Run the MTC node with robot_description and robot_description_semantic.
     hello_moveit = Node(

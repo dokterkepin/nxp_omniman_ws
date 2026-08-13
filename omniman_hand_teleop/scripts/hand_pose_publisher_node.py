@@ -49,11 +49,14 @@ class OmnimanHandTeleop(Node):
             "gripper_action", "/gripper_controller/gripper_cmd").value
 
         # Robot workspace box (planning frame, metres). Defaults for omniman.
-        self.robot_x_min = self.declare_parameter("robot_x_min", 0.05).value   # forward, near (low allows side reach)
-        self.robot_x_max = self.declare_parameter("robot_x_max", 0.40).value   # forward, far
-        self.robot_y_min = self.declare_parameter("robot_y_min", -0.40).value  # lateral (wider for left/right reach)
+        #   x: forward reach; min kept low so side reaches stay in range
+        #   y: lateral; widened for left/right reach
+        #   z: height; min is the lowest reach
+        self.robot_x_min = self.declare_parameter("robot_x_min", 0.05).value
+        self.robot_x_max = self.declare_parameter("robot_x_max", 0.40).value
+        self.robot_y_min = self.declare_parameter("robot_y_min", -0.40).value
         self.robot_y_max = self.declare_parameter("robot_y_max", 0.40).value
-        self.robot_z_min = self.declare_parameter("robot_z_min", 0.10).value   # height (lowest reach)
+        self.robot_z_min = self.declare_parameter("robot_z_min", 0.10).value
         self.robot_z_max = self.declare_parameter("robot_z_max", 0.50).value
 
         # Forward reach (robot X) from hand depth. Two methods:
@@ -63,7 +66,8 @@ class OmnimanHandTeleop(Node):
         self.use_hand_size_depth = self.declare_parameter("use_hand_size_depth", True).value
         # Palm length (wrist->middle-MCP, normalised image coords) calibration.
         # Hold your hand at the near/far extremes and read the on-screen "size=" to tune.
-        self.hand_size_min = self.declare_parameter("hand_size_min", 0.05).value  # hand far  -> X min
+        # hand far -> X min
+        self.hand_size_min = self.declare_parameter("hand_size_min", 0.05).value
         # hand close-> X max. Keep this comfortably BELOW a screen-filling palm so
         # full forward reach is hit while the hand is still well inside the frame
         # (room left for X/Y). Read the on-screen "size=" HUD to recalibrate.
@@ -215,7 +219,8 @@ class OmnimanHandTeleop(Node):
         right_hand = None
         left_hand = None
         if results.multi_hand_landmarks and results.multi_handedness:
-            for landmarks, handedness in zip(results.multi_hand_landmarks, results.multi_handedness):
+            for landmarks, handedness in zip(
+                    results.multi_hand_landmarks, results.multi_handedness):
                 label = handedness.classification[0].label.lower()
                 mp_drawing.draw_landmarks(frame, landmarks, mp_hands.HAND_CONNECTIONS)
                 if label == CONTROL_HAND:
@@ -239,9 +244,11 @@ class OmnimanHandTeleop(Node):
                 cv2.putText(frame, f"Fingers:{fingers_up} | {'OPEN' if want_open else 'CLOSE'}",
                             (10, 78), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
                 if self.use_hand_size_depth:
-                    cv2.putText(frame, f"size:{self._hand_size:.3f} "
-                                       f"(min {self.hand_size_min:.2f}/max {self.hand_size_max:.2f})",
-                                (10, 101), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                    cv2.putText(
+                        frame,
+                        f"size:{self._hand_size:.3f} "
+                        f"(min {self.hand_size_min:.2f}/max {self.hand_size_max:.2f})",
+                        (10, 101), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
             if self.frame_count % 30 == 0:
                 self.get_logger().info(
                     f"Pose [{pose.pose.position.x:.2f}, {pose.pose.position.y:.2f}, "
@@ -258,8 +265,10 @@ class OmnimanHandTeleop(Node):
                         (10, 124), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 200, 0), 1)
 
         if self.show_window:
-            cv2.putText(frame, f"{self.open_finger_count}+ fingers = OPEN, fewer = CLOSE | 'q' quits",
-                        (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            cv2.putText(
+                frame,
+                f"{self.open_finger_count}+ fingers = OPEN, fewer = CLOSE | 'q' quits",
+                (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             cv2.imshow("Omniman Hand Teleop", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 rclpy.shutdown()

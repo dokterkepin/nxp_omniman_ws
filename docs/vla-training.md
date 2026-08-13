@@ -15,34 +15,31 @@ Leader Follower Teleoperation should be working first — otherwise there is no 
 the task, so no data collection and no training. See
 **[leader-teleop.md](leader-teleop.md)** for the leader bringup, gravity compensation, and tuning.
 
-you an install lerobot framework by using ```bash pip install lerobot``` but robotis use different and lower version of lerobot framework (it does build from sorce instead of binary install)
-at the first time you clone the repository, it will located in physical_ai_tools package [../physical_ai_tools/lerobot].
-the lerobot framework should match, therefore it is better to source the cloned version by write in .bashrc:
+### Making LeRobot importable
+
+`pip install lerobot` pulls the latest upstream release, which does **not** match the version
+ROBOTIS vendors. `physical_ai_tools` ships its own LeRobot as a submodule at
+`../physical_ai_tools/lerobot`, built from source — that is the copy everything must import,
+or the versions silently diverge.
+
+There are **two ways** to make that copy importable, and they are alternatives — you only need
+one:
+
+**Option A — `PYTHONPATH` (used on the robot PC).** Add to `.bashrc`:
 ```bash
 export PYTHONPATH=/home/dokterkepin/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot/src:$PYTHONPATH
 ```
 
-
-**Pin the `datasets` version.** LeRobot requires `datasets>=2.19.0,<=3.6.0`. A newer 4.x
-release breaks dataset loading:
-
+**Option B — editable install (used on the remote training machine, §5).**
 ```bash
-pip3 install 'datasets<=3.6.0'
+cd .../physical_ai_tools/lerobot
+pip install -e .
 ```
-
-> **Why this matters:** with `datasets` 4.x the UI fails with
-> `Invalid repository name, Please change the repository name`. That message is misleading —
-> the repo name is fine. `physical_ai_server` catches *any* dataset exception and reports it
-> as a name error. The real error appears in the server terminal as
-> `Error checking lerobot dataset: ...`. Telltale sign: creating a new dataset works, but
-> appending to an existing one always fails.
->
-> If you already recorded under 4.x, that data is unreadable (`Feature type 'List' not found`)
-> and must be re-recorded. After changing the version you **must restart `physical_ai_server`** —
-> a running process keeps the old library in memory.
+This writes a pointer into that interpreter's `site-packages` so `import lerobot` resolves to
+the source tree — no `PYTHONPATH` needed. Verify with
+`python3 -c "import lerobot; print(lerobot.__file__)"`, Pin the `datasets` version. LeRobot requires `datasets>=2.19.0,<=3.6.0`. A newer 4.x release breaks dataset loading
 
 Verify GPU:
-
 ```bash
 python3 -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
 ```
@@ -199,7 +196,7 @@ Then get the dataset and LeRobot source onto the remote machine and install the 
 ```
 cd ~/lerobot
 pip install -e .
-pip install 'datasets<=3.6.0'   # same version that used by physical_ai_tools 
+pip install 'datasets<=3.6.0'   # same version that used by physical_ai_tools
 ```
 
 ### 5.2 The training command

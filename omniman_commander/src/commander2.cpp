@@ -1,18 +1,15 @@
-#include <memory>
-#include <thread>
-
-#include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_visual_tools/moveit_visual_tools.h>
 
-int main(int argc, char* argv[])
-{
+#include <memory>
+#include <rclcpp/rclcpp.hpp>
+#include <thread>
+
+int main(int argc, char* argv[]) {
   rclcpp::init(argc, argv);
   auto const node = std::make_shared<rclcpp::Node>(
-    "hello_moveit",
-    rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true)
-  );
+      "hello_moveit", rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
   auto const logger = rclcpp::get_logger("hello_moveit");
 
   rclcpp::executors::SingleThreadedExecutor executor;
@@ -22,15 +19,16 @@ int main(int argc, char* argv[])
   using moveit::planning_interface::MoveGroupInterface;
   auto move_group_interface = MoveGroupInterface(node, "arm");
   auto gripper_group_interface = MoveGroupInterface(node, "gripper");
-  
-  RCLCPP_INFO(logger, "Planning Pipeline: %s", move_group_interface.getPlanningPipelineId().c_str());
-  RCLCPP_INFO(logger, "Planner ID: %s", move_group_interface.getPlannerId().c_str());
-  RCLCPP_INFO(logger, "Gripper Planning Pipeline: %s", gripper_group_interface.getPlanningPipelineId().c_str());
 
+  RCLCPP_INFO(logger, "Planning Pipeline: %s",
+              move_group_interface.getPlanningPipelineId().c_str());
+  RCLCPP_INFO(logger, "Planner ID: %s", move_group_interface.getPlannerId().c_str());
+  RCLCPP_INFO(logger, "Gripper Planning Pipeline: %s",
+              gripper_group_interface.getPlanningPipelineId().c_str());
 
   auto moveit_visual_tools = moveit_visual_tools::MoveItVisualTools{
-    node, "base_link", rviz_visual_tools::RVIZ_MARKER_TOPIC,
-    move_group_interface.getRobotModel()};
+      node, "base_link", rviz_visual_tools::RVIZ_MARKER_TOPIC,
+      move_group_interface.getRobotModel()};
   moveit_visual_tools.deleteAllMarkers();
   moveit_visual_tools.loadRemoteControl();
 
@@ -44,12 +42,10 @@ int main(int argc, char* argv[])
                                     rviz_visual_tools::XLARGE);
   };
   auto const draw_trajectory_tool_path =
-    [&moveit_visual_tools,
-     jmg = move_group_interface.getRobotModel()->getJointModelGroup("arm"),
-     ee  = move_group_interface.getRobotModel()->getLinkModel("ee_link")](
-       auto const trajectory) {
-      moveit_visual_tools.publishTrajectoryLine(trajectory, ee, jmg);
-    };
+      [&moveit_visual_tools, jmg = move_group_interface.getRobotModel()->getJointModelGroup("arm"),
+       ee = move_group_interface.getRobotModel()->getLinkModel("ee_link")](auto const trajectory) {
+        moveit_visual_tools.publishTrajectoryLine(trajectory, ee, jmg);
+      };
 
   // Add floor collision object
   {
@@ -76,8 +72,13 @@ int main(int argc, char* argv[])
     // Target 1
     {
       geometry_msgs::msg::Pose target;
-      target.position.x = 0.2738;  target.position.y = 0.1550;  target.position.z = 0.0522;
-      target.orientation.x = 0.6158; target.orientation.y = 0.7598; target.orientation.z = 0.0881; target.orientation.w = 0.1889;
+      target.position.x = 0.2738;
+      target.position.y = 0.1550;
+      target.position.z = 0.0522;
+      target.orientation.x = 0.6158;
+      target.orientation.y = 0.7598;
+      target.orientation.z = 0.0881;
+      target.orientation.w = 0.1889;
       move_group_interface.setPoseTarget(target);
 
       moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -102,8 +103,13 @@ int main(int argc, char* argv[])
     // Target 2
     {
       geometry_msgs::msg::Pose target;
-      target.position.x = 0.3501;  target.position.y = -0.0039;  target.position.z = 0.0864;
-      target.orientation.x = 0.0044; target.orientation.y = 0.9747; target.orientation.z = 0.0011; target.orientation.w = 0.2234;
+      target.position.x = 0.3501;
+      target.position.y = -0.0039;
+      target.position.z = 0.0864;
+      target.orientation.x = 0.0044;
+      target.orientation.y = 0.9747;
+      target.orientation.z = 0.0011;
+      target.orientation.w = 0.2234;
       move_group_interface.setPoseTarget(target);
 
       moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -128,8 +134,13 @@ int main(int argc, char* argv[])
     // Target 3
     {
       geometry_msgs::msg::Pose target;
-      target.position.x = 0.2684;  target.position.y = -0.1553;  target.position.z = 0.1971;
-      target.orientation.x = 0.4472; target.orientation.y = 0.8187; target.orientation.z = 0.1835; target.orientation.w = 0.3100;
+      target.position.x = 0.2684;
+      target.position.y = -0.1553;
+      target.position.z = 0.1971;
+      target.orientation.x = 0.4472;
+      target.orientation.y = 0.8187;
+      target.orientation.z = 0.1835;
+      target.orientation.w = 0.3100;
       move_group_interface.setPoseTarget(target);
 
       moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -150,11 +161,9 @@ int main(int argc, char* argv[])
       }
     }
     std::this_thread::sleep_for(std::chrono::seconds(3));
-
   }
 
   rclcpp::shutdown();
   spinner.join();
   return 0;
-   
-} 
+}

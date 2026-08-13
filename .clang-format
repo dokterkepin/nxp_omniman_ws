@@ -1,0 +1,13 @@
+---
+# ROS 2 standard C++ style. Chosen because the existing hand-written C++ in
+# omniman_commander/ and omniman_hand_teleop/ is already close to it: this
+# setting reformats ~840 lines, whereas Google/4-space/150-col would churn
+# ~2570 (essentially a full rewrite of every file).
+#
+# Note: cybergear_hardware/ ships its own .clang-format (Google/4/150). That
+# does not conflict, because clang-format resolves the nearest config walking
+# up from each file, and cybergear_hardware/ is vendored and excluded from
+# the pre-commit hooks entirely.
+BasedOnStyle: Google
+IndentWidth: 2
+ColumnLimit: 100

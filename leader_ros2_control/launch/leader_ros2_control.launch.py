@@ -1,18 +1,13 @@
 from launch import LaunchDescription
-from launch.actions import (
-    DeclareLaunchArgument,
-    RegisterEventHandler,
-)
+from launch.actions import RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import (
     Command,
     FindExecutable,
-    LaunchConfiguration,
     PathJoinSubstitution,
 )
 
 from launch_ros.actions import Node
-from launch_ros.descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 

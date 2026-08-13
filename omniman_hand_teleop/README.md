@@ -281,7 +281,7 @@ Two instances of this node run simultaneously (one per arm):
 | `/left_hand_gripper_control` | Open/close left gripper |
 | `/right_hand_gripper_control` | Open/close right gripper |
 
-<!-- ## 🛠️ Development Journey 
+<!-- ## 🛠️ Development Journey
 
 <details>
 <summary><strong>From Single Arm to Dual Arm Control</strong></summary>

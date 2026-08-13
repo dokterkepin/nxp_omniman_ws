@@ -6,6 +6,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
+
 def generate_launch_description():
     declared_arguments = [
         DeclareLaunchArgument(
@@ -20,7 +21,7 @@ def generate_launch_description():
 
     urdf_file = PathJoinSubstitution([pkg_path, "urdf", "omniman.urdf"])
 
-    robot_description_content = Command(["cat ", urdf_file])    
+    robot_description_content = Command(["cat ", urdf_file])
     robot_description = {"robot_description": robot_description_content}
 
     rviz_config_file = PathJoinSubstitution([pkg_path, "config", "config.rviz"])
@@ -31,7 +32,7 @@ def generate_launch_description():
         output="both",
         parameters=[robot_description],
     )
-    
+
     gui_node = Node(
         package="joint_state_publisher_gui",
         executable="joint_state_publisher_gui",
@@ -48,4 +49,4 @@ def generate_launch_description():
         arguments=["-d", rviz_config_file]
     )
 
-    return LaunchDescription(declared_arguments + [rsp_node, gui_node, rviz_node])       
+    return LaunchDescription(declared_arguments + [rsp_node, gui_node, rviz_node])

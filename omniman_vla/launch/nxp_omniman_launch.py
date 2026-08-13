@@ -112,7 +112,6 @@ def generate_launch_description():
         )
     )
 
-
     # Wrist camera (mounted on palm_link, moves with the arm).
     usb_cam = Node(
         package='usb_cam',

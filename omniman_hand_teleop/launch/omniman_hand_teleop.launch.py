@@ -11,9 +11,9 @@ from launch_param_builder import ParameterBuilder
 
 def launch_setup(context, *args, **kwargs):
     use_trajectory = LaunchConfiguration("use_trajectory").perform(context).lower() == "true"
-    show_window   = LaunchConfiguration("show_window").perform(context).lower() == "true"
+    show_window = LaunchConfiguration("show_window").perform(context).lower() == "true"
 
-    pkg_share  = get_package_share_directory("omniman_hand_teleop")
+    pkg_share = get_package_share_directory("omniman_hand_teleop")
     teleop_params = os.path.join(pkg_share, "config", "teleop.yaml")
     config_dir = os.path.join(pkg_share, "config", "pose_tracking")
     rviz_config = os.path.join(pkg_share, "config", "rviz", "omniman_hand_teleop.rviz")
@@ -35,11 +35,11 @@ def launch_setup(context, *args, **kwargs):
     # Use the same use_trajectory arg as nxp_omniman_launch.py and servo_example.launch.py.
     s = servo_params["moveit_servo"]
     if use_trajectory:
-        s["command_out_type"]  = "trajectory_msgs/JointTrajectory"
+        s["command_out_type"] = "trajectory_msgs/JointTrajectory"
         s["command_out_topic"] = "/arm_controller/joint_trajectory"
         s["publish_joint_velocities"] = True
     else:
-        s["command_out_type"]  = "std_msgs/Float64MultiArray"
+        s["command_out_type"] = "std_msgs/Float64MultiArray"
         s["command_out_topic"] = "/arm_group_position_controller/commands"
         s["publish_joint_velocities"] = False
 

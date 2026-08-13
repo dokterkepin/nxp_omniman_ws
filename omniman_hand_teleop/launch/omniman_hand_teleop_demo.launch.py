@@ -38,7 +38,9 @@ from launch_param_builder import ParameterBuilder
 def launch_setup(context, *args, **kwargs):
     track_orientation = LaunchConfiguration("track_orientation").perform(context).lower() == "true"
     show_window = LaunchConfiguration("show_window").perform(context).lower() == "true"
-    use_fixed_orientation = LaunchConfiguration("use_fixed_orientation").perform(context).lower() == "true"
+    use_fixed_orientation = (
+        LaunchConfiguration("use_fixed_orientation").perform(context).lower() == "true"
+    )
     fixed_roll = float(LaunchConfiguration("fixed_roll").perform(context))
     fixed_pitch = float(LaunchConfiguration("fixed_pitch").perform(context))
     fixed_yaw = float(LaunchConfiguration("fixed_yaw").perform(context))
@@ -62,8 +64,8 @@ def launch_setup(context, *args, **kwargs):
     # Sim always uses arm_controller (JTC); override the yaml default which
     # points at arm_group_position_controller (JGPC, not spawned in sim).
     s = servo_params["moveit_servo"]
-    s["command_out_type"]         = "trajectory_msgs/JointTrajectory"
-    s["command_out_topic"]        = "/arm_controller/joint_trajectory"
+    s["command_out_type"] = "trajectory_msgs/JointTrajectory"
+    s["command_out_topic"] = "/arm_controller/joint_trajectory"
     s["publish_joint_velocities"] = True
 
     # --- Robot state publisher ------------------------------------------------

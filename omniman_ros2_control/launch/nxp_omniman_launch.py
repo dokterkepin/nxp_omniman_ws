@@ -30,7 +30,9 @@ def generate_launch_description():
         [pkg_path, "config", "controllers.yaml"]
     )
 
-    rviz_config_file = (PathJoinSubstitution(
+    # Consumed by rviz_node below, which is currently commented out of the
+    # LaunchDescription; kept so RViz can be re-enabled without rebuilding it.
+    rviz_config_file = (PathJoinSubstitution(  # noqa: F841
         [pkg_path, "config", "ros2_control_config.rviz"]
     ))
 
@@ -58,7 +60,8 @@ def generate_launch_description():
         "use_trajectory",
         default_value="true",
         description="false -> JointGroupPositionController (for MoveIt Servo). "
-                    "true  -> JointTrajectoryController (for planned motion / PoseTracking trajectory mode).",
+                    "true  -> JointTrajectoryController (for planned motion / "
+                    "PoseTracking trajectory mode).",
     )
 
     robot_description_content = Command(
@@ -214,7 +217,9 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("use_trajectory")),
     )
 
-    rplidar_node = Node(
+    # Launched separately in the SLAM/Nav2 bringup; kept here (commented out of
+    # the LaunchDescription) so the tuned serial settings stay in one place.
+    rplidar_node = Node(  # noqa: F841
         package="rplidar_ros",
         executable="rplidar_node",
         name="rplidar_node",

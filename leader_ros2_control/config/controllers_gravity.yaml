@@ -15,7 +15,6 @@
       joint_trajectory_command_broadcaster:
         type: joint_trajectory_command_broadcaster/JointTrajectoryCommandBroadcaster
 
-/**:
   gravity_compensation_controller:
     ros__parameters:
       joints:
@@ -49,7 +48,6 @@
         - 80.0
       enable_spring_effect: false
 
-/**:
   spring_actuator_controller:
     ros__parameters:
       joints:
@@ -69,7 +67,6 @@
       torque_scaling_factors:
         - 200.0
 
-/**:
   joint_trajectory_command_broadcaster:
     ros__parameters:
       # VLA teleop: 7 joints = 6 arm + gripper, matching the omniman_vla

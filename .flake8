@@ -1,0 +1,16 @@
+[flake8]
+# 99 matches ament_flake8, so this config and `colcon test` agree.
+max-line-length = 99
+
+extend-ignore =
+    # Slice-colon spacing; conflicts with the formatter's opinion.
+    E203,
+    # Line break before binary operator; the modern PEP 8 recommendation.
+    W503
+
+exclude =
+    .git,
+    __pycache__,
+    build,
+    install,
+    log

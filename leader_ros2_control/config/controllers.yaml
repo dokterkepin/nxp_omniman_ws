@@ -9,7 +9,6 @@
       position_controller:
         type: position_controllers/JointGroupPositionController
 
-/**:
   position_controller:
     ros__parameters:
       joints:

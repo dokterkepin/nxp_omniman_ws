@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def quaternion_from_euler_numpy(roll: float, pitch: float, yaw: float) -> np.ndarray:
     """Converts euler roll, pitch, yaw to a quaternion (x, y, z, w)."""
     cy = np.cos(yaw * 0.5)
@@ -16,6 +17,7 @@ def quaternion_from_euler_numpy(roll: float, pitch: float, yaw: float) -> np.nda
     q[3] = cr * cp * cy + sr * sp * sy
     return q
 
+
 def get_hand_pose_from_landmarks(landmarks, image_width, image_height):
     """Extract hand pose from landmarks."""
     cx = landmarks[0].x
@@ -29,6 +31,7 @@ def get_hand_pose_from_landmarks(landmarks, image_width, image_height):
     while roll_mapped < -np.pi:
         roll_mapped += 2*np.pi
     return cx, cy, roll_mapped + np.pi/2
+
 
 def get_finger_states(landmarks):
     """Determine which fingers are raised."""

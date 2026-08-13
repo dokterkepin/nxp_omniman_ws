@@ -41,7 +41,7 @@ All three run simultaneously on the same arm. They coexist because they claim
 The two effort controllers write to *disjoint* joint sets, so they never fight. The broadcaster
 claims no command interfaces at all, so it layers freely on top of both.
 
-**Friction compensation** exists because the model gives the *ideal* torque while real gearboxes resist motion. 
+**Friction compensation** exists because the model gives the *ideal* torque while real gearboxes resist motion.
 
 **static-friction** alternates ±torque every cycle to break stiction —
 that faint buzz at rest is intentional and is what stops the arm feeling sticky.

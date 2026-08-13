@@ -1,18 +1,15 @@
-#include <memory>
-#include <thread>
-
-#include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_visual_tools/moveit_visual_tools.h>
 
-int main(int argc, char* argv[])
-{
+#include <memory>
+#include <rclcpp/rclcpp.hpp>
+#include <thread>
+
+int main(int argc, char* argv[]) {
   rclcpp::init(argc, argv);
   auto const node = std::make_shared<rclcpp::Node>(
-    "hello_moveit",
-    rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true)
-  );
+      "hello_moveit", rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
   auto const logger = rclcpp::get_logger("hello_moveit");
 
   rclcpp::executors::SingleThreadedExecutor executor;
@@ -25,12 +22,13 @@ int main(int argc, char* argv[])
   move_group_interface.setPlanningPipelineId("pilz_industrial_motion_planner");
   move_group_interface.setPlannerId("PTP");
 
-  RCLCPP_INFO(logger, "Planning Pipeline: %s", move_group_interface.getPlanningPipelineId().c_str());
+  RCLCPP_INFO(logger, "Planning Pipeline: %s",
+              move_group_interface.getPlanningPipelineId().c_str());
   RCLCPP_INFO(logger, "Planner ID: %s", move_group_interface.getPlannerId().c_str());
 
   auto moveit_visual_tools = moveit_visual_tools::MoveItVisualTools{
-    node, "base_link", rviz_visual_tools::RVIZ_MARKER_TOPIC,
-    move_group_interface.getRobotModel()};
+      node, "base_link", rviz_visual_tools::RVIZ_MARKER_TOPIC,
+      move_group_interface.getRobotModel()};
   moveit_visual_tools.deleteAllMarkers();
   moveit_visual_tools.loadRemoteControl();
 
@@ -44,12 +42,10 @@ int main(int argc, char* argv[])
                                     rviz_visual_tools::XLARGE);
   };
   auto const draw_trajectory_tool_path =
-    [&moveit_visual_tools,
-     jmg = move_group_interface.getRobotModel()->getJointModelGroup("arm"),
-     ee  = move_group_interface.getRobotModel()->getLinkModel("ee_link")](
-       auto const trajectory) {
-      moveit_visual_tools.publishTrajectoryLine(trajectory, ee, jmg);
-    };
+      [&moveit_visual_tools, jmg = move_group_interface.getRobotModel()->getJointModelGroup("arm"),
+       ee = move_group_interface.getRobotModel()->getLinkModel("ee_link")](auto const trajectory) {
+        moveit_visual_tools.publishTrajectoryLine(trajectory, ee, jmg);
+      };
 
   // Add floor collision object
   {
@@ -77,9 +73,9 @@ int main(int argc, char* argv[])
   // Get the current pose (position + quaternion) of the end effector
   auto current_pose = move_group_interface.getCurrentPose("ee_link").pose;
   RCLCPP_INFO(logger, "Current pose: pos=(%.4f, %.4f, %.4f) quat=(%.4f, %.4f, %.4f, %.4f)",
-    current_pose.position.x, current_pose.position.y, current_pose.position.z,
-    current_pose.orientation.x, current_pose.orientation.y,
-    current_pose.orientation.z, current_pose.orientation.w);
+              current_pose.position.x, current_pose.position.y, current_pose.position.z,
+              current_pose.orientation.x, current_pose.orientation.y, current_pose.orientation.z,
+              current_pose.orientation.w);
 
   // Build target pose from the current pose (same orientation, slight position offset)
   geometry_msgs::msg::Pose target_pose;
@@ -89,9 +85,9 @@ int main(int argc, char* argv[])
   target_pose.orientation = current_pose.orientation;
 
   RCLCPP_INFO(logger, "Target pose: pos=(%.4f, %.4f, %.4f) quat=(%.4f, %.4f, %.4f, %.4f)",
-    target_pose.position.x, target_pose.position.y, target_pose.position.z,
-    target_pose.orientation.x, target_pose.orientation.y,
-    target_pose.orientation.z, target_pose.orientation.w);
+              target_pose.position.x, target_pose.position.y, target_pose.position.z,
+              target_pose.orientation.x, target_pose.orientation.y, target_pose.orientation.z,
+              target_pose.orientation.w);
 
   // Clear any previous targets/constraints before planning a new motion
   move_group_interface.clearPoseTargets();
@@ -125,15 +121,14 @@ int main(int argc, char* argv[])
       RCLCPP_INFO(logger, "Target executed successfully");
     } else {
       RCLCPP_ERROR(logger, "Target execute failed with error code: %d (%s)",
-        static_cast<int>(exec_result.val),
-        moveit::core::error_code_to_string(exec_result).c_str());
+                   static_cast<int>(exec_result.val),
+                   moveit::core::error_code_to_string(exec_result).c_str());
     }
   } else {
     draw_title("Plan Failed!");
     moveit_visual_tools.trigger();
-    RCLCPP_ERROR(logger, "Plan failed with error code: %d (%s)",
-      static_cast<int>(plan_result.val),
-      moveit::core::error_code_to_string(plan_result).c_str());
+    RCLCPP_ERROR(logger, "Plan failed with error code: %d (%s)", static_cast<int>(plan_result.val),
+                 moveit::core::error_code_to_string(plan_result).c_str());
 
     // Log diagnostics that help identify the failure
     auto joints = move_group_interface.getCurrentJointValues();
@@ -143,9 +138,9 @@ int main(int argc, char* argv[])
       RCLCPP_ERROR(logger, "  %s = %.4f rad", names[i].c_str(), joints[i]);
     }
     RCLCPP_ERROR(logger, "Target pose was: pos=(%.4f, %.4f, %.4f) quat=(%.4f, %.4f, %.4f, %.4f)",
-      target_pose.position.x, target_pose.position.y, target_pose.position.z,
-      target_pose.orientation.x, target_pose.orientation.y,
-      target_pose.orientation.z, target_pose.orientation.w);
+                 target_pose.position.x, target_pose.position.y, target_pose.position.z,
+                 target_pose.orientation.x, target_pose.orientation.y, target_pose.orientation.z,
+                 target_pose.orientation.w);
   }
 
   rclcpp::shutdown();

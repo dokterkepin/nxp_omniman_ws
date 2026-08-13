@@ -1303,7 +1303,7 @@
             <origin xyz="-0.0077812 -0.025918 0.037903" rpy="0.14094 -0.14308 0.79578" />
             <axis xyz="-1 0 0" />
         </joint>
-    
+
         <!-- ==================== Manipulator ==================== -->
         <joint name="shoulder_yaw_joint" type="revolute">
             <parent link="base_link" />
@@ -1328,8 +1328,8 @@
             <inertial>
                 <mass value="0.283407" />
                 <origin xyz="0.000000 -0.002915 0.032463" rpy="0 0 0" />
-                <inertia ixx="0.000301" ixy="0.000000" ixz="0.0000000" 
-                        iyy="0.000191" iyz="-0.000011" 
+                <inertia ixx="0.000301" ixy="0.000000" ixz="0.0000000"
+                        iyy="0.000191" iyz="-0.000011"
                         izz="0.000238" />
             </inertial>
         </link>
@@ -1357,8 +1357,8 @@
             <inertial>
                 <mass value="0.334430" />
                 <origin xyz="-0.000059 -0.035570 0.043824" rpy="0 0 0" />
-                <inertia ixx="0.000660" ixy="0.000000" ixz="-0.000002" 
-                        iyy="0.000428" iyz="-0.000003" 
+                <inertia ixx="0.000660" ixy="0.000000" ixz="-0.000002"
+                        iyy="0.000428" iyz="-0.000003"
                         izz="0.000388" />
             </inertial>
         </link>
@@ -1386,8 +1386,8 @@
             <inertial>
                 <mass value="0.283407" />
                 <origin xyz="0.000000 -0.002178 0.031926" rpy="0 0 0" />
-                <inertia ixx="0.000299" ixy="0.000000" ixz="0.000000" 
-                        iyy="0.000189" iyz="-0.000011" 
+                <inertia ixx="0.000299" ixy="0.000000" ixz="0.000000"
+                        iyy="0.000189" iyz="-0.000011"
                         izz="0.000237" />
             </inertial>
         </link>
@@ -1415,8 +1415,8 @@
             <inertial>
                 <mass value="0.332340" />
                 <origin xyz="-0.000852 -0.036144 0.055987" rpy="0 0 0" />
-                <inertia ixx="0.000671" ixy="0.000000" ixz="-0.000003" 
-                        iyy="0.000410" iyz="0.000006" 
+                <inertia ixx="0.000671" ixy="0.000000" ixz="-0.000003"
+                        iyy="0.000410" iyz="0.000006"
                         izz="0.000330" />
             </inertial>
         </link>
@@ -1444,8 +1444,8 @@
             <inertial>
                 <mass value="0.221348" />
                 <origin xyz="0.011223 -0.019000 0.037608" rpy="0 0 0" />
-                <inertia ixx="0.000072" ixy="0.000000" ixz="0.000004" 
-                        iyy="0.000085" iyz="0.000000" 
+                <inertia ixx="0.000072" ixy="0.000000" ixz="0.000004"
+                        iyy="0.000085" iyz="0.000000"
                         izz="0.000088" />
             </inertial>
         </link>
@@ -1473,8 +1473,8 @@
             <inertial>
                 <mass value="0.216056" />
                 <origin xyz="0.008366 0.000000 0.026410" rpy="0 0 0" />
-                <inertia ixx="0.000126" ixy="0.000000" ixz="-0.000007" 
-                        iyy="0.000080" iyz="0.000000" 
+                <inertia ixx="0.000126" ixy="0.000000" ixz="-0.000007"
+                        iyy="0.000080" iyz="0.000000"
                         izz="0.000145" />
             </inertial>
         </link>
@@ -1512,7 +1512,7 @@
             <child link="camera_optical_frame" />
             <origin xyz="-0.071 0.021 0.059" rpy="0 0 -1.5707963" />
         </joint>
-        
+
         <link name="camera_optical_frame" />
 
         <joint name="left_finger_prismatic_joint" type="prismatic">
@@ -1547,8 +1547,8 @@
             <inertial>
                 <mass value="0.111661" />
                 <origin xyz="0.016199 0.012512 0.036901" rpy="0 0 0" />
-                <inertia ixx="0.000065" ixy="0.000000" ixz="0.000000" 
-                        iyy="0.000075" iyz="0.000012" 
+                <inertia ixx="0.000065" ixy="0.000000" ixz="0.000000"
+                        iyy="0.000075" iyz="0.000012"
                         izz="0.000028" />
             </inertial>
         </link>
@@ -1568,8 +1568,8 @@
             <inertial>
                 <mass value="0.111661" />
                 <origin xyz="0.016201 -0.012604 0.036901" rpy="0 0 0" />
-                <inertia ixx="0.000065" ixy="0.000000" ixz="0.000000" 
-                        iyy="0.000075" iyz="-0.000012" 
+                <inertia ixx="0.000065" ixy="0.000000" ixz="0.000000"
+                        iyy="0.000075" iyz="-0.000012"
                         izz="0.000028" />
             </inertial>
         </link>

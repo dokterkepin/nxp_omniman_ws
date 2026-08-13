@@ -75,7 +75,7 @@ This tells you the lidar is publishing at ~12.76 Hz. The rate may fluctuate with
 ros2 topic echo /scan --once
 ```
 
-Prints one full message and exits. For `/scan` this shows the laser ranges, angle limits, and timestamp. For `/tf` it shows the transform data. 
+Prints one full message and exits. For `/scan` this shows the laser ranges, angle limits, and timestamp. For `/tf` it shows the transform data.
 
 ### 3. Check who is publishing and subscribing to a topic
 
@@ -116,7 +116,7 @@ Prints seconds since epoch (Jan 1, 1970) with nanosecond precision. Run on both 
 ### Check ROS2 timestamps
 
 ```bash
-ros2 topic echo /rosout --once 
+ros2 topic echo /rosout --once
 ```
 
 ### Check if simulation clock is publishing (Isaac Sim only)
