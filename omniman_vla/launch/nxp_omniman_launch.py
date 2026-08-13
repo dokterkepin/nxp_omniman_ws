@@ -1,9 +1,11 @@
 from launch import LaunchDescription
-from launch.actions import RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler
+from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import (
     Command,
     FindExecutable,
+    LaunchConfiguration,
     PathJoinSubstitution,
 )
 from launch_ros.actions import Node
@@ -13,8 +15,20 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     pkg_path = FindPackageShare('omniman_vla')
 
+    # Joystick is only for driving the BASE between recording locations -- it is not
+    # part of the VLA action space. Set false if driving from another machine.
+    use_joy_arg = DeclareLaunchArgument(
+        'use_joy',
+        default_value='true',
+        description='Start joy_linux + teleop_twist_joy for driving the mecanum base.',
+    )
+
     robot_controllers = PathJoinSubstitution(
         [pkg_path, 'config', 'controllers_vla.yaml']
+    )
+
+    joystick_config = PathJoinSubstitution(
+        [pkg_path, 'config', 'joystick.yaml']
     )
 
     robot_description_content = Command(
@@ -33,6 +47,10 @@ def generate_launch_description():
         executable='ros2_control_node',
         parameters=[robot_description, robot_controllers],
         output='both',
+        remappings=[
+            ('/mecanum_drive_controller/reference', '/cmd_vel_stamped'),
+            ('/mecanum_drive_controller/reference_unstamped', '/cmd_vel'),
+        ],
     )
 
     robot_state_publisher_node = Node(
@@ -48,11 +66,42 @@ def generate_launch_description():
         arguments=['joint_state_broadcaster'],
     )
 
+    mecanum_drive_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=['mecanum_drive_controller'],
+    )
+
     # 7-joint arm_controller (6 arm + gripper_prismatic_joint)
     arm_controller_spawner = Node(
         package='controller_manager',
         executable='spawner',
         arguments=['arm_controller', '--param-file', robot_controllers],
+    )
+
+    # mecanum_drive_controller waits on joint_state_broadcaster.
+    delay_mecanum_controller = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[mecanum_drive_controller_spawner],
+        )
+    )
+
+    joy_node = Node(
+        package='joy_linux',
+        executable='joy_linux_node',
+        name='joy_node',
+        output='screen',
+        parameters=[joystick_config],
+        condition=IfCondition(LaunchConfiguration('use_joy')),
+    )
+
+    teleop_joy_node = Node(
+        package='teleop_twist_joy',
+        executable='teleop_node',
+        parameters=[joystick_config],
+        remappings=[('/cmd_vel', '/cmd_vel_stamped')],
+        condition=IfCondition(LaunchConfiguration('use_joy')),
     )
 
     # arm_controller waits on joint_state_broadcaster.
@@ -92,10 +141,14 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            use_joy_arg,
             control_node,
             robot_state_publisher_node,
             joint_state_broadcaster_spawner,
+            delay_mecanum_controller,
             delay_arm_controller,
+            joy_node,
+            teleop_joy_node,
             usb_cam,
             workspace_cam,
         ]

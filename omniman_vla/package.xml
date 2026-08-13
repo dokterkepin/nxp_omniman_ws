@@ -26,6 +26,11 @@
   <exec_depend>usb_cam</exec_depend>
   <exec_depend>image_proc</exec_depend>
 
+  <!-- Mecanum base: drive between pick/place locations (joystick now, Nav2 later). -->
+  <exec_depend>mecanum_drive_controller</exec_depend>
+  <exec_depend>joy_linux</exec_depend>
+  <exec_depend>teleop_twist_joy</exec_depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
