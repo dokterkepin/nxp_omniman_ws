@@ -504,8 +504,16 @@ class DataManager:
             'names': joint_list,
             'shape': (len(joint_list),)
         }
+        # Pass the configured root explicitly. Without it, LeRobot falls back to
+        # HF_LEROBOT_HOME (~/.cache/huggingface/lerobot by default), which can differ
+        # from self._save_path -- the path _check_dataset_exists() looks in. When they
+        # diverge, the existence check never finds the dataset and same-name recording
+        # silently creates a new one instead of appending.
+        # Note this cannot be solved with an env var alone: saving happens in a spawned
+        # child process that does not inherit the parent's environment.
         return LeRobotDatasetWrapper.create(
                 repo_id=repo_id,
+                root=self._save_path,
                 fps=self._task_info.fps,
                 features=features,
                 use_videos=True

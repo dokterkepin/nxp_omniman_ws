@@ -133,32 +133,65 @@ PYTHONPATH=src python3 -m lerobot.scripts.visualize_dataset_html \
 Delete bad episodes via **Data Tools → Delete** (accepts `0,1,5-9`). Don't delete parquet files
 by hand; the metadata has to stay consistent.
 
----
+### Changing the save location
 
-## 3. Train
+The dataset root comes from `physical_ai_server.py`'s `DEFAULT_SAVE_ROOT_PATH`, overridable with
+an env var (export it in the terminal that launches the server):
 
-**Training** tab. Select the dataset, then:
-
-| Field | Value |
-|---|---|
-| Policy | `act` |
-| Device | `cuda` |
-| Batch Size | 8 (use 4 if OOM, or with 2+ cameras) |
-| Steps | 100000 |
-| Num Workers | 4 |
-| Save Frequency | 10000 |
-| Seed | 1000 |
-
-On an RTX 4060 Laptop (8 GB): ~0.176 s/step → **~5 hours** for 100k steps, 52M parameters.
-
-Checkpoints land in:
-```
-physical_ai_tools/lerobot/outputs/train/<output_name>/checkpoints/NNNNNN/pretrained_model/
+```bash
+export PHYSICAL_AI_DATASET_ROOT=/home/dokterkepin/dataset
 ```
 
+> This only works because `data_manager.py` passes `root=self._save_path` to
+> `LeRobotDatasetWrapper.create()`. Upstream omits that argument, so LeRobot falls back to
+> `HF_LEROBOT_HOME` and writes to `~/.cache/...` regardless of what the server was configured
+> with — and `HF_LEROBOT_HOME` alone can't fix it either, because saving runs in a spawned child
+> process that doesn't inherit the parent's environment. If datasets ever reappear in `~/.cache`
+> after a submodule update, that one-line `root=` is what got reverted.
+
+### Pre-filling the UI fields
+
+Recording defaults live in `physical_ai_manager/src/features/tasks/taskSlice.js`, under
+`initialState.taskInfo`. The UI has no session persistence, so a browser refresh resets every
+field to these values — setting them avoids retyping (and mistyping) the task name each time:
+
+```js
+taskInfo: {
+  taskName: 'drive_pick_place',       // folder name (robot type prepended, see below)
+  taskInstruction: ['pick the yellow duck and place it on the black box'],
+  userId: 'dokterkepin',              // first half of the repo id
+  fps: 30,                            // must match the camera rate
+  warmupTime: 1,                      // countdown before recording starts
+  episodeTime: 20,                    // length of each recorded episode (s)
+  resetTime: 5,                       // gap between episodes — reposition the object here
+  numEpisodes: 1,                     // 1 = press Start per episode (needed when driving between spots)
+  pushToHub: false,                   // true spams HF token warnings if not logged in
+  useOptimizedSave: true,
+  recordRosBag2: false,               // extra raw bag alongside the dataset; not needed for training
+},
+taskStatus: {
+  robotType: 'omniman',               // preselects the robot; must match a config/*.yaml key
+},
+```
+
+> `numEpisodes: 1` is deliberate for mobile recording: the UI has no pause button, so a batch
+> would auto-advance while you are still driving to the next spot. With 1, it returns to
+> "Ready to start" and waits indefinitely between episodes.
+
+File-browser start directories are in `physical_ai_manager/src/constants/paths.js`, which
+defaults to the Docker image's `/root/...` paths. Override them in `physical_ai_manager/.env`
+(these only affect the browser UI, never where data is written):
+
+```bash
+REACT_APP_POLICY_MODEL_PATH=/home/dokterkepin/output/
+REACT_APP_DOT_CACHE_PATH=/home/dokterkepin/.cache
+```
+
+> `.env` is read only at startup — restart `npm start`. Edits to `taskSlice.js` hot-reload.
+
 ---
 
-## 4. Run inference
+## 3. Run inference
 
 **Shut down the leader first.**
 
@@ -181,7 +214,7 @@ Then in the **Inference** tab: select the policy path
 
 ---
 
-## 5. Train on a different machine — no physical_ai_tools needed
+## 4. Train on a different machine — no physical_ai_tools needed
 
 Training is plain PyTorch reading a folder of parquet/mp4 files — it never touches ROS,
 `physical_ai_server`, or the web UI. That means it can run on **any machine with a GPU**,
@@ -199,7 +232,7 @@ pip install -e .
 pip install 'datasets<=3.6.0'   # same version that used by physical_ai_tools
 ```
 
-### 5.2 The training command
+### 4.2 The training command
 ```bash
 cat > ~/train_cmd.sh << 'EOF'
 python3 -m lerobot.scripts.train \
@@ -219,7 +252,7 @@ EOF
 bash ~/train_cmd.sh
 ```
 
-### 5.3 Live monitoring with Weights & Biases (optional)
+### 4.3 Live monitoring with Weights & Biases (optional)
 The UI's live loss graph comes from `physical_ai_server` always setting `wandb.enable: false`
 internally — calling the CLI directly, you can turn it on for the same kind of live browser
 dashboard:
