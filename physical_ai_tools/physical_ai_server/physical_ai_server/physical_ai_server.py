@@ -66,7 +66,15 @@ from rclpy.node import Node
 class PhysicalAIServer(Node):
     # Define operation modes (constants taken from Communicator)
 
-    DEFAULT_SAVE_ROOT_PATH = Path.home() / '.cache/huggingface/lerobot'
+    # Where recorded datasets are written. Override with the PHYSICAL_AI_DATASET_ROOT
+    # environment variable, e.g.
+    #     export PHYSICAL_AI_DATASET_ROOT=/home/dokterkepin/dataset
+    # (LeRobot's own default is ~/.cache/huggingface/lerobot, kept as the fallback.)
+    # NOTE: the physical_ai_manager .env file does NOT affect this -- that only sets
+    # where the web UI's file browser starts, not where data is actually saved.
+    DEFAULT_SAVE_ROOT_PATH = Path(
+        os.environ.get('PHYSICAL_AI_DATASET_ROOT', Path.home() / '.cache/huggingface/lerobot')
+    )
     DEFAULT_TOPIC_TIMEOUT = 5.0  # seconds
     PUB_QOS_SIZE = 10
     TRAINING_STATUS_TIMER_FREQUENCY = 0.5  # seconds

@@ -25,7 +25,10 @@ const BASE_WORKSPACE_PATH =
 const LEROBOT_OUTPUTS_PATH =
   process.env.REACT_APP_LEROBOT_OUTPUTS_PATH || `${BASE_WORKSPACE_PATH}/lerobot/outputs`;
 
-const DOT_CACHE_PATH = '/root/.cache';
+// NOTE: the fallbacks below are the DOCKER image's paths (/root/...). On a native
+// install they do not exist, so set the REACT_APP_* vars in physical_ai_manager/.env
+// to point the file browsers at real locations. See that file for this machine's values.
+const DOT_CACHE_PATH = process.env.REACT_APP_DOT_CACHE_PATH || '/root/.cache';
 
 export const DEFAULT_PATHS = {
   // Base paths
@@ -33,7 +36,8 @@ export const DEFAULT_PATHS = {
   LEROBOT_OUTPUTS: LEROBOT_OUTPUTS_PATH,
 
   // File browser defaults
-  POLICY_MODEL_PATH: `${LEROBOT_OUTPUTS_PATH}/train/`,
+  POLICY_MODEL_PATH:
+    process.env.REACT_APP_POLICY_MODEL_PATH || `${LEROBOT_OUTPUTS_PATH}/train/`,
   DATASET_PATH: `${DOT_CACHE_PATH}/huggingface/lerobot/`,
 };
 

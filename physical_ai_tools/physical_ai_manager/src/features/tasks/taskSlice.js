@@ -21,26 +21,29 @@ import TaskPhase from '../../constants/taskPhases';
 
 const initialState = {
   taskInfo: {
-    taskName: '',
+    // NOTE: do NOT include the robot type here -- the UI builds the repo id as
+    //   <userId>/<robotType>_<taskName>   (see InfoPanel.js)
+    // so 'drive_pick_place' yields dokterkepin/omniman_drive_pick_place.
+    taskName: 'drive_pick_place',
     taskType: '',
-    taskInstruction: [],
+    taskInstruction: ['pick the yellow duck and place it on the black box'],
     policyPath: '',
     recordInferenceMode: false,
-    userId: undefined,
+    userId: 'dokterkepin',
     fps: 30,
     tags: [],
-    warmupTime: 5,
+    warmupTime: 1,
     episodeTime: 20,
     resetTime: 5,
-    numEpisodes: 5,
+    numEpisodes: 1,
     token: '',
-    pushToHub: true,
+    pushToHub: false,
     privateMode: false,
     useOptimizedSave: true,
     recordRosBag2: false,
   },
   taskStatus: {
-    robotType: '',
+    robotType: 'omniman',
     taskName: 'idle',
     running: false,
     phase: TaskPhase.READY,
