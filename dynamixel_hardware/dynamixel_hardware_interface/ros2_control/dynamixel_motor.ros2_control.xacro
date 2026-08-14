@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="dynamixel_ros2_control" params="name serial_device device_id joint_name use_prismatic:=0 revolute_max:=0.0 revolute_min:=0.0 prismatic_max:=0.0 prismatic_min:=0.0 driver_mode:=0 position_p_gain:=800">
+    <xacro:macro name="dynamixel_ros2_control" params="name serial_device device_id joint_name use_prismatic:=0 revolute_max:=0.0 revolute_min:=0.0 prismatic_max:=0.0 prismatic_min:=0.0 driver_mode:=0">
         <ros2_control name="${name}" type="system">
             <hardware>
                 <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>

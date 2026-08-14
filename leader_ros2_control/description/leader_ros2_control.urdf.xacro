@@ -14,17 +14,18 @@
          after a gravity-comp session left them in current mode (0).
          Drive Modes match leader.gravity.xacro: 1,0,1,1,1,0,0
          ============================================================ -->
-    <xacro:macro name="leader_dynamixel_ros2_control" params="name device_id joint_name driver_mode:=0 position_p_gain:=800">
+    <xacro:macro name="leader_dynamixel_ros2_control" params="name device_id joint_name driver_mode:=0">
         <ros2_control name="${name}" type="system">
             <hardware>
                 <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
                 <param name="port_name">${serial_port}</param>
                 <param name="baud_rate">1000000</param>
-                <param name="error_timeout_ms">500</param>
+                <param name="error_timeout_ms">0.2</param>
                 <param name="disable_torque_at_init">true</param>
                 <param name="dynamixel_model_folder">/param/dxl_model</param>
                 <param name="number_of_joints">1</param>
                 <param name="number_of_transmissions">1</param>
+                <param name="ros_update_freq">200</param>
                 <param name="dynamixel_state_pub_msg_name">dynamixel_hardware_interface/dxl_state</param>
                 <param name="get_dynamixel_data_srv_name">dynamixel_hardware_interface/get_dxl_data</param>
                 <param name="set_dynamixel_data_srv_name">dynamixel_hardware_interface/set_dxl_data</param>
@@ -48,10 +49,13 @@
                 <state_interface name="Present Current"/>
                 <state_interface name="Torque Enable"/>
                 <state_interface name="Present Input Voltage"/>
-                <param name="Position P Gain">${position_p_gain}</param>
+                <param name="Position P Gain">800</param>
+                <param name="Position I Gain">100</param>
+                <param name="Position D Gain">100</param>
+                <param name="Profile Velocity">200</param>
+                <param name="Profile Acceleration">50</param>
                 <param name="Drive Mode">${driver_mode}</param>
-                <param name="Operating Mode">3</param>
-                <param name="Return Delay Time">2</param>
+                <param name="Return Delay Time">0</param>
             </gpio>
 
             <transmission name="${joint_name}_transmission">
