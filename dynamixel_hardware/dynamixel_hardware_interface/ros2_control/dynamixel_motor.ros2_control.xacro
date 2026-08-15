@@ -46,10 +46,10 @@
                 <state_interface name="Torque Enable"/>
                 <state_interface name="Present Input Voltage"/>
                 <param name="Position P Gain">800</param>
-                <param name="Position I Gain">100</param>
-                <param name="Position D Gain">100</param>
+                <param name="Position I Gain">0</param>
+                <param name="Position D Gain">0</param>
                 <param name="Profile Velocity">0</param>
-                <param name="Profile Acceleration">50</param>
+                <param name="Profile Acceleration">0</param>
                 <param name="Drive Mode">${driver_mode}</param>
                 <param name="Return Delay Time">0</param>
             </gpio>
