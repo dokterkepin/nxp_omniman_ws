@@ -138,6 +138,22 @@ def generate_launch_description():
     #     namespace='cam_workspace',
     # )
 
+    rplidar_node = Node(  # noqa: F841
+        package="rplidar_ros",
+        executable="rplidar_node",
+        name="rplidar_node",
+        parameters=[{
+            'channel_type': 'serial',
+            'serial_port': '/dev/rplidar',
+            'serial_baudrate': 256000,
+            'frame_id': 'lidar_link',
+            'inverted': False,
+            'angle_compensate': True,
+            'scan_mode': 'Sensitivity',
+        }],
+        output="screen",
+    )
+
     return LaunchDescription(
         [
             use_joy_arg,
@@ -149,6 +165,7 @@ def generate_launch_description():
             joy_node,
             teleop_joy_node,
             usb_cam,
+            rplidar_node,
             # workspace_cam,
         ]
     )

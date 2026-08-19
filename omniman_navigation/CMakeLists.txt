@@ -17,6 +17,7 @@ install(DIRECTORY
 install(PROGRAMS
   scripts/twist_to_twist_stamped.py
   scripts/nav_commander.py
+  scripts/get_robot_pose.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
