@@ -53,7 +53,8 @@ def main():
     navigator.waitUntilNav2Active()  # blocks until planner/controller/bt are active
 
     # ---- 2. Send a single goal ---------------------------------------------
-    goal = make_pose(navigator, 1.5, 0.5, yaw_deg=90.0)
+    goal = make_pose(navigator, 1.0, -2.0, yaw_deg=0.0)
+
     navigator.goToPose(goal)
 
     # ---- 3. Spin while the task runs, reading live feedback -----------------
@@ -89,7 +90,8 @@ def main():
     #     if fb:
     #         navigator.get_logger().info(f"On waypoint {fb.current_waypoint + 1}")
 
-    navigator.lifecycleShutdown()
+    # navigator.lifecycleShutdown()
+    navigator.destroy_node()
     rclpy.shutdown()
 
 

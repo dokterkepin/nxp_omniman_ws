@@ -27,7 +27,7 @@ one:
 
 **Option A — `PYTHONPATH` (used on the robot PC).** Add to `.bashrc`:
 ```bash
-export PYTHONPATH=/home/dokterkepin/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot/src:$PYTHONPATH
+export PYTHONPATH=/home/dokterkepin/anaconda3/envs/lerobot_train/lib/python3.10/site-packages:/home/dokterkepin/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot/src:$PYTHONPATH
 ```
 
 **Option B — editable install (used on the remote training machine, §5).**
@@ -140,6 +140,7 @@ an env var (export it in the terminal that launches the server):
 
 ```bash
 export PHYSICAL_AI_DATASET_ROOT=/home/dokterkepin/dataset
+export HF_LEROBOT_HOME=/home/dokterkepin/dataset
 ```
 
 > This only works because `data_manager.py` passes `root=self._save_path` to
@@ -154,29 +155,6 @@ export PHYSICAL_AI_DATASET_ROOT=/home/dokterkepin/dataset
 Recording defaults live in `physical_ai_manager/src/features/tasks/taskSlice.js`, under
 `initialState.taskInfo`. The UI has no session persistence, so a browser refresh resets every
 field to these values — setting them avoids retyping (and mistyping) the task name each time:
-
-```js
-taskInfo: {
-  taskName: 'drive_pick_place',       // folder name (robot type prepended, see below)
-  taskInstruction: ['pick the yellow duck and place it on the black box'],
-  userId: 'dokterkepin',              // first half of the repo id
-  fps: 30,                            // must match the camera rate
-  warmupTime: 1,                      // countdown before recording starts
-  episodeTime: 20,                    // length of each recorded episode (s)
-  resetTime: 5,                       // gap between episodes — reposition the object here
-  numEpisodes: 1,                     // 1 = press Start per episode (needed when driving between spots)
-  pushToHub: false,                   // true spams HF token warnings if not logged in
-  useOptimizedSave: true,
-  recordRosBag2: false,               // extra raw bag alongside the dataset; not needed for training
-},
-taskStatus: {
-  robotType: 'omniman',               // preselects the robot; must match a config/*.yaml key
-},
-```
-
-> `numEpisodes: 1` is deliberate for mobile recording: the UI has no pause button, so a batch
-> would auto-advance while you are still driving to the next spot. With 1, it returns to
-> "Ready to start" and waits indefinitely between episodes.
 
 File-browser start directories are in `physical_ai_manager/src/constants/paths.js`, which
 defaults to the Docker image's `/root/...` paths. Override them in `physical_ai_manager/.env`
@@ -225,11 +203,15 @@ independent of this project's ROS distro
 pip3 install torch torchvision
 ```
 
-Then get the dataset and LeRobot source onto the remote machine and install the rest:
+verify:
+```bash
+python3 -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.device_count())"
 ```
+
+Then get the dataset and LeRobot source onto the remote machine and install the rest:
+```bash
 cd ~/lerobot
 pip install -e .
-pip install 'datasets<=3.6.0'   # same version that used by physical_ai_tools
 ```
 
 ### 4.2 The training command
@@ -251,22 +233,3 @@ python3 -m lerobot.scripts.train \
 EOF
 bash ~/train_cmd.sh
 ```
-
-### 4.3 Live monitoring with Weights & Biases (optional)
-The UI's live loss graph comes from `physical_ai_server` always setting `wandb.enable: false`
-internally — calling the CLI directly, you can turn it on for the same kind of live browser
-dashboard:
-
-```bash
-pip install wandb
-wandb login          # free account, one-time
-```
-Add `--wandb.enable=true --wandb.project=<name>` (already in the command above). The run prints
-a `https://wandb.ai/...` URL — open it for live `train/loss`, `train/lr`, GPU utilization, etc.
-
-> This uploads metrics to a third-party cloud service by default. Use `--wandb.mode=offline` to
-> log locally instead, at the cost of the live browser view.
->
-> The `eval/*` panels seen in LeRobot's own example dashboards (success rate, reward, video)
-> only populate for datasets trained against a simulated `env` — real-robot runs like this one
-> have `env: None`, so those panels simply never appear here. Not a bug.

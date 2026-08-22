@@ -19,7 +19,7 @@ def generate_launch_description():
     map_file = DeclareLaunchArgument(
         "map",
         default_value=PathJoinSubstitution(
-            [pkg_path, "maps", "my_map.yaml"]
+            [pkg_path, "maps", "my_maps_v2.yaml"]
         ),
         description="Full path to the map yaml file",
     )
