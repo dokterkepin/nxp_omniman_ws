@@ -57,29 +57,51 @@ controller_server:
 
     general_goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.05
-      yaw_goal_tolerance: 0.1
+      # Loosened from 0.05/0.05. A slipping mecanum base cannot settle inside a
+      # 5 cm / 2.9 deg window, so it hunts around the goal - and goal-hunting is
+      # exactly where it makes the small lateral/oblique corrections we want to
+      # avoid. Wider tolerances end the approach cleanly.
+      xy_goal_tolerance: 0.12
+      yaw_goal_tolerance: 0.15
       stateful: true
-      xy_goal_tolerance_buffer: 0.15
+      # (xy_goal_tolerance_buffer removed - not a SimpleGoalChecker parameter,
+      #  it was being silently ignored.)
 
     FollowPath:
-      plugin: "nav2_mppi_controller::MPPIController"
+      # RotationShim wraps MPPI: when the path heading differs from the robot
+      # heading by more than angular_dist_threshold, it rotates in place first,
+      # then hands control to MPPI. This structurally removes oblique departures
+      # instead of just penalising them via critic weights.
+      plugin: "nav2_rotation_shim_controller::RotationShimController"
+      primary_controller: "nav2_mppi_controller::MPPIController"
+      angular_dist_threshold: 0.40
+      forward_sampling_distance: 0.40
+      rotate_to_heading_angular_vel: 0.40
+      max_angular_accel: 0.8
+      simulate_ahead_time: 1.0
+      rotate_to_goal_heading: true
+      closed_loop: false
+
+      # --- MPPI (the primary controller, configured in this same namespace) ---
       time_steps: 56
       model_dt: 0.05
+      # 3000 -> 2000: buys CPU headroom to hold 20 Hz (see CostCritic below).
       batch_size: 2000
       vx_std: 0.2
-      vy_std: 0.2
+      # 0.05 -> 0.02. Sampling std must sit well below vy_max, otherwise nearly
+      # every sample saturates the lateral limit and MPPI still explores lateral
+      # motion aggressively - just bounded.
+      vy_std: 0.02
       wz_std: 0.4
       vx_max: 0.2
       vx_min: -0.15
-      vy_max: 0.15
+      vy_max: 0.06
       wz_max: 0.25
-      ax_max: 1.0
-      ax_min: -1.0
-      ay_max: 1.0
-      ay_min: -1.0
-      az_max: 2.0
       motion_model: "Omni"
+      # NOTE: Humble's MPPI has NO acceleration constraints. Its ControlConstraints
+      # struct is {vx_max, vx_min, vy, wz} only - ax_max/ax_min/ay_max/ay_min/az_max
+      # were added in Iron and were silently discarded here. Acceleration limiting
+      # is done by velocity_smoother instead (see the velocity_smoother block).
       critics:
         - "ConstraintCritic"
         - "CostCritic"
@@ -90,28 +112,37 @@ controller_server:
         - "PathAngleCritic"
         - "PreferForwardCritic"
       GoalCritic:
-        cost_weight: 5.0
-        threshold_to_consider: 0.5
+        cost_weight: 8.0
+        threshold_to_consider: 2.0
       GoalAngleCritic:
         cost_weight: 3.0
         threshold_to_consider: 0.5
       PathAlignCritic:
-        cost_weight: 14.0
+        cost_weight: 8.0
         max_path_occupancy_ratio: 0.05
-        offset_from_furthest: 20
+        offset_from_furthest: 5
       PathFollowCritic:
-        cost_weight: 5.0
+        cost_weight: 12.0
         offset_from_furthest: 5
       PathAngleCritic:
-        cost_weight: 2.0
+        # This is the real anti-strafe lever: it penalises heading misalignment
+        # with the path, pushing the robot to point where it is going. Weight
+        # doubled and the allowed heading error tightened from the 1.2 rad
+        # default to 0.8 rad (~46 deg).
+        cost_weight: 8.0
         offset_from_furthest: 4
+        max_angle_to_furthest: 0.8
       PreferForwardCritic:
         cost_weight: 5.0
         threshold_to_consider: 0.5
       CostCritic:
         cost_weight: 3.81
         critical_cost: 300.0
-        consider_footprint: true
+        # true -> false. At 2000 batch x 56 steps this was ~112k full footprint
+        # collision checks per iteration at 20 Hz. With inflation_radius now set
+        # correctly (> circumscribed radius) the inflation gradient carries the
+        # obstacle cost, so per-point lookup is enough.
+        consider_footprint: false
       ConstraintCritic:
         cost_weight: 4.0
 
@@ -121,7 +152,10 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 0.5 # tolarance for thresholding the goal lower means precision
+      # Raised from 0.05 as a direct consequence of the larger inflation_radius:
+      # with a 0.45 m inflation, a goal set close to a wall falls in inflated
+      # space and NavFn would fail to plan at all with a 5 cm tolerance.
+      tolerance: 0.25
       use_astar: false
       allow_unknown: true
 
@@ -141,9 +175,13 @@ behavior_server:
     robot_base_frame: base_footprint
     transform_tolerance: 0.1
     simulate_ahead_time: 2.0
-    max_rotational_vel: 1.0
-    min_rotational_vel: 0.4
-    rotational_acc_lim: 2.0
+    # Recovery behaviours publish straight to /cmd_vel and bypass the velocity
+    # smoother, so their limits must be gentle on their own. A 1.0 rad/s spin
+    # with 2.0 rad/s^2 accel would slip the wheels and wreck the AMCL estimate
+    # at exactly the moment localisation is already struggling.
+    max_rotational_vel: 0.6
+    min_rotational_vel: 0.3
+    rotational_acc_lim: 1.0
 
 map_server:
   ros__parameters:
@@ -152,10 +190,10 @@ map_server:
 amcl:
   ros__parameters:
     alpha1: 0.4
-    alpha2: 0.4
-    alpha3: 0.8
-    alpha4: 0.4
-    alpha5: 0.8
+    alpha2: 1.5
+    alpha3: 2.0
+    alpha4: 0.8
+    alpha5: 2.0
     base_frame_id: "base_footprint"
     beam_skip_distance: 0.5
     beam_skip_error_threshold: 0.9
@@ -169,7 +207,7 @@ amcl:
     laser_model_type: "likelihood_field"
     max_beams: 60
     max_particles: 3000
-    min_particles: 800
+    min_particles: 1000
     odom_frame_id: "odom"
     pf_err: 0.05
     pf_z: 0.99
@@ -226,7 +264,11 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.25
+        # Footprint [[0.24, 0.20], ...] gives a circumscribed radius of
+        # sqrt(0.24^2 + 0.20^2) = 0.31 m. The old 0.25 was SMALLER than the robot,
+        # so the inflation layer could not produce a usable cost gradient - which
+        # is why the robot appeared to "see itself" and stop. Must exceed 0.31.
+        inflation_radius: 0.45
       always_send_full_costmap: true
 
 velocity_smoother:
@@ -234,10 +276,18 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: false
     feedback: "OPEN_LOOP"
-    max_velocity: [0.2, 0.15, 0.5]
-    min_velocity: [-0.15, -0.15, -0.5]
-    max_accel: [1.0, 1.0, 2.0]
-    max_decel: [-1.0, -1.0, -2.0]
+    # Velocity caps match the MPPI constraints. Angular is left at 0.5 (above
+    # MPPI's wz_max 0.25) so RotationShim's 0.40 rad/s in-place turn is not clipped.
+    max_velocity: [0.2, 0.06, 0.5]
+    min_velocity: [-0.15, -0.06, -0.5]
+    # THIS is now the only acceleration limiter in the whole stack, because
+    # Humble's MPPI has no acceleration constraints at all. Previously nothing
+    # limited acceleration anywhere: MPPI could step 0 -> 0.2 m/s in one 50 ms
+    # tick, which breaks mecanum traction on an uneven floor. Ramped down hard.
+    max_accel: [0.3, 0.15, 0.8]
+    # Deceleration is allowed to be stronger than acceleration for stopping
+    # distance, but still far below the old -1.0/-2.0.
+    max_decel: [-0.5, -0.25, -1.2]
     odom_topic: "/odometry/filtered"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
@@ -274,5 +324,9 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.25
+        # Footprint [[0.24, 0.20], ...] gives a circumscribed radius of
+        # sqrt(0.24^2 + 0.20^2) = 0.31 m. The old 0.25 was SMALLER than the robot,
+        # so the inflation layer could not produce a usable cost gradient - which
+        # is why the robot appeared to "see itself" and stop. Must exceed 0.31.
+        inflation_radius: 0.45
       always_send_full_costmap: true

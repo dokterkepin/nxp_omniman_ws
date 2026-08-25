@@ -19,7 +19,7 @@ def generate_launch_description():
     map_file = DeclareLaunchArgument(
         "map",
         default_value=PathJoinSubstitution(
-            [pkg_path, "maps", "my_maps_v2.yaml"]
+            [pkg_path, "maps", "my_map_v3.yaml"]
         ),
         description="Full path to the map yaml file",
     )
@@ -64,7 +64,7 @@ def generate_launch_description():
             "base_frame_id": "base_footprint",
             "odom_frame_id": "odom",
             "init_pose_from_topic": "",
-            "freq": 20.0,
+            "freq": 12.0,
         }],
     )
 
@@ -92,14 +92,41 @@ def generate_launch_description():
         }.items(),
     )
 
-    # --- Navigation nodes (no velocity_smoother, no cmd_vel_nav remap) ---
+    # --- Navigation nodes ---
+    #
+    # cmd_vel chain (mirrors upstream nav2_bringup/navigation_launch.py):
+    #   controller_server --> /cmd_vel_nav --> velocity_smoother --> /cmd_vel
+    #                                                                   |
+    #                                              twist_to_twist_stamped
+    #                                                                   v
+    #                                                        /cmd_vel_stamped
+    #
+    # The smoother is what enforces acceleration limits: Humble's MPPI has no
+    # acceleration constraints of its own, so without this node nothing in the
+    # stack limits how fast the base is asked to change speed.
+    #
+    # Recovery behaviours (spin/backup) publish straight to /cmd_vel and
+    # deliberately bypass the smoother, so their limits are set directly in
+    # the behavior_server block of nav2_params.yaml.
 
     controller_server = Node(
         package="nav2_controller",
         executable="controller_server",
         output="screen",
         parameters=[configured_params],
-        remappings=remappings,
+        remappings=remappings + [("cmd_vel", "cmd_vel_nav")],
+    )
+
+    velocity_smoother = Node(
+        package="nav2_velocity_smoother",
+        executable="velocity_smoother",
+        name="velocity_smoother",
+        output="screen",
+        parameters=[configured_params],
+        remappings=remappings + [
+            ("cmd_vel", "cmd_vel_nav"),
+            ("cmd_vel_smoothed", "cmd_vel"),
+        ],
     )
 
     planner_server = Node(
@@ -152,6 +179,7 @@ def generate_launch_description():
                 "behavior_server",
                 "bt_navigator",
                 "waypoint_follower",
+                "velocity_smoother",
             ],
         }],
     )
@@ -190,6 +218,7 @@ def generate_launch_description():
         behavior_server,
         bt_navigator,
         waypoint_follower,
+        velocity_smoother,
         lifecycle_manager,
         twist_relay,
         rviz_node,

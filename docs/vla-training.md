@@ -21,16 +21,6 @@ the task, so no data collection and no training. See
 ROBOTIS vendors. `physical_ai_tools` ships its own LeRobot as a submodule at
 `../physical_ai_tools/lerobot`, built from source — that is the copy everything must import,
 or the versions silently diverge.
-
-There are **two ways** to make that copy importable, and they are alternatives — you only need
-one:
-
-**Option A — `PYTHONPATH` (used on the robot PC).** Add to `.bashrc`:
-```bash
-export PYTHONPATH=/home/dokterkepin/anaconda3/envs/lerobot_train/lib/python3.10/site-packages:/home/dokterkepin/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot/src:$PYTHONPATH
-```
-
-**Option B — editable install (used on the remote training machine, §5).**
 ```bash
 cd .../physical_ai_tools/lerobot
 pip install -e .
@@ -202,12 +192,6 @@ independent of this project's ROS distro
 ```bash
 pip3 install torch torchvision
 ```
-
-verify:
-```bash
-python3 -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.device_count())"
-```
-
 Then get the dataset and LeRobot source onto the remote machine and install the rest:
 ```bash
 cd ~/lerobot

@@ -17,15 +17,13 @@ Run it (after `colcon build` + sourcing the workspace):
 """
 
 import rclpy
-from rclpy.duration import Duration
+import math
+import time
 from geometry_msgs.msg import PoseStamped
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 
 
 def make_pose(navigator, x, y, yaw_deg=0.0, frame_id="map"):
-    """Build a PoseStamped goal in the map frame from x, y and a yaw in degrees."""
-    import math
-
     pose = PoseStamped()
     pose.header.frame_id = frame_id
     pose.header.stamp = navigator.get_clock().now().to_msg()
@@ -47,35 +45,45 @@ def main():
     # need to call setInitialPose(). Only AMCL needs an initial pose. Uncomment
     # the block below if you switch to AMCL localization on a saved map.
     #
-    # initial = make_pose(navigator, 0.0, 0.0, 0.0)
-    # navigator.setInitialPose(initial)
+    initial = make_pose(navigator, 0.0, 0.0, 0.0)
+    navigator.setInitialPose(initial)
 
     navigator.waitUntilNav2Active()  # blocks until planner/controller/bt are active
 
     # ---- 2. Send a single goal ---------------------------------------------
-    goal = make_pose(navigator, 1.0, -2.0, yaw_deg=0.0)
+    for i in range(100):
+        navigator.get_logger().info(f"=== Iteration {i} ===")
 
-    navigator.goToPose(goal)
+        goal1 = make_pose(navigator, 0.0, 0.0, yaw_deg=0.0)
+        navigator.goToPose(goal1)
+        # ---- 3. Spin while the task runs, reading live feedback -----------------
+        while not navigator.isTaskComplete():
+            feedback = navigator.getFeedback()
+            if feedback:
+                remaining = feedback.distance_remaining
+                navigator.get_logger().info(f"Distance remaining: {remaining:.2f} m")
 
-    # ---- 3. Spin while the task runs, reading live feedback -----------------
-    while not navigator.isTaskComplete():
-        feedback = navigator.getFeedback()
-        if feedback:
-            remaining = feedback.distance_remaining
-            navigator.get_logger().info(f"Distance remaining: {remaining:.2f} m")
+        result1 = navigator.getResult()
+        if result1 == TaskResult.SUCCEEDED:
+            navigator.get_logger().info("System Success.")
+            time.sleep(2.0)
+        elif result1 == TaskResult.CANCELED:
+            navigator.get_logger().warn("System Failed.")
 
-            # Example of a timeout / cancel policy: bail out after 90 s.
-            if Duration.from_msg(feedback.navigation_time) > Duration(seconds=90.0):
-                navigator.cancelTask()
+        goal2 = make_pose(navigator, 1.0, -1.0, yaw_deg=90.0)
+        navigator.goToPose(goal2)
+        while not navigator.isTaskComplete():
+            feedback = navigator.getFeedback()
+            if feedback:
+                remaining = feedback.distance_remaining
+                navigator.get_logger().info(f"Distance remaining: {remaining:.2f} m")
 
-    # ---- 4. Check how it ended ---------------------------------------------
-    result = navigator.getResult()
-    if result == TaskResult.SUCCEEDED:
-        navigator.get_logger().info("Goal reached.")
-    elif result == TaskResult.CANCELED:
-        navigator.get_logger().warn("Goal was canceled.")
-    elif result == TaskResult.FAILED:
-        navigator.get_logger().error("Goal failed (planner/controller could not reach it).")
+        result2 = navigator.getResult()
+        if result2 == TaskResult.SUCCEEDED:
+            navigator.get_logger().info("System Success.")
+            time.sleep(2.0)
+        elif result2 == TaskResult.CANCELED:
+            navigator.get_logger().warn("System Failed.")
 
     # ---- 5. (Optional) Patrol through several waypoints ---------------------
     # waypoints = [
