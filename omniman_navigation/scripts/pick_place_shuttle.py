@@ -101,7 +101,11 @@ class Actuator:
         self.fps = fps
         self.owner = Owner.NONE
 
-    def _call(self, request, what):
+    # physical_ai_server rejects every command when nothing is running, with this
+    # message. For a preventive stop that is the expected answer, not a failure.
+    IDLE_MESSAGE = 'Not currently recording'
+
+    def _call(self, request, what, idle_ok=False):
         future = self.client.call_async(request)
         rclpy.spin_until_future_complete(self.navigator, future, timeout_sec=15.0)
         result = future.result()
@@ -109,22 +113,42 @@ class Actuator:
             self.navigator.get_logger().error(f'{what}: /task/command timed out')
             return False
         if not result.success:
+            if idle_ok and self.IDLE_MESSAGE in result.message:
+                # Nothing was running -- the goal (policy stopped) already holds.
+                self.navigator.get_logger().info(f'{what}: nothing to stop')
+                return True
             self.navigator.get_logger().error(f'{what}: refused -- {result.message}')
             return False
         self.navigator.get_logger().info(f'{what}: {result.message}')
         return True
 
+    def stop_policy(self):
+        """Stop inference on the server.
+
+        Must be FINISH, not STOP: physical_ai_server's STOP only calls
+        record_stop() and replies 'Recording stopped' -- it never clears
+        on_inference, so the policy keeps publishing to the arm. FINISH is the
+        only command that sets on_inference = False.
+
+        Sent unconditionally rather than only when this script started the policy,
+        because inference may already be running from the web UI when we launch.
+        idle_ok: an idle server refuses it, which for a preventive stop is success.
+        """
+        req = SendCommand.Request()
+        req.command = SendCommand.Request.FINISH
+        return self._call(req, 'policy finish', idle_ok=True)
+
     def release(self):
-        """Stop whichever subsystem holds the robot. Safe to call in any state."""
-        if self.owner is Owner.NAV:
-            # No-op if the goal already finished, so this is safe after a normal
-            # arrival as well as mid-drive.
-            self.navigator.cancelTask()
-            self.navigator.get_logger().info('nav: released')
-        elif self.owner is Owner.POLICY:
-            req = SendCommand.Request()
-            req.command = SendCommand.Request.STOP
-            self._call(req, 'policy stop')
+        """Stop BOTH subsystems, regardless of what this script thinks it owns.
+
+        Deliberately unconditional rather than keyed off self.owner: inference may
+        already be running from the web UI when this script starts, in which case
+        owner is NONE and an ownership-keyed release would drive off with the arm
+        still live. Both calls are safe no-ops when idle -- cancelTask() guards on
+        result_future, and FINISH just returns 'Not currently recording'.
+        """
+        self.navigator.cancelTask()
+        self.stop_policy()
         self.owner = Owner.NONE
 
     def navigate(self, pose_cfg, label):

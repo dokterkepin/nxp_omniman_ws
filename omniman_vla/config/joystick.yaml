@@ -49,5 +49,9 @@ teleop_twist_joy_node:
     enable_button: 6        # LB — hold to move
     enable_turbo_button: 7  # RB — hold for turbo
 
-    # Official mecanum_drive_controller expects TwistStamped
-    publish_stamped_twist: true
+    # false -> publishes geometry_msgs/Twist on /cmd_vel, the topic the mecanum
+    # controller now reads (use_stamped_vel: false in controllers_vla.yaml) AND the
+    # topic physical_ai_server records as the base action. Was true (TwistStamped on
+    # /cmd_vel_stamped), which drove the robot fine but bypassed /cmd_vel entirely,
+    # so base motion could never be recorded into the dataset.
+    publish_stamped_twist: false

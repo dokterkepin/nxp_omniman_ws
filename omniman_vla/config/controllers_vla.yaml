@@ -35,6 +35,17 @@ mecanum_drive_controller:
     enable_odom_tf: false
     reference_timeout: 10.0
 
+    # false -> the controller subscribes to ~/reference_unstamped (plain Twist),
+    # remapped to /cmd_vel in the launch file. true would use ~/reference
+    # (TwistStamped); the two subscribers are mutually exclusive, only one is
+    # created. Unstamped is required here because it puts the joystick, Nav2, and
+    # the VLA policy on ONE topic carrying ONE message type:
+    #   joystick / nav2 collision_monitor / ACT policy -> /cmd_vel -> controller
+    # That single topic is also what physical_ai_server records as the base action
+    # (leader_mobile:/cmd_vel, geometry_msgs/Twist) and republishes at inference,
+    # so the recorded action and the deployed command are the same signal.
+    use_stamped_vel: false
+
     pose_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.01]
     twist_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.01]
 

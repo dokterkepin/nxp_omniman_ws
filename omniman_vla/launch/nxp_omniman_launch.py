@@ -97,11 +97,15 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_joy')),
     )
 
+    # No cmd_vel remap: the joystick publishes plain Twist straight onto /cmd_vel,
+    # which is now both what the mecanum controller reads (reference_unstamped) and
+    # what physical_ai_server records as the base action (leader_mobile:/cmd_vel).
+    # Previously remapped to /cmd_vel_stamped, which drove the robot but bypassed
+    # /cmd_vel, so base motion never reached the dataset.
     teleop_joy_node = Node(
         package='teleop_twist_joy',
         executable='teleop_node',
         parameters=[joystick_config],
-        remappings=[('/cmd_vel', '/cmd_vel_stamped')],
         condition=IfCondition(LaunchConfiguration('use_joy')),
     )
 

@@ -34,13 +34,31 @@ physical_ai_server:
         - cam:/image_raw/compressed
         # - cam_workspace:/cam_workspace/image_raw/compressed
 
+      # MOBILE BASE (leader_mobile / follower_mobile): communicator.py keys off the
+      # substring 'mobile' in the name -- leader_mobile subscribes as Twist (and
+      # PUBLISHES Twist at inference), follower_mobile subscribes as Odometry.
+      # data_converter maps both to [linear.x, linear.y, angular.z].
+      # Same pattern as ROBOTIS's own ffw_sg2_rev1_config.yaml.
+      #
+      # /cmd_vel carries plain Twist from whichever source is active (joystick while
+      # recording, the policy at inference, Nav2 while navigating) and feeds the
+      # controller's reference_unstamped. Recorded action == deployed command.
+      # follower_mobile reads wheel odometry from the controller rather than
+      # /odometry/filtered, because the EKF only runs when nav2_launch is up and
+      # recording happens without it.
       joint_topic_list:
         - follower:/joint_states
+        - follower_mobile:/mecanum_drive_controller/odometry
         - leader:/leader/joint_trajectory
+        - leader_mobile:/cmd_vel
 
       joint_list:
         - leader
+        - leader_mobile
 
+      # Order matters: total_joint_order is the concatenation of these lists, and
+      # the state vector is assembled in the same order from the follower topics.
+      # action = 7 arm/gripper + 3 base = 10; state likewise.
       joint_order:
         leader:
           - shoulder_yaw_joint
@@ -50,3 +68,7 @@ physical_ai_server:
           - wrist_pitch_joint
           - palm_yaw_joint
           - gripper_prismatic_joint
+        leader_mobile:
+          - linear_x
+          - linear_y
+          - angular_z
