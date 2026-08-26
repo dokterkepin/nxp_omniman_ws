@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """
 Fixed home <-> target shuttle: drive out, pick, drive back, place.
-
     HOME (0, 0, 0)  --drive-->  TARGET (-1, 1, 0)  --policy: pick-->
-                                                          |
     HOME (0, 0, 0)  <--policy: place--  <--drive--  TARGET
+
+Runs as an explicit state machine:
+
+Navigation and inference are strictly mutually exclusive. Nav2 drives the base
+over /cmd_vel while the policy drives the arm over /leader/joint_trajectory --
+different actuators, so nothing at the topic level stops both running at once.
+Actuator is the arbiter: acquiring one releases the other first, and every exit
+path (failure, Ctrl-C, crash) releases both.
 
 No language resolution, no locations.yaml -- the two poses are hardcoded below
 because for this run they're fixed and known. This is the simple counterpart to
@@ -32,6 +38,7 @@ Run:
 
 import math
 import time
+from enum import Enum, auto
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
@@ -40,6 +47,31 @@ from physical_ai_interfaces.srv import SendCommand
 
 HOME = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}
 TARGET = {'x': 1.0, 'y': -1.0, 'yaw': -100.0}
+
+
+class State(Enum):
+    """Mission progress. Each state hands off to the next, or to ABORT."""
+
+    NAV_TO_TARGET = auto()
+    PICK = auto()
+    NAV_TO_HOME = auto()
+    PLACE = auto()
+    DONE = auto()
+    ABORT = auto()
+
+
+class Owner(Enum):
+    """Which subsystem is currently allowed to actuate.
+
+    Nav2 drives the base over /cmd_vel; the policy drives the arm over
+    /leader/joint_trajectory. Different actuators, so nothing at the topic level
+    stops both running at once -- the base could drive with the arm live, or the
+    arm manipulate while the base creeps. This is what makes them exclusive.
+    """
+
+    NONE = auto()
+    NAV = auto()
+    POLICY = auto()
 
 
 def make_pose(navigator, x, y, yaw_deg=0.0, frame_id='map'):
@@ -55,68 +87,124 @@ def make_pose(navigator, x, y, yaw_deg=0.0, frame_id='map'):
     return pose
 
 
-def drive_to(navigator, pose_cfg, label):
-    navigator.get_logger().info(
-        f'-> driving to {label}  (x={pose_cfg["x"]:.2f}, y={pose_cfg["y"]:.2f}, '
-        f'yaw={pose_cfg["yaw"]:.0f})')
+class Actuator:
+    """Arbiter that guarantees navigation and inference are never both active.
 
-    navigator.goToPose(make_pose(navigator, pose_cfg['x'], pose_cfg['y'], pose_cfg['yaw']))
-
-    last_log = 0.0
-    while not navigator.isTaskComplete():
-        feedback = navigator.getFeedback()
-        if feedback and time.time() - last_log > 1.0:
-            navigator.get_logger().info(f'   {feedback.distance_remaining:.2f} m remaining')
-            last_log = time.time()
-
-    result = navigator.getResult()
-    if result != TaskResult.SUCCEEDED:
-        navigator.get_logger().error(f'navigation to {label} did not succeed: {result}')
-        return False
-
-    navigator.get_logger().info(f'arrived at {label}')
-    return True
-
-
-def call_task_command(navigator, client, request):
-    future = client.call_async(request)
-    rclpy.spin_until_future_complete(navigator, future, timeout_sec=15.0)
-    result = future.result()
-    if result is None:
-        navigator.get_logger().error('/task/command call timed out')
-        return False
-    if not result.success:
-        navigator.get_logger().error(f'/task/command refused: {result.message}')
-        return False
-    navigator.get_logger().info(result.message)
-    return True
-
-
-def run_policy(navigator, client, policy_path, instruction, fps, duration_s, label):
-    """Start inference, let it run for a fixed time, then stop.
-
-    physical_ai_server has no "policy finished" signal to wait on -- START_INFERENCE
-    just runs until STOP is sent. duration_s is how long to trust it, not a real
-    completion check.
+    Every acquire releases the other subsystem first, so the invariant holds even
+    when a leg fails partway through or the script is interrupted.
     """
-    req = SendCommand.Request()
-    req.command = SendCommand.Request.START_INFERENCE
-    req.task_info.policy_path = policy_path
-    req.task_info.task_instruction = [instruction]
-    req.task_info.fps = int(fps)
-    req.task_info.record_inference_mode = False
 
-    navigator.get_logger().info(f'{label}: starting policy ({instruction})')
-    if not call_task_command(navigator, client, req):
-        return False
+    def __init__(self, navigator, client, policy_path, fps):
+        self.navigator = navigator
+        self.client = client
+        self.policy_path = policy_path
+        self.fps = fps
+        self.owner = Owner.NONE
 
-    navigator.get_logger().info(f'{label}: running for {duration_s:.0f}s...')
-    time.sleep(duration_s)
+    def _call(self, request, what):
+        future = self.client.call_async(request)
+        rclpy.spin_until_future_complete(self.navigator, future, timeout_sec=15.0)
+        result = future.result()
+        if result is None:
+            self.navigator.get_logger().error(f'{what}: /task/command timed out')
+            return False
+        if not result.success:
+            self.navigator.get_logger().error(f'{what}: refused -- {result.message}')
+            return False
+        self.navigator.get_logger().info(f'{what}: {result.message}')
+        return True
 
-    stop_req = SendCommand.Request()
-    stop_req.command = SendCommand.Request.STOP
-    navigator.get_logger().info(f'{label}: stopping policy')
-    return call_task_command(navigator, client, stop_req)
+    def release(self):
+        """Stop whichever subsystem holds the robot. Safe to call in any state."""
+        if self.owner is Owner.NAV:
+            # No-op if the goal already finished, so this is safe after a normal
+            # arrival as well as mid-drive.
+            self.navigator.cancelTask()
+            self.navigator.get_logger().info('nav: released')
+        elif self.owner is Owner.POLICY:
+            req = SendCommand.Request()
+            req.command = SendCommand.Request.STOP
+            self._call(req, 'policy stop')
+        self.owner = Owner.NONE
+
+    def navigate(self, pose_cfg, label):
+        """Drive to a pose. Blocks until Nav2 finishes. Returns True on success."""
+        self.release()          # inference off before the base moves
+        self.owner = Owner.NAV
+
+        self.navigator.get_logger().info(
+            f'nav -> {label}  (x={pose_cfg["x"]:.2f}, y={pose_cfg["y"]:.2f}, '
+            f'yaw={pose_cfg["yaw"]:.0f})')
+        self.navigator.goToPose(
+            make_pose(self.navigator, pose_cfg['x'], pose_cfg['y'], pose_cfg['yaw']))
+
+        last_log = 0.0
+        while not self.navigator.isTaskComplete():
+            feedback = self.navigator.getFeedback()
+            if feedback and time.time() - last_log > 1.0:
+                self.navigator.get_logger().info(
+                    f'   {feedback.distance_remaining:.2f} m remaining')
+                last_log = time.time()
+
+        result = self.navigator.getResult()
+        self.owner = Owner.NONE  # Nav2 stopped driving on its own
+
+        if result != TaskResult.SUCCEEDED:
+            self.navigator.get_logger().error(f'nav to {label} failed: {result}')
+            return False
+
+        self.navigator.get_logger().info(f'nav: arrived at {label}')
+        return True
+
+    def run_policy(self, instruction, duration_s, label):
+        """Run inference for a fixed time, then stop.
+
+        physical_ai_server has no "policy finished" signal to wait on --
+        START_INFERENCE runs until STOP is sent. duration_s is how long to trust
+        it, not a real completion check.
+        """
+        self.release()          # base stopped before the arm moves
+
+        req = SendCommand.Request()
+        req.command = SendCommand.Request.START_INFERENCE
+        req.task_info.policy_path = self.policy_path
+        req.task_info.task_instruction = [instruction]
+        req.task_info.fps = int(self.fps)
+        req.task_info.record_inference_mode = False
+
+        self.navigator.get_logger().info(f'policy -> {label} ({instruction})')
+        if not self._call(req, f'{label} start'):
+            return False
+
+        self.owner = Owner.POLICY
+        self.navigator.get_logger().info(
+            f'policy: running {label} for {duration_s:.0f}s...')
+        time.sleep(duration_s)
+
+        self.release()
+        return True
+
+
+def run_mission(actuator, pick_duration_s, place_duration_s):
+    """Drive the state machine. Each state returns the next one."""
+    state = State.NAV_TO_TARGET
+
+    while state not in (State.DONE, State.ABORT):
+        if state is State.NAV_TO_TARGET:
+            state = State.PICK if actuator.navigate(TARGET, 'target') else State.ABORT
+
+        elif state is State.PICK:
+            ok = actuator.run_policy('pick the object', pick_duration_s, 'pick')
+            state = State.NAV_TO_HOME if ok else State.ABORT
+
+        elif state is State.NAV_TO_HOME:
+            state = State.PLACE if actuator.navigate(HOME, 'home') else State.ABORT
+
+        elif state is State.PLACE:
+            ok = actuator.run_policy('place the object', place_duration_s, 'place')
+            state = State.DONE if ok else State.ABORT
+
+    return state
 
 
 def main():
@@ -162,20 +250,19 @@ def main():
     navigator.get_logger().info('Waiting for Nav2 to become active...')
     navigator.waitUntilNav2Active()
 
+    actuator = Actuator(navigator, client, policy_path, fps)
     try:
-        if not drive_to(navigator, TARGET, 'target'):
-            return
-        if not run_policy(navigator, client, policy_path, 'pick the object',
-                          fps, pick_duration_s, 'pick'):
-            return
-        if not drive_to(navigator, HOME, 'home'):
-            return
-        run_policy(navigator, client, policy_path, 'place the object',
-                   fps, place_duration_s, 'place')
-        navigator.get_logger().info('Pick-and-place cycle complete.')
+        final = run_mission(actuator, pick_duration_s, place_duration_s)
+        if final is State.DONE:
+            navigator.get_logger().info('Pick-and-place cycle complete.')
+        else:
+            navigator.get_logger().error('Mission aborted.')
     except KeyboardInterrupt:
-        pass
+        navigator.get_logger().warn('Interrupted.')
     finally:
+        # The robot must not be left driving or inferring on any exit path,
+        # including Ctrl-C partway through a policy run.
+        actuator.release()
         navigator.destroy_node()
         rclpy.shutdown()
 

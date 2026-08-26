@@ -16,7 +16,6 @@ install(DIRECTORY
 )
 
 install(PROGRAMS
-  scripts/grasp_stop_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
