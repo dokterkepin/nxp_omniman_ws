@@ -1,0 +1,46 @@
+# Laser filter chain (stock laser_filters package, no custom code).
+#
+#   /scan  ->  scan_to_scan_filter_chain  ->  /scan_filtered
+#
+# Consumed by both costmaps and by nav2_collision_monitor. The collision
+# monitor's scan source has NO range filtering of its own, so anything the
+# lidar sees of the robot itself would sit inside its stop polygon and latch a
+# permanent emergency stop - hence filtering geometrically, here, once.
+#
+# Geometry note: base_footprint -> base_link is "0 0 0.09" (pure Z), so the
+# SolidWorks measurements about base_link apply directly to base_footprint.
+# The base is symmetric: x = +/-0.127, y = +/-0.160.
+#
+# The lidar sits at (-0.070, 0, 0.167) with yaw 0, so the robot's rear edge is
+# only 0.057 m from it - well inside the sensor's 0.15 m range_min. The base is
+# therefore mostly invisible to its own lidar, and this filter will rarely fire.
+# It is kept as correct-by-construction protection for whatever DOES come into
+# view (arm, cabling, payload) rather than as a workaround for a known return.
+
+scan_to_scan_filter_chain:
+  ros__parameters:
+
+    # Remove returns landing inside the physical robot outline.
+    filter1:
+      name: robot_body
+      type: laser_filters/LaserScanPolygonFilter
+      params:
+        polygon_frame: base_footprint
+        polygon: "[[0.127, 0.160], [0.127, -0.160], [-0.127, -0.160], [-0.127, 0.160]]"
+        # Small margin for mounting tolerance and beam width.
+        polygon_padding: 0.02
+        # false = discard points INSIDE the polygon (invert would keep only those).
+        invert: false
+
+    # Drop isolated single-beam returns. These are common on the RPLIDAR at
+    # grazing incidence and would otherwise appear as phantom obstacles that
+    # briefly block the local costmap.
+    filter2:
+      name: speckle
+      type: laser_filters/LaserScanSpeckleFilter
+      params:
+        # 0 = distance-based comparison across the window.
+        filter_type: 0
+        max_range: 2.0
+        max_range_difference: 0.1
+        filter_window: 2

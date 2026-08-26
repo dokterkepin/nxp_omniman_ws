@@ -50,22 +50,26 @@ def generate_launch_description():
 
     remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
 
-    # --- Laser self-filter ---
+    # --- Laser filter chain (stock laser_filters) ---
     #
-    # Masks the robot's own structure out of /scan and republishes as
-    # /scan_filtered. Both costmaps and the collision monitor consume the
-    # filtered topic; without it neither can safely look inside 0.25 m.
+    # /scan -> /scan_filtered. Removes returns inside the robot outline and
+    # single-beam speckle. Config and rationale in config/scan_filter.yaml.
     #
-    # NOTE: rf2o below still consumes raw /scan. The self-returns are perfectly
-    # stationary, so they act as a rigid anchor that biases scan matching toward
-    # "not moving" - switching rf2o to /scan_filtered would likely improve
-    # odometry, but that is a separate change and worth testing on its own.
+    # NOTE: rf2o below deliberately consumes raw /scan, not the filtered topic -
+    # scan matching benefits from every available return, and the speckle filter
+    # would silently change odometry behaviour.
 
-    scan_self_filter = Node(
-        package="omniman_navigation",
-        executable="scan_self_filter.py",
-        name="scan_self_filter",
+    scan_filter_config = PathJoinSubstitution(
+        [pkg_path, "config", "scan_filter.yaml"]
+    )
+
+    scan_filter = Node(
+        package="laser_filters",
+        executable="scan_to_scan_filter_chain",
+        name="scan_to_scan_filter_chain",
         output="screen",
+        parameters=[scan_filter_config],
+        remappings=[("scan", "/scan"), ("scan_filtered", "/scan_filtered")],
     )
 
     # --- Odometry ---
@@ -248,7 +252,7 @@ def generate_launch_description():
     return LaunchDescription([
         map_file,
         nav2_params_file,
-        scan_self_filter,
+        scan_filter,
         rf2o_node,
         ekf_node,
         localization_launch,

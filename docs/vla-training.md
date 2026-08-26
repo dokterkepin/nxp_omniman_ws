@@ -34,6 +34,11 @@ Verify GPU:
 python3 -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
 ```
 
+load the conda environment:
+```bash
+export PYTHONPATH=/home/dokterkepin/anaconda3/envs/lerobot_train/lib/python3.10/site-packages:/home/dokterkepin/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot/src:$PYTHONPATH
+```
+
 ---
 
 ## 1. Bring up the robots

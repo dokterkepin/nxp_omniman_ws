@@ -9,6 +9,10 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- vln_commander.py: triggers the manipulation policy via /task/command -->
+  <exec_depend>physical_ai_interfaces</exec_depend>
+  <exec_depend>nav2_simple_commander</exec_depend>
+
   <exec_depend>rf2o_laser_odometry</exec_depend>
   <exec_depend>robot_localization</exec_depend>
   <exec_depend>slam_toolbox</exec_depend>
@@ -26,6 +30,7 @@
   <exec_depend>nav2_lifecycle_manager</exec_depend>
   <exec_depend>nav2_velocity_smoother</exec_depend>
   <exec_depend>nav2_collision_monitor</exec_depend>
+  <exec_depend>laser_filters</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>nav2_simple_commander</exec_depend>
   <exec_depend>rplidar_ros</exec_depend>

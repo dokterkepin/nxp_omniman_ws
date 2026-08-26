@@ -270,7 +270,12 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.05
-      footprint: "[[0.24, 0.20], [0.24, -0.20], [-0.18, -0.20], [-0.18, 0.20]]"
+      # Measured in SolidWorks from the defined base origin. The base is
+      # symmetric in both axes: x = +/-0.127, y = +/-0.160. base_footprint ->
+      # base_link is "0 0 0.09" (pure Z), so base_link measurements apply
+      # directly here. Replaces an earlier asymmetric guess of
+      # [[0.24, 0.20], [0.24, -0.20], [-0.18, -0.20], [-0.18, 0.20]].
+      footprint: "[[0.127, 0.160], [0.127, -0.160], [-0.127, -0.160], [-0.127, 0.160]]"
       plugins: ["obstacle_layer", "inflation_layer"] # inflation robot will stop it saw itself nearthis parameter
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -278,10 +283,8 @@ local_costmap:
         footprint_clearing_enabled: true
         observation_sources: scan
         scan:
-          # /scan_filtered comes from scan_self_filter.py, which masks the
-          # robot's own structure (two rigid clusters at ~0.19 m and ~0.21 m,
-          # bearings -170..-158 and +144..+162). Masking those by BEARING is
-          # what lets the min ranges below drop to the sensor floor.
+          # /scan_filtered comes from the stock laser_filters chain
+          # (config/scan_filter.yaml): robot-outline polygon + speckle removal.
           topic: /scan_filtered
           max_obstacle_height: 2.0
           clearing: true
@@ -299,11 +302,12 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        # Footprint [[0.24, 0.20], ...] gives a circumscribed radius of
-        # sqrt(0.24^2 + 0.20^2) = 0.31 m. The old 0.25 was SMALLER than the robot,
-        # so the inflation layer could not produce a usable cost gradient - which
-        # is why the robot appeared to "see itself" and stop. Must exceed 0.31.
-        inflation_radius: 0.45
+        # Must exceed the circumscribed radius or the inflation layer cannot
+        # produce a usable cost gradient. With the measured footprint that is
+        # sqrt(0.127^2 + 0.160^2) = 0.204 m - considerably smaller than the
+        # 0.31 m implied by the earlier guessed footprint, so this comes down
+        # from 0.45 and is less likely to make doorways unplannable.
+        inflation_radius: 0.35
       always_send_full_costmap: true
 
 velocity_smoother:
@@ -392,14 +396,16 @@ collision_monitor:
     # threshold parameter is max_points (newer Nav2 renamed it to min_points and
     # switched to a nested string - neither works here).
     #
-    # Footprint is x: -0.18..0.24, y: +/-0.20. The stop zone clears it by a few
-    # cm all round. At vx_max 0.2 m/s and max_decel 0.5 m/s^2 the stopping
-    # distance is only ~4 cm, so this is a generous margin.
     # Last-resort backstop for anything "approach" misses (a sensor glitch, or
-    # an obstacle appearing inside the prediction horizon). Deliberately HUGS
-    # the footprint: y is +/-0.21 against a footprint half-width of 0.20, so an
-    # object 2 cm off the flank no longer stops the robot, while something
-    # genuinely touching it still does.
+    # an obstacle appearing inside the prediction horizon).
+    #
+    # Measured footprint is x: +/-0.127, y: +/-0.160 (SolidWorks, symmetric).
+    # Against that, this zone clears the chassis by ~5 cm on the flanks and
+    # ~7 cm at the rear, and reaches 0.30 m forward. At vx_max 0.2 m/s and
+    # max_decel 0.5 m/s^2 the stopping distance is only ~4 cm, so the forward
+    # margin is generous. Note these numbers were originally chosen against a
+    # larger guessed footprint, so they are now more conservative than intended
+    # rather than tighter - safe, but worth revisiting if the robot proves shy.
     PolygonStop:
       type: "polygon"
       points: [0.30, 0.21, 0.30, -0.21, -0.20, -0.21, -0.20, 0.21]
@@ -424,8 +430,17 @@ collision_monitor:
       enabled: true
 
     PolygonSlowFar:
+      # Rear extent pulled in from -0.26 to -0.20. This is a judgement call, not
+      # a bug fix: a zone reaching 13 cm behind a robot that almost always drives
+      # forward mostly just triggers when reversing near furniture. -0.20 still
+      # clears the chassis rear (-0.127) by 7 cm.
+      #
+      # (An earlier version of this comment justified the change by claiming
+      # fixed structure sat ~12 cm behind the base. That was wrong - those
+      # returns were environment, confirmed by scan_origin_test.py: they came
+      # and went while the robot drove, which robot-mounted structure cannot do.)
       type: "polygon"
-      points: [1.00, 0.36, 1.00, -0.36, -0.26, -0.36, -0.26, 0.36]
+      points: [1.00, 0.36, 1.00, -0.36, -0.20, -0.36, -0.20, 0.36]
       action_type: "slowdown"
       slowdown_ratio: 0.65
       max_points: 3
@@ -449,7 +464,12 @@ global_costmap:
       publish_frequency: 2.0
       global_frame: map
       robot_base_frame: base_footprint
-      footprint: "[[0.24, 0.20], [0.24, -0.20], [-0.18, -0.20], [-0.18, 0.20]]"
+      # Measured in SolidWorks from the defined base origin. The base is
+      # symmetric in both axes: x = +/-0.127, y = +/-0.160. base_footprint ->
+      # base_link is "0 0 0.09" (pure Z), so base_link measurements apply
+      # directly here. Replaces an earlier asymmetric guess of
+      # [[0.24, 0.20], [0.24, -0.20], [-0.18, -0.20], [-0.18, 0.20]].
+      footprint: "[[0.127, 0.160], [0.127, -0.160], [-0.127, -0.160], [-0.127, 0.160]]"
       resolution: 0.05
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
@@ -462,10 +482,8 @@ global_costmap:
         footprint_clearing_enabled: true
         observation_sources: scan
         scan:
-          # /scan_filtered comes from scan_self_filter.py, which masks the
-          # robot's own structure (two rigid clusters at ~0.19 m and ~0.21 m,
-          # bearings -170..-158 and +144..+162). Masking those by BEARING is
-          # what lets the min ranges below drop to the sensor floor.
+          # /scan_filtered comes from the stock laser_filters chain
+          # (config/scan_filter.yaml): robot-outline polygon + speckle removal.
           topic: /scan_filtered
           max_obstacle_height: 2.0
           clearing: true
@@ -483,9 +501,10 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        # Footprint [[0.24, 0.20], ...] gives a circumscribed radius of
-        # sqrt(0.24^2 + 0.20^2) = 0.31 m. The old 0.25 was SMALLER than the robot,
-        # so the inflation layer could not produce a usable cost gradient - which
-        # is why the robot appeared to "see itself" and stop. Must exceed 0.31.
-        inflation_radius: 0.45
+        # Must exceed the circumscribed radius or the inflation layer cannot
+        # produce a usable cost gradient. With the measured footprint that is
+        # sqrt(0.127^2 + 0.160^2) = 0.204 m - considerably smaller than the
+        # 0.31 m implied by the earlier guessed footprint, so this comes down
+        # from 0.45 and is less likely to make doorways unplannable.
+        inflation_radius: 0.35
       always_send_full_costmap: true

@@ -154,6 +154,13 @@ def generate_launch_description():
         output="screen",
     )
 
+    teleop_inference_node = Node(
+        package='leader_ros2_control',
+        executable='teleop_bridges_launch.py',
+        name='teleop_inference',
+        output='screen',
+    )
+
     return LaunchDescription(
         [
             use_joy_arg,
@@ -167,5 +174,6 @@ def generate_launch_description():
             usb_cam,
             rplidar_node,
             # workspace_cam,
+            teleop_inference_node,
         ]
     )
