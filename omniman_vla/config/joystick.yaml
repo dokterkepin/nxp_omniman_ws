@@ -33,11 +33,11 @@ teleop_twist_joy_node:
       x: 1           # left stick up/down → forward/backward
       y: 0           # left stick left/right → strafe left/right
     scale_linear:
-      x: 0.5         # max linear X speed (m/s)
+      x: 0.5        # max linear X speed (m/s)
       y: 0.5         # max linear Y speed (m/s)
     scale_linear_turbo:
-      x: 1.0
-      y: 1.0
+      x: 1.5
+      y: 1.5
 
     axis_angular:
       yaw: 2         # right stick left/right → rotation

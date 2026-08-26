@@ -11,6 +11,7 @@ install(DIRECTORY
   config
   launch
   maps
+  behavior_trees
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -18,6 +19,7 @@ install(PROGRAMS
   scripts/twist_to_twist_stamped.py
   scripts/nav_commander.py
   scripts/get_robot_pose.py
+  scripts/scan_self_filter.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -9,21 +9,62 @@ ekf_filter_node:
     world_frame: odom
     map_frame: map
 
-    # Wheel odometry input
+    # --------------------------------------------------------------------
+    # Each sensor is given the job it is actually good at:
+    #   wheels measure VELOCITY,  laser measures POSE.
+    #
+    # Measured on the real robot, the two sources disagreed by 10.5 m and
+    # 103 deg about the same odom -> base_footprint displacement:
+    #
+    #   /mecanum_drive_controller/odometry : (-8.177,  4.145)  yaw -145.8 deg
+    #   /odom_rf2o                         : ( 1.309, -0.419)  yaw  -42.4 deg
+    #
+    # AMCL was absorbing the difference: map -> odom sat at [4.984, 6.334]
+    # with 86.8 deg of yaw error, corrected every cycle.
+    #
+    # Two bugs caused that, and they compounded:
+    #
+    #  1. Wheel odometry pose was fused as ABSOLUTE (x/y/yaw true with
+    #     differential:false). On a mecanum base that slips, integrated wheel
+    #     position accumulates unbounded error, and absolute fusion dragged
+    #     the filter along with it permanently.
+    #
+    #  2. Both sources fused a quantity AND its own derivative (pose plus
+    #     velocity from the same sensor). robot_localization warns against
+    #     this explicitly: the filter counts the same information twice and
+    #     grows overconfident exactly when it should widen its covariance.
+    # --------------------------------------------------------------------
+
+    # Wheel odometry: VELOCITIES ONLY (vx, vy, vyaw).
+    # Encoders report wheel rotation rate honestly over short windows. Their
+    # integrated position is worthless here, so none of the pose fields are
+    # fused. High rate, fills the gaps between 13 Hz laser scans.
     odom0: /mecanum_drive_controller/odometry
-    odom0_config: [true,  true,  false,
-                   false, false, true,
+    odom0_config: [false, false, false,
+                   false, false, false,
                    true,  true,  false,
                    false, false, true,
                    false, false, false]
     odom0_differential: false
+    odom0_relative: false
+    odom0_queue_size: 10
+    odom0_nodelay: true
 
-    # Laser odometry input
+    # Laser odometry: POSE ONLY (x, y, yaw), differential.
+    # Scan matching does not care whether the wheels slipped, so this is the
+    # drift-resistant reference. differential:true integrates pose DELTAS
+    # rather than trusting rf2o's absolute frame origin.
+    #
+    # NOTE: _relative was true alongside _differential. Those are two separate
+    # mechanisms for the same goal and should not both be enabled - differential
+    # mode already handles the relative case.
     odom1: /odom_rf2o
     odom1_config: [true,  true,  false,
                    false, false, true,
-                   true,  true,  false,
-                   false, false, true,
+                   false, false, false,
+                   false, false, false,
                    false, false, false]
     odom1_differential: true
-    odom1_relative: true
+    odom1_relative: false
+    odom1_queue_size: 10
+    odom1_nodelay: true

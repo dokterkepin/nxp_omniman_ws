@@ -1,0 +1,66 @@
+<!--
+  Service-robot navigate_through_poses tree (restaurant / food-delivery style).
+
+  Companion to navigate_to_pose_service_robot.xml - BOTH trees must exist,
+  because bt_navigator loads both at activation and a failure in either one
+  blocks the whole node.
+
+  Adapted from the stock navigate_through_poses_w_replanning_and_recovery.xml:
+
+  1. NO <Spin> recovery, for the same reason as the nav_to_pose tree: recovery
+     behaviours bypass the velocity smoother AND the collision monitor, so a
+     spin rotates the robot blind next to whoever is blocking it.
+
+     This is not merely a preference - it is REQUIRED once "spin" is removed
+     from behavior_plugins in nav2_params.yaml. Nav2's BtActionNode waits for
+     its action server inside the CONSTRUCTOR, i.e. at tree-load time, so a
+     <Spin> node with no /spin action server throws:
+
+         Exception when loading BT: Action server spin not available
+
+     which fails the whole XML load and leaves bt_navigator stuck in the
+     inactive state, stalling the lifecycle manager and everything after it.
+
+  2. Recovery order is clear -> wait -> wait -> back up.
+
+  3. Replanning raised from 0.333 Hz to 1.0 Hz so multi-waypoint routes
+     re-route around people rather than every three seconds.
+-->
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+      <PipelineSequence name="NavigateWithReplanning">
+        <RateController hz="1.0">
+          <RecoveryNode number_of_retries="1" name="ComputePathThroughPoses">
+            <ReactiveSequence>
+              <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.7"/>
+              <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+            </ReactiveSequence>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Context"
+                                service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        </RateController>
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <ClearEntireCostmap name="ClearLocalCostmap-Context"
+                              service_name="local_costmap/clear_entirely_local_costmap"/>
+        </RecoveryNode>
+      </PipelineSequence>
+
+      <ReactiveFallback name="RecoveryFallback">
+        <GoalUpdated/>
+        <RoundRobin name="RecoveryActions">
+          <Sequence name="ClearingActions">
+            <ClearEntireCostmap name="ClearLocalCostmap-Subtree"
+                                service_name="local_costmap/clear_entirely_local_costmap"/>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree"
+                                service_name="global_costmap/clear_entirely_global_costmap"/>
+          </Sequence>
+          <Wait wait_duration="8"/>
+          <Wait wait_duration="15"/>
+          <BackUp backup_dist="0.25" backup_speed="0.05"/>
+        </RoundRobin>
+      </ReactiveFallback>
+    </RecoveryNode>
+  </BehaviorTree>
+</root>

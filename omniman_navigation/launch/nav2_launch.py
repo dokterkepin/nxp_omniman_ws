@@ -50,6 +50,24 @@ def generate_launch_description():
 
     remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
 
+    # --- Laser self-filter ---
+    #
+    # Masks the robot's own structure out of /scan and republishes as
+    # /scan_filtered. Both costmaps and the collision monitor consume the
+    # filtered topic; without it neither can safely look inside 0.25 m.
+    #
+    # NOTE: rf2o below still consumes raw /scan. The self-returns are perfectly
+    # stationary, so they act as a rigid anchor that biases scan matching toward
+    # "not moving" - switching rf2o to /scan_filtered would likely improve
+    # odometry, but that is a separate change and worth testing on its own.
+
+    scan_self_filter = Node(
+        package="omniman_navigation",
+        executable="scan_self_filter.py",
+        name="scan_self_filter",
+        output="screen",
+    )
+
     # --- Odometry ---
 
     rf2o_node = Node(
@@ -94,20 +112,30 @@ def generate_launch_description():
 
     # --- Navigation nodes ---
     #
-    # cmd_vel chain (mirrors upstream nav2_bringup/navigation_launch.py):
-    #   controller_server --> /cmd_vel_nav --> velocity_smoother --> /cmd_vel
-    #                                                                   |
-    #                                              twist_to_twist_stamped
-    #                                                                   v
-    #                                                        /cmd_vel_stamped
+    # cmd_vel chain:
+    #
+    #   controller_server
+    #        |  /cmd_vel_nav
+    #        v
+    #   velocity_smoother          enforces acceleration limits
+    #        |  /cmd_vel_smoothed
+    #        v
+    #   collision_monitor          stop / slowdown zones, reads /scan_filtered
+    #        |  /cmd_vel
+    #        v
+    #   twist_to_twist_stamped --> /cmd_vel_stamped --> mecanum controller
     #
     # The smoother is what enforces acceleration limits: Humble's MPPI has no
     # acceleration constraints of its own, so without this node nothing in the
     # stack limits how fast the base is asked to change speed.
     #
-    # Recovery behaviours (spin/backup) publish straight to /cmd_vel and
-    # deliberately bypass the smoother, so their limits are set directly in
-    # the behavior_server block of nav2_params.yaml.
+    # The collision monitor goes AFTER the smoother deliberately, so an
+    # emergency stop is immediate rather than ramped down.
+    #
+    # CAVEAT: recovery behaviours (spin/backup) publish straight to /cmd_vel and
+    # bypass BOTH the smoother and the collision monitor. Their limits are set
+    # directly in the behavior_server block of nav2_params.yaml, and they are
+    # not zone-protected.
 
     controller_server = Node(
         package="nav2_controller",
@@ -123,10 +151,19 @@ def generate_launch_description():
         name="velocity_smoother",
         output="screen",
         parameters=[configured_params],
-        remappings=remappings + [
-            ("cmd_vel", "cmd_vel_nav"),
-            ("cmd_vel_smoothed", "cmd_vel"),
-        ],
+        # The smoother's output is NO LONGER remapped onto cmd_vel - it now
+        # publishes cmd_vel_smoothed, which collision_monitor consumes and
+        # gates before republishing as cmd_vel.
+        remappings=remappings + [("cmd_vel", "cmd_vel_nav")],
+    )
+
+    collision_monitor = Node(
+        package="nav2_collision_monitor",
+        executable="collision_monitor",
+        name="collision_monitor",
+        output="screen",
+        parameters=[configured_params],
+        remappings=remappings,
     )
 
     planner_server = Node(
@@ -180,6 +217,7 @@ def generate_launch_description():
                 "bt_navigator",
                 "waypoint_follower",
                 "velocity_smoother",
+                "collision_monitor",
             ],
         }],
     )
@@ -210,6 +248,7 @@ def generate_launch_description():
     return LaunchDescription([
         map_file,
         nav2_params_file,
+        scan_self_filter,
         rf2o_node,
         ekf_node,
         localization_launch,
@@ -219,6 +258,7 @@ def generate_launch_description():
         bt_navigator,
         waypoint_follower,
         velocity_smoother,
+        collision_monitor,
         lifecycle_manager,
         twist_relay,
         rviz_node,

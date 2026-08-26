@@ -1,0 +1,57 @@
+<!--
+  Service-robot behaviour tree (restaurant / food-delivery style).
+
+  Differences from the stock navigate_to_pose_w_replanning_and_recovery.xml:
+
+  1. NO <Spin> recovery.
+     Recovery behaviours publish straight to /cmd_vel, bypassing both the
+     velocity smoother and the collision monitor. The situation most likely to
+     trigger a recovery is a person standing in front of the robot - and the
+     stock tree answers that by rotating 90 degrees blind, right next to them.
+     Removing the node also avoids a 20 s stall per recovery cycle (the BT would
+     otherwise wait on a /spin action server that no longer exists, because
+     "spin" was removed from behavior_plugins in nav2_params.yaml).
+
+  2. Recovery order is clear -> wait -> wait -> back up.
+     A blocked service robot should hold still and let people move. Backing up
+     is genuinely last resort: it is ungated, so it reverses without collision
+     checking.
+
+  3. Global replanning at 2 Hz instead of 1 Hz, so the path re-routes around
+     people more promptly. NavFn on this map is cheap enough to afford it.
+-->
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+      <PipelineSequence name="NavigateWithReplanning">
+        <RateController hz="2.0">
+          <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+            <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Context"
+                                service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        </RateController>
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <ClearEntireCostmap name="ClearLocalCostmap-Context"
+                              service_name="local_costmap/clear_entirely_local_costmap"/>
+        </RecoveryNode>
+      </PipelineSequence>
+
+      <ReactiveFallback name="RecoveryFallback">
+        <GoalUpdated/>
+        <RoundRobin name="RecoveryActions">
+          <Sequence name="ClearingActions">
+            <ClearEntireCostmap name="ClearLocalCostmap-Subtree"
+                                service_name="local_costmap/clear_entirely_local_costmap"/>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree"
+                                service_name="global_costmap/clear_entirely_global_costmap"/>
+          </Sequence>
+          <Wait wait_duration="8"/>
+          <Wait wait_duration="15"/>
+          <BackUp backup_dist="0.25" backup_speed="0.05"/>
+        </RoundRobin>
+      </ReactiveFallback>
+    </RecoveryNode>
+  </BehaviorTree>
+</root>
