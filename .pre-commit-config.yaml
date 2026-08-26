@@ -59,3 +59,12 @@ repos:
     rev: 7.1.1
     hooks:
       - id: flake8
+
+  # Type checking. Scoped to hand-written node scripts only: launch files are
+  # declarative builders where mypy finds nothing but costs time on every commit.
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.14.1
+    hooks:
+      - id: mypy
+        args: [--config-file=mypy.ini]
+        files: ^(omniman_hand_teleop|omniman_navigation)/scripts/.*\.py$
