@@ -1,7 +1,8 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, RegisterEventHandler
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     Command,
     FindExecutable,
@@ -154,11 +155,12 @@ def generate_launch_description():
         output="screen",
     )
 
-    teleop_inference_node = Node(
-        package='leader_ros2_control',
-        executable='teleop_bridges_launch.py',
-        name='teleop_inference',
-        output='screen',
+    teleop_inference_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare('leader_ros2_control'), 'launch', 'teleop_bridges_launch.py']
+            )
+        ),
     )
 
     return LaunchDescription(
@@ -174,6 +176,6 @@ def generate_launch_description():
             usb_cam,
             rplidar_node,
             # workspace_cam,
-            teleop_inference_node,
+            teleop_inference_launch,
         ]
     )
