@@ -159,7 +159,7 @@ def generate_launch_description():
         output="screen",
     )
 
-    teleop_inference_launch = IncludeLaunchDescription(
+    teleop_inference_launch = IncludeLaunchDescription(  # noqa: F841
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
                 [FindPackageShare('leader_ros2_control'), 'launch', 'teleop_bridges_launch.py']
@@ -180,6 +180,6 @@ def generate_launch_description():
             usb_cam,
             # rplidar_node,
             # workspace_cam,
-            teleop_inference_launch,
+            # teleop_inference_launch,
         ]
     )
