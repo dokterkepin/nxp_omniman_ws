@@ -24,9 +24,9 @@ const initialState = {
     // NOTE: do NOT include the robot type here -- the UI builds the repo id as
     //   <userId>/<robotType>_<taskName>   (see InfoPanel.js)
     // so 'drive_pick_place' yields dokterkepin/omniman_drive_pick_place.
-    taskName: 'drive_pick_place',
+    taskName: 'nav2_drive_pick_place',
     taskType: '',
-    taskInstruction: ['pick the yellow duck and place it on the black box'],
+    taskInstruction: ['pick everything on the table'],
     policyPath: '',
     recordInferenceMode: false,
     userId: 'dokterkepin',
