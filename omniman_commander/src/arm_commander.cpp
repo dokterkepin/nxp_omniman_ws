@@ -83,7 +83,7 @@ bool ArmCommander::move_to_pose(const geometry_msgs::msg::Pose& target, const st
   if (plan_result != moveit::core::MoveItErrorCode::SUCCESS) {
     RCLCPP_ERROR(logger_, "  [%s] planning failed: code %d (%s)", label.c_str(),
                  static_cast<int>(plan_result.val),
-                 moveit::core::error_code_to_string(plan_result).c_str());
+                 moveit::core::errorCodeToString(plan_result).c_str());
     auto joints = arm_.getCurrentJointValues();
     auto names = arm_.getJointNames();
     for (size_t i = 0; i < joints.size() && i < names.size(); ++i) {
@@ -97,7 +97,7 @@ bool ArmCommander::move_to_pose(const geometry_msgs::msg::Pose& target, const st
   if (exec_result != moveit::core::MoveItErrorCode::SUCCESS) {
     RCLCPP_ERROR(logger_, "  [%s] execution failed: code %d (%s)", label.c_str(),
                  static_cast<int>(exec_result.val),
-                 moveit::core::error_code_to_string(exec_result).c_str());
+                 moveit::core::errorCodeToString(exec_result).c_str());
     return false;
   }
   RCLCPP_INFO(logger_, "  [%s] done", label.c_str());

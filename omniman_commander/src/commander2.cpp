@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
       moveit::planning_interface::MoveGroupInterface::Plan plan;
       auto const ok = static_cast<bool>(move_group_interface.plan(plan));
       if (ok) {
-        draw_trajectory_tool_path(plan.trajectory_);
+        draw_trajectory_tool_path(plan.trajectory);
         moveit_visual_tools.trigger();
         draw_title("Executing Target 1");
         moveit_visual_tools.trigger();
@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
       moveit::planning_interface::MoveGroupInterface::Plan plan;
       auto const ok = static_cast<bool>(move_group_interface.plan(plan));
       if (ok) {
-        draw_trajectory_tool_path(plan.trajectory_);
+        draw_trajectory_tool_path(plan.trajectory);
         moveit_visual_tools.trigger();
         draw_title("Executing Target 2");
         moveit_visual_tools.trigger();
@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
       moveit::planning_interface::MoveGroupInterface::Plan plan;
       auto const ok = static_cast<bool>(move_group_interface.plan(plan));
       if (ok) {
-        draw_trajectory_tool_path(plan.trajectory_);
+        draw_trajectory_tool_path(plan.trajectory);
         moveit_visual_tools.trigger();
         draw_title("Executing Target 3");
         moveit_visual_tools.trigger();

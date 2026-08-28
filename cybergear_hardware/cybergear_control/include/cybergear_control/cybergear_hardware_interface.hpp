@@ -54,7 +54,6 @@ class CybergearActuator : public ActuatorInterface {
      * \return logger of the SystemInterface.
      */
     rclcpp::Logger get_logger() const { return *logger_; }
-    rclcpp::Clock get_clock() const { return *clock_; }
 
    private:
     void receive();

@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
   moveit::planning_interface::MoveGroupInterface::Plan plan;
   auto plan_result = move_group_interface.plan(plan);
   if (plan_result == moveit::core::MoveItErrorCode::SUCCESS) {
-    draw_trajectory_tool_path(plan.trajectory_);
+    draw_trajectory_tool_path(plan.trajectory);
     moveit_visual_tools.trigger();
     draw_title("Executing Target");
     moveit_visual_tools.trigger();
@@ -122,13 +122,13 @@ int main(int argc, char* argv[]) {
     } else {
       RCLCPP_ERROR(logger, "Target execute failed with error code: %d (%s)",
                    static_cast<int>(exec_result.val),
-                   moveit::core::error_code_to_string(exec_result).c_str());
+                   moveit::core::errorCodeToString(exec_result).c_str());
     }
   } else {
     draw_title("Plan Failed!");
     moveit_visual_tools.trigger();
     RCLCPP_ERROR(logger, "Plan failed with error code: %d (%s)", static_cast<int>(plan_result.val),
-                 moveit::core::error_code_to_string(plan_result).c_str());
+                 moveit::core::errorCodeToString(plan_result).c_str());
 
     // Log diagnostics that help identify the failure
     auto joints = move_group_interface.getCurrentJointValues();
