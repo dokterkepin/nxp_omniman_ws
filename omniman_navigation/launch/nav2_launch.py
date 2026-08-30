@@ -12,10 +12,6 @@ def generate_launch_description():
     pkg_path = FindPackageShare("omniman_navigation")
     nav2_bringup = FindPackageShare("nav2_bringup")
 
-    ekf_config = PathJoinSubstitution(
-        [pkg_path, "config", "ekf.yaml"]
-    )
-
     map_file = DeclareLaunchArgument(
         "map",
         default_value=PathJoinSubstitution(
@@ -50,54 +46,6 @@ def generate_launch_description():
 
     remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
 
-    # --- Laser filter chain (stock laser_filters) ---
-    #
-    # /scan -> /scan_filtered. Removes returns inside the robot outline and
-    # single-beam speckle. Config and rationale in config/scan_filter.yaml.
-    #
-    # NOTE: rf2o below deliberately consumes raw /scan, not the filtered topic -
-    # scan matching benefits from every available return, and the speckle filter
-    # would silently change odometry behaviour.
-
-    scan_filter_config = PathJoinSubstitution(
-        [pkg_path, "config", "scan_filter.yaml"]
-    )
-
-    scan_filter = Node(
-        package="laser_filters",
-        executable="scan_to_scan_filter_chain",
-        name="scan_to_scan_filter_chain",
-        output="screen",
-        parameters=[scan_filter_config],
-        remappings=[("scan", "/scan"), ("scan_filtered", "/scan_filtered")],
-    )
-
-    # --- Odometry ---
-
-    rf2o_node = Node(
-        package="rf2o_laser_odometry",
-        executable="rf2o_laser_odometry_node",
-        name="rf2o_laser_odometry",
-        output="screen",
-        parameters=[{
-            "laser_scan_topic": "/scan",
-            "odom_topic": "/odom_rf2o",
-            "publish_tf": False,
-            "base_frame_id": "base_footprint",
-            "odom_frame_id": "odom",
-            "init_pose_from_topic": "",
-            "freq": 12.0,
-        }],
-    )
-
-    ekf_node = Node(
-        package="robot_localization",
-        executable="ekf_node",
-        name="ekf_filter_node",
-        output="screen",
-        parameters=[ekf_config],
-    )
-
     # --- Localization (map_server + amcl) ---
 
     localization_launch = IncludeLaunchDescription(
@@ -114,57 +62,21 @@ def generate_launch_description():
         }.items(),
     )
 
-    # --- Navigation nodes ---
+    # controller_server publishes /cmd_vel directly - nothing sits between it
+    # and the robot.
     #
-    # cmd_vel chain:
+    #   controller_server --> /cmd_vel --> twist_to_twist_stamped
+    #                                  --> /cmd_vel_stamped --> mecanum controller
     #
-    #   controller_server
-    #        |  /cmd_vel_nav
-    #        v
-    #   velocity_smoother          enforces acceleration limits
-    #        |  /cmd_vel_smoothed
-    #        v
-    #   collision_monitor          stop / slowdown zones, reads /scan_filtered
-    #        |  /cmd_vel
-    #        v
-    #   twist_to_twist_stamped --> /cmd_vel_stamped --> mecanum controller
-    #
-    # The smoother is what enforces acceleration limits: Humble's MPPI has no
-    # acceleration constraints of its own, so without this node nothing in the
-    # stack limits how fast the base is asked to change speed.
-    #
-    # The collision monitor goes AFTER the smoother deliberately, so an
-    # emergency stop is immediate rather than ramped down.
-    #
-    # CAVEAT: recovery behaviours (spin/backup) publish straight to /cmd_vel and
-    # bypass BOTH the smoother and the collision monitor. Their limits are set
-    # directly in the behavior_server block of nav2_params.yaml, and they are
-    # not zone-protected.
-
+    # NOTE: with no velocity_smoother, NOTHING in the stack limits acceleration.
+    # Humble's MPPI has no acceleration constraints (ControlConstraints is
+    # {vx_max, vx_min, vy, wz} only) and mecanum_drive_controller implements no
+    # limits either (unlike diff_drive_controller, which has
+    # has_acceleration_limits / max_acceleration / max_jerk). So a commanded
+    # step from 0 to vx_max reaches the wheels in one 50 ms control tick.
     controller_server = Node(
         package="nav2_controller",
         executable="controller_server",
-        output="screen",
-        parameters=[configured_params],
-        remappings=remappings + [("cmd_vel", "cmd_vel_nav")],
-    )
-
-    velocity_smoother = Node(
-        package="nav2_velocity_smoother",
-        executable="velocity_smoother",
-        name="velocity_smoother",
-        output="screen",
-        parameters=[configured_params],
-        # The smoother's output is NO LONGER remapped onto cmd_vel - it now
-        # publishes cmd_vel_smoothed, which collision_monitor consumes and
-        # gates before republishing as cmd_vel.
-        remappings=remappings + [("cmd_vel", "cmd_vel_nav")],
-    )
-
-    collision_monitor = Node(
-        package="nav2_collision_monitor",
-        executable="collision_monitor",
-        name="collision_monitor",
         output="screen",
         parameters=[configured_params],
         remappings=remappings,
@@ -188,6 +100,8 @@ def generate_launch_description():
         remappings=remappings,
     )
 
+    # Provides /navigate_to_pose, which BasicNavigator (nav2_simple_commander)
+    # connects to. Uses Nav2's stock behaviour tree - no custom XML.
     bt_navigator = Node(
         package="nav2_bt_navigator",
         executable="bt_navigator",
@@ -197,15 +111,9 @@ def generate_launch_description():
         remappings=remappings,
     )
 
-    waypoint_follower = Node(
-        package="nav2_waypoint_follower",
-        executable="waypoint_follower",
-        name="waypoint_follower",
-        output="screen",
-        parameters=[configured_params],
-        remappings=remappings,
-    )
-
+    # node_names must list exactly the lifecycle nodes that are actually running.
+    # Naming one that was never launched leaves the manager waiting on it forever
+    # and the stack never reaches active.
     lifecycle_manager = Node(
         package="nav2_lifecycle_manager",
         executable="lifecycle_manager",
@@ -215,13 +123,10 @@ def generate_launch_description():
             "use_sim_time": False,
             "autostart": True,
             "node_names": [
+                "bt_navigator",
                 "controller_server",
                 "planner_server",
                 "behavior_server",
-                "bt_navigator",
-                "waypoint_follower",
-                "velocity_smoother",
-                "collision_monitor",
             ],
         }],
     )
@@ -252,17 +157,11 @@ def generate_launch_description():
     return LaunchDescription([
         map_file,
         nav2_params_file,
-        scan_filter,
-        rf2o_node,
-        ekf_node,
         localization_launch,
         controller_server,
         planner_server,
         behavior_server,
         bt_navigator,
-        waypoint_follower,
-        velocity_smoother,
-        collision_monitor,
         lifecycle_manager,
         twist_relay,
         rviz_node,

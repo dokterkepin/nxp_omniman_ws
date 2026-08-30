@@ -20,37 +20,26 @@ def generate_launch_description():
         [pkg_path, "config", "slam_toolbox.yaml"]
     )
 
-    ekf_config = PathJoinSubstitution(
-        [pkg_path, "config", "ekf.yaml"]
-    )
-
     rviz_config = PathJoinSubstitution(
         [pkg_path, "config", "slam_toolbox_config.rviz"]
     )
 
-    rf2o_node = Node(
-        package="rf2o_laser_odometry",
-        executable="rf2o_laser_odometry_node",
-        name="rf2o_laser_odometry",
-        output="screen",
-        parameters=[{
-            "laser_scan_topic": "/scan",
-            "odom_topic": "/odom_rf2o",
-            "publish_tf": False,
-            "base_frame_id": "base_footprint",
-            "odom_frame_id": "odom",
-            "init_pose_from_topic": "",
-            "freq": 20.0,
-        }, sim_time],
-    )
-
-    ekf_node = Node(
-        package="robot_localization",
-        executable="ekf_node",
-        name="ekf_filter_node",
-        output="screen",
-        parameters=[ekf_config, sim_time],
-    )
+    # --- Odometry ---
+    #
+    # Matches nav2_launch.py: wheel odometry only. rf2o (laser odometry) and the
+    # robot_localization EKF have both been removed, so mecanum_drive_controller
+    # is the sole source of odom -> base_footprint and publishes that transform
+    # itself (enable_odom_tf: true in controllers.yaml).
+    #
+    # This must stay aligned with nav2_launch.py: a map built against laser
+    # odometry would not match what wheel odometry produces at run time.
+    #
+    #   mapping:    odom --(mecanum_drive_controller)--> base_footprint
+    #               map  --(slam_toolbox)-------------> odom
+    #   navigation: same odom link, map -> odom from AMCL instead
+    #
+    # No odometry node is launched here - it comes from ros2_control, which is
+    # already running as part of the robot bringup.
 
     slam_toolbox_node = Node(
         package="slam_toolbox",
@@ -71,8 +60,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         use_sim_arg,
-        rf2o_node,
-        ekf_node,
         slam_toolbox_node,
         rviz_node,
     ])
