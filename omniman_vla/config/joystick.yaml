@@ -46,9 +46,7 @@ teleop_twist_joy_node:
     scale_angular_turbo:
       yaw: 2.0
 
-    require_enable_button: false
-    # enable_turbo_button still gates turbo independently of the line above --
-    # RB is a real button check either way, not affected by require_enable_button.
+    enable_button: 6        # LB — hold to move
     enable_turbo_button: 7  # RB — hold for turbo
 
     # false -> publishes geometry_msgs/Twist on /cmd_vel, the topic the mecanum

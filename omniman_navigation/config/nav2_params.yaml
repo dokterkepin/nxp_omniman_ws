@@ -233,8 +233,14 @@ local_costmap:
       # base_link is "0 0 0.09" (pure Z), so base_link measurements apply
       # directly here. Replaces an earlier asymmetric guess of
       # [[0.24, 0.20], [0.24, -0.20], [-0.18, -0.20], [-0.18, 0.20]].
+      # Circular footprint. robot_radius and footprint are mutually exclusive -
+      # if "footprint" is set to a non-empty polygon it WINS and robot_radius is
+      # ignored, so the polygon line must be removed, not just commented beside it.
+      #
+      # 0.204 m = the polygon's circumscribed radius, sqrt(0.127^2 + 0.160^2),
+      # i.e. the smallest circle that fully contains the real chassis.
       footprint: "[[0.127, 0.160], [0.127, -0.160], [-0.127, -0.160], [-0.127, 0.160]]"
-      plugins: ["obstacle_layer", "inflation_layer"] # inflation robot will stop it saw itself nearthis parameter
+      plugins: ["obstacle_layer", "keepout_filter", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
@@ -260,15 +266,19 @@ local_costmap:
           raytrace_min_range: 0.16
           obstacle_max_range: 10.0
           obstacle_min_range: 0.16
+      keepout_filter:
+        plugin: "nav2_costmap_2d::KeepoutFilter"
+        enabled: true
+        filter_info_topic: "/costmap_filter_info"
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
+        cost_scaling_factor: 8.0
         # Must exceed the circumscribed radius or the inflation layer cannot
         # produce a usable cost gradient. With the measured footprint that is
         # sqrt(0.127^2 + 0.160^2) = 0.204 m - considerably smaller than the
         # 0.31 m implied by the earlier guessed footprint, so this comes down
         # from 0.45 and is less likely to make doorways unplannable.
-        inflation_radius: 0.35
+        inflation_radius: 0.25
       always_send_full_costmap: true
 global_costmap:
   global_costmap:
@@ -285,10 +295,16 @@ global_costmap:
       # base_link is "0 0 0.09" (pure Z), so base_link measurements apply
       # directly here. Replaces an earlier asymmetric guess of
       # [[0.24, 0.20], [0.24, -0.20], [-0.18, -0.20], [-0.18, 0.20]].
+      # Circular footprint. robot_radius and footprint are mutually exclusive -
+      # if "footprint" is set to a non-empty polygon it WINS and robot_radius is
+      # ignored, so the polygon line must be removed, not just commented beside it.
+      #
+      # 0.204 m = the polygon's circumscribed radius, sqrt(0.127^2 + 0.160^2),
+      # i.e. the smallest circle that fully contains the real chassis.
       footprint: "[[0.127, 0.160], [0.127, -0.160], [-0.127, -0.160], [-0.127, 0.160]]"
       resolution: 0.05
       track_unknown_space: true
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      plugins: ["static_layer", "obstacle_layer", "keepout_filter", "inflation_layer"]
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: true
@@ -317,6 +333,10 @@ global_costmap:
           raytrace_min_range: 0.16
           obstacle_max_range: 10.0
           obstacle_min_range: 0.16
+      keepout_filter:
+        plugin: "nav2_costmap_2d::KeepoutFilter"
+        enabled: true
+        filter_info_topic: "/costmap_filter_info"
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
@@ -325,5 +345,32 @@ global_costmap:
         # sqrt(0.127^2 + 0.160^2) = 0.204 m - considerably smaller than the
         # 0.31 m implied by the earlier guessed footprint, so this comes down
         # from 0.45 and is less likely to make doorways unplannable.
-        inflation_radius: 0.35
+        inflation_radius: 0.25
       always_send_full_costmap: true
+
+# --- Keepout filter support -------------------------------------------------
+#
+# The KeepoutFilter plugin does NOT read the mask image directly. It subscribes
+# to /costmap_filter_info, which tells it which topic carries the mask and how
+# to interpret its pixel values. So two extra nodes are needed:
+#
+#   keepout_mask.yaml -> filter_mask_server -> /keepout_filter_mask
+#                                                     ^
+#   costmap_filter_info_server -> /costmap_filter_info |
+#                                        -> KeepoutFilter in both costmaps
+#
+# Both are lifecycle nodes and must appear in a lifecycle manager's node_names.
+
+costmap_filter_info_server:
+  ros__parameters:
+    type: 0                                   # 0 = keepout / lanes filter
+    filter_info_topic: "/costmap_filter_info"
+    mask_topic: "/keepout_filter_mask"
+    base: 0.0
+    multiplier: 1.0
+
+filter_mask_server:
+  ros__parameters:
+    frame_id: "map"
+    topic_name: "/keepout_filter_mask"
+    yaml_filename: ""                         # set from the launch file

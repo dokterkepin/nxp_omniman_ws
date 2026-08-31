@@ -46,6 +46,48 @@ def generate_launch_description():
 
     remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
 
+    # --- Keepout filter ---
+    #
+    # filter_mask_server serves maps/keepout_mask.yaml (black = do not enter) on
+    # /keepout_filter_mask, and costmap_filter_info_server tells the KeepoutFilter
+    # plugins in both costmaps where to find it. Both are lifecycle nodes, hence
+    # their own manager below.
+
+    keepout_mask_file = PathJoinSubstitution(
+        [pkg_path, "maps", "keepout_mask.yaml"]
+    )
+
+    filter_mask_server = Node(
+        package="nav2_map_server",
+        executable="map_server",
+        name="filter_mask_server",
+        output="screen",
+        parameters=[configured_params,
+                    {"yaml_filename": keepout_mask_file}],
+        remappings=remappings,
+    )
+
+    costmap_filter_info_server = Node(
+        package="nav2_map_server",
+        executable="costmap_filter_info_server",
+        name="costmap_filter_info_server",
+        output="screen",
+        parameters=[configured_params],
+        remappings=remappings,
+    )
+
+    lifecycle_manager_filters = Node(
+        package="nav2_lifecycle_manager",
+        executable="lifecycle_manager",
+        name="lifecycle_manager_filters",
+        output="screen",
+        parameters=[{
+            "use_sim_time": False,
+            "autostart": True,
+            "node_names": ["filter_mask_server", "costmap_filter_info_server"],
+        }],
+    )
+
     # --- Localization (map_server + amcl) ---
 
     localization_launch = IncludeLaunchDescription(
@@ -158,6 +200,9 @@ def generate_launch_description():
         map_file,
         nav2_params_file,
         localization_launch,
+        filter_mask_server,
+        costmap_filter_info_server,
+        lifecycle_manager_filters,
         controller_server,
         planner_server,
         behavior_server,
