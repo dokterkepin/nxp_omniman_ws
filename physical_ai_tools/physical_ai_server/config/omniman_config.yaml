@@ -37,9 +37,11 @@ physical_ai_server:
       joint_topic_list:
         - follower:/joint_states
         - leader:/leader/joint_trajectory
+        - leader_mobile:/cmd_vel
 
       joint_list:
         - leader
+        - leader_mobile
 
       # Order matters: total_joint_order is the concatenation of these lists, and
       # the state vector is assembled in the same order from the follower topics.
@@ -53,3 +55,12 @@ physical_ai_server:
           - wrist_pitch_joint
           - palm_yaw_joint
           - gripper_prismatic_joint
+        # /cmd_vel is a Twist (BODY-frame velocity), not per-wheel commands -- the
+        # mecanum controller does the inverse kinematics to wheel speeds itself.
+        # twist2tensor_array ignores these names and always emits exactly
+        # [linear.x, linear.y, angular.z], but the LENGTH of this list sets the
+        # declared feature shape and the inference slice width -- so it must be 3.
+        leader_mobile:
+          - linear_x
+          - linear_y
+          - angular_z
