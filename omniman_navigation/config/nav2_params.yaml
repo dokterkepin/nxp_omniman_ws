@@ -27,7 +27,7 @@ controller_server:
       # counting while a person stands in the way. At 30 s a customer pausing to
       # chat was enough to declare failure and fire a recovery. A service robot
       # should wait for people to move, not start manoeuvring around them.
-      movement_time_allowance: 90.0
+      movement_time_allowance: 30.0
 
     general_goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
@@ -36,7 +36,10 @@ controller_server:
       # exactly where it makes the small lateral/oblique corrections we want to
       # avoid. Wider tolerances end the approach cleanly.
       xy_goal_tolerance: 0.12
-      yaw_goal_tolerance: 0.15
+      # 0.30 rad (17 deg) -> 0.10 rad (5.7 deg). Measured AMCL yaw uncertainty
+      # is 4.68 deg (1 sigma), so 17 deg was letting the robot stop ~3.7x further
+      # off than localization could actually resolve. Matched to what AMCL knows.
+      yaw_goal_tolerance: 0.10
       stateful: true
       # (xy_goal_tolerance_buffer removed - not a SimpleGoalChecker parameter,
       #  it was being silently ignored.)
@@ -70,7 +73,11 @@ controller_server:
       vx_max: 0.2
       vx_min: -0.15
       vy_max: 0.12
-      wz_max: 0.25
+      # 0.25 -> 0.5. A tighter yaw tolerance only converges if the controller has
+      # the authority to make small corrections stick. At 0.25 rad/s, with no
+      # acceleration limiting anywhere in the stack, fine rotation commands slip
+      # instead of turning - which is what made the robot hunt and then time out.
+      wz_max: 0.5
       motion_model: "Omni"
       # NOTE: Humble's MPPI has NO acceleration constraints. Its ControlConstraints
       # struct is {vx_max, vx_min, vy, wz} only - ax_max/ax_min/ay_max/ay_min/az_max
@@ -91,7 +98,7 @@ controller_server:
         cost_weight: 8.0
         threshold_to_consider: 2.0
       GoalAngleCritic:
-        cost_weight: 3.0
+        cost_weight: 8.0
         threshold_to_consider: 0.5
       PathAlignCritic:
         cost_weight: 8.0
@@ -168,11 +175,11 @@ map_server:
 
 amcl:
   ros__parameters:
-    alpha1: 0.4
-    alpha2: 1.5
-    alpha3: 2.0
+    alpha1: 0.5
+    alpha2: 0.5
+    alpha3: 0.4
     alpha4: 0.8
-    alpha5: 2.0
+    alpha5: 0.1
     base_frame_id: "base_footprint"
     beam_skip_distance: 0.5
     beam_skip_error_threshold: 0.9
@@ -184,9 +191,9 @@ amcl:
     laser_max_range: 12.0
     laser_min_range: 0.2
     laser_model_type: "likelihood_field"
-    max_beams: 60
+    max_beams: 180
     max_particles: 3000
-    min_particles: 1000
+    min_particles: 1500
     odom_frame_id: "odom"
     pf_err: 0.05
     pf_z: 0.99
@@ -195,10 +202,10 @@ amcl:
     resample_interval: 1
     robot_model_type: "nav2_amcl::OmniMotionModel"
     save_pose_rate: 0.5
-    sigma_hit: 0.2
+    sigma_hit: 0.1
     tf_broadcast: true
     transform_tolerance: 1.0
-    update_min_a: 0.05
+    update_min_a: 0.02
     update_min_d: 0.05
     z_hit: 0.5
     z_max: 0.05
@@ -278,7 +285,7 @@ local_costmap:
         # sqrt(0.127^2 + 0.160^2) = 0.204 m - considerably smaller than the
         # 0.31 m implied by the earlier guessed footprint, so this comes down
         # from 0.45 and is less likely to make doorways unplannable.
-        inflation_radius: 0.25
+        inflation_radius: 0.30
       always_send_full_costmap: true
 global_costmap:
   global_costmap:
@@ -298,7 +305,6 @@ global_costmap:
       # Circular footprint. robot_radius and footprint are mutually exclusive -
       # if "footprint" is set to a non-empty polygon it WINS and robot_radius is
       # ignored, so the polygon line must be removed, not just commented beside it.
-      #
       # 0.204 m = the polygon's circumscribed radius, sqrt(0.127^2 + 0.160^2),
       # i.e. the smallest circle that fully contains the real chassis.
       footprint: "[[0.127, 0.160], [0.127, -0.160], [-0.127, -0.160], [-0.127, 0.160]]"

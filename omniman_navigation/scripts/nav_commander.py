@@ -14,14 +14,19 @@ Run:
 """
 
 import math
+import time
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 
 HOME = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}
-GOAL = {'x': 0.2, 'y': 1.4, 'yaw': 0.0}
+GOAL = {'x': 1.0, 'y': -1.0, 'yaw': 0.0}
 LAPS = 100
+# Pause after each leg. Lets the base settle before the next goal is sent -
+# sending one immediately means the robot is still coasting when the new path
+# is computed, which starts the next leg from a pose that is already stale.
+SETTLE_S = 5.0
 
 
 def make_pose(navigator, x, y, yaw_deg=0.0, frame_id='map'):
@@ -76,8 +81,11 @@ def main():
 
             if not go(navigator, GOAL, 'goal'):
                 break
+            time.sleep(SETTLE_S)
+
             if not go(navigator, HOME, 'home'):
                 break
+            time.sleep(SETTLE_S)
 
             completed = lap
     except KeyboardInterrupt:

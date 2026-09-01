@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-Fixed home <-> target shuttle: drive out, pick, drive back, place.
-    HOME (0, 0, 0)  --drive-->  TARGET (-1, 1, 0)  --policy: pick-->
-    HOME (0, 0, 0)  <--policy: place--  <--drive--  TARGET
+Fixed pick-and-place shuttle across three known poses:
+
+    HOME       ( 0.0,  0.0,    0)  --drive-->
+    PICK_AREA  ( 1.2, -4.0, -100)  --policy: pick-->   --drive-->
+    PLACE_AREA ( 1.0, -1.0, -100)  --policy: place-->  --drive-->
+    HOME
 
 Runs as an explicit state machine:
 
@@ -46,16 +49,23 @@ from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from physical_ai_interfaces.srv import SendCommand
 
 HOME = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}
-TARGET = {'x': 1.0, 'y': -1.0, 'yaw': -100.0}
+PICK_AREA = {'x': 1.2, 'y': -4.0, 'yaw': -100.0}
+PLACE_AREA = {'x': 1.0, 'y': -1.0, 'yaw': 0.0}
 
 
 class State(Enum):
-    """Mission progress. Each state hands off to the next, or to ABORT."""
+    """Mission progress. Each state hands off to the next, or to ABORT.
 
-    NAV_TO_TARGET = auto()
+        HOME --drive--> PICK_AREA --policy: pick-->
+             --drive--> PLACE_AREA --policy: place-->
+             --drive--> HOME
+    """
+
+    NAV_TO_PICK = auto()
     PICK = auto()
-    NAV_TO_HOME = auto()
+    NAV_TO_PLACE = auto()
     PLACE = auto()
+    NAV_TO_HOME = auto()
     DONE = auto()
     ABORT = auto()
 
@@ -211,21 +221,32 @@ class Actuator:
 
 def run_mission(actuator, pick_duration_s, place_duration_s):
     """Drive the state machine. Each state returns the next one."""
-    state = State.NAV_TO_TARGET
+    state = State.NAV_TO_PICK
 
     while state not in (State.DONE, State.ABORT):
-        if state is State.NAV_TO_TARGET:
-            state = State.PICK if actuator.navigate(TARGET, 'target') else State.ABORT
+        if state is State.NAV_TO_PICK:
+            ok = actuator.navigate(PICK_AREA, 'pick area')
+            state = State.PICK if ok else State.ABORT
 
         elif state is State.PICK:
             ok = actuator.run_policy('pick the object', pick_duration_s, 'pick')
-            state = State.NAV_TO_HOME if ok else State.ABORT
+            state = State.NAV_TO_PLACE if ok else State.ABORT
 
-        elif state is State.NAV_TO_HOME:
-            state = State.PLACE if actuator.navigate(HOME, 'home') else State.ABORT
+        elif state is State.NAV_TO_PLACE:
+            # Carrying the object. The arm is released before the base moves,
+            # so whatever pose the gripper held at the end of the pick is what
+            # it keeps for the drive.
+            ok = actuator.navigate(PLACE_AREA, 'place area')
+            state = State.PLACE if ok else State.ABORT
 
         elif state is State.PLACE:
             ok = actuator.run_policy('place the object', place_duration_s, 'place')
+            state = State.NAV_TO_HOME if ok else State.ABORT
+
+        elif state is State.NAV_TO_HOME:
+            # Return to a known pose so the next run starts where setInitialPose
+            # in main() assumes the robot is.
+            ok = actuator.navigate(HOME, 'home')
             state = State.DONE if ok else State.ABORT
 
     return state
