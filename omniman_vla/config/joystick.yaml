@@ -46,8 +46,8 @@ teleop_twist_joy_node:
     scale_angular_turbo:
       yaw: 2.0
 
-    enable_button: 6        # LB — hold to move
-    enable_turbo_button: 7  # RB — hold for turbo
+    # enable_button: 6        # LB — hold to move
+    # enable_turbo_button: 7  # RB — hold for turbo
 
     # false -> publishes geometry_msgs/Twist on /cmd_vel, the topic the mecanum
     # controller now reads (use_stamped_vel: false in controllers_vla.yaml) AND the
