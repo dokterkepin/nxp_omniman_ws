@@ -40,8 +40,19 @@ physical_ai_server:
       camera_topic_list:
         - cam:/image_raw/compressed
 
+      # follower_mobile IS required here even though we don't want base velocity
+      # in the TRAINING data: physical_ai_server ties observation.state and
+      # action to the SAME length (both = len(total_joint_order), see
+      # data_manager._create_dataset / physical_ai_server.py's
+      # check_lerobot_dataset(camera_data, self.total_joint_order)). There is
+      # no way to declare an asymmetric shape at record time -- omitting this
+      # topic crashes on frame 1 with
+      #   ValueError: observation.state of shape (7,) does not match (10,)
+      # Base velocity is removed from state AFTER recording instead, via
+      # omniman_vla/scripts/slice_dataset.py (state 10->7, action stays 10).
       joint_topic_list:
         - follower:/joint_states
+        - follower_mobile:/mecanum_drive_controller/odometry
         - leader:/leader/joint_trajectory
         - leader_mobile:/cmd_vel
 
