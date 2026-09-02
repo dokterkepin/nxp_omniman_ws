@@ -18,7 +18,6 @@ install(DIRECTORY
 install(PROGRAMS
   scripts/replay_arm.py
   scripts/replay_base.py
-  scripts/slice_dataset.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
