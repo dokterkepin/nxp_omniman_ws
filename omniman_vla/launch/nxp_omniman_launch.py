@@ -179,8 +179,8 @@ def generate_launch_description():
             joy_node,
             teleop_joy_node,
             usb_cam,
-            # rplidar_node,
+            rplidar_node,
             # workspace_cam,
-            # teleop_inference_launch,
+            teleop_inference_launch,
         ]
     )

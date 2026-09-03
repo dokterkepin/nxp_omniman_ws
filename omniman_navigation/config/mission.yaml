@@ -1,0 +1,38 @@
+# Mission definition for pick_place_shuttle.py
+#
+#   home -> pick_area  (nav2)
+#           correct    (base_correction policy - fixes nav2's residual error)
+#           pick       (pick_place policy)
+#   ->     place_area  (nav2)
+#           correct    (base_correction policy)
+#           place      (pick_place policy, same checkpoint)
+#   -> home (nav2)
+#
+# Poses are map-frame, yaw in DEGREES.
+# Policies are ACT checkpoints; both are 10-dim (7 arm/gripper + 3 base), so
+# they can drive the base as well as the arm. That is what makes the base
+# correction step possible - nav2 gets close, the policy closes the loop
+# visually, which is not bounded by AMCL's ~5 deg yaw uncertainty.
+
+poses:
+  home:       {x:  0.0, y:  0.0, yaw:    0.0}
+  pick_area:  {x:  1.2, y: -4.0, yaw: -100.0}
+  place_area: {x:  1.0, y: -1.0, yaw: -100.0}
+
+policies:
+  base_correction:
+    path: /home/dokterkepin/output/omniman_base_correction/checkpoints/last/pretrained_model
+    instruction: "correct the base position"
+    duration_s: 10.0
+  manipulate:
+    path: /home/dokterkepin/output/omniman_nav2_drive_pick_place/checkpoints/last/pretrained_model
+    instruction_pick: "pick the object"
+    instruction_place: "place the object"
+    pick_duration_s: 20.0
+    place_duration_s: 20.0
+
+settings:
+  fps: 30
+  # Pause after each leg so the base stops coasting before the next step reads
+  # its pose.
+  settle_s: 2.0

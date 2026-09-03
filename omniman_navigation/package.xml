@@ -12,6 +12,7 @@
   <!-- vln_commander.py: triggers the manipulation policy via /task/command -->
   <exec_depend>physical_ai_interfaces</exec_depend>
   <exec_depend>nav2_simple_commander</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
 
   <exec_depend>slam_toolbox</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
