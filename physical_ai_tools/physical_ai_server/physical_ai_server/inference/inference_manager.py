@@ -58,6 +58,13 @@ class InferenceManager:
             result_message = f'Policy type {policy_type} is not supported.'
             return False, result_message
 
+        # Drop a cached policy when the requested checkpoint changes. The caller
+        # only reloads when self.policy is None, and FINISH does not clear it -
+        # so without this a second START_INFERENCE with a DIFFERENT policy_path
+        # silently keeps running the first policy's weights under the new name.
+        if self.policy is not None and self.policy_path != policy_path:
+            self.clear_policy()
+
         self.policy_path = policy_path
         self.policy_type = policy_type
         return True, f'Policy {policy_type} is valid.'
