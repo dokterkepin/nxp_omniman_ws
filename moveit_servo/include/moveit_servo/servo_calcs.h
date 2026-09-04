@@ -49,8 +49,6 @@
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
-#include <moveit_msgs/srv/change_drift_dimensions.hpp>
-#include <moveit_msgs/srv/change_control_dimensions.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
@@ -249,13 +247,9 @@ protected:
    * @param response the service response
    * @return true if the adjustment was made
    */
-  void changeDriftDimensions(const std::shared_ptr<moveit_msgs::srv::ChangeDriftDimensions::Request> req,
-                             std::shared_ptr<moveit_msgs::srv::ChangeDriftDimensions::Response> res);
 
   /** \brief Start the main calculation timer */
   // Service callback for changing servoing dimensions
-  void changeControlDimensions(const std::shared_ptr<moveit_msgs::srv::ChangeControlDimensions::Request> req,
-                               std::shared_ptr<moveit_msgs::srv::ChangeControlDimensions::Response> res);
 
   /** \brief Service callback to reset Servo status, e.g. so the arm can move again after a collision */
   bool resetServoStatus(const std::shared_ptr<std_srvs::srv::Empty::Request> req,
@@ -314,8 +308,6 @@ protected:
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr trajectory_outgoing_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr multiarray_outgoing_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr condition_pub_;
-  rclcpp::Service<moveit_msgs::srv::ChangeControlDimensions>::SharedPtr control_dimensions_server_;
-  rclcpp::Service<moveit_msgs::srv::ChangeDriftDimensions>::SharedPtr drift_dimensions_server_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr reset_servo_status_;
 
   // Main tracking / result publisher loop

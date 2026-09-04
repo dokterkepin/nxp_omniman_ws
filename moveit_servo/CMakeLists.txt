@@ -198,6 +198,11 @@ if(BUILD_TESTING)
   # ament_target_dependencies(unit_test_servo_calcs ${THIS_PACKAGE_INCLUDE_DEPENDS} Boost)
   # add_ros_test(test/launch/unit_test_servo_calcs.test.py TIMEOUT 120 ARGS "test_binary_dir:=${CMAKE_CURRENT_BINARY_DIR}")
 
+  # These are the upstream Panda integration tests. They depend on the
+  # moveit_msgs Change{Drift,Control}Dimensions services, which were removed
+  # from moveit_msgs in Jazzy along with the servo rewrite. Off by default.
+  option(MOVEIT_SERVO_BUILD_PANDA_TESTS "Build the upstream Panda servo integration tests" OFF)
+  if(MOVEIT_SERVO_BUILD_PANDA_TESTS)
   # Servo integration launch test
   ament_add_gtest_executable(test_servo_integration
       test/test_servo_interface.cpp
@@ -241,6 +246,7 @@ if(BUILD_TESTING)
   ament_target_dependencies(basic_servo_tests ${THIS_PACKAGE_INCLUDE_DEPENDS})
   target_link_libraries(basic_servo_tests ${POSE_TRACKING})
   add_ros_test(test/launch/test_basic_servo.test.py TIMEOUT 120 ARGS "test_binary_dir:=${CMAKE_CURRENT_BINARY_DIR}")
+  endif()
 
   # Enforce limits unit tests
   ament_add_gtest(enforce_limits_tests

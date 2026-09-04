@@ -55,6 +55,29 @@ static const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_servo.servo_calc
 constexpr auto ROS_LOG_THROTTLE_PERIOD = std::chrono::milliseconds(3000).count();
 static constexpr double STOPPED_VELOCITY_EPS = 1e-4;  // rad/s
 
+namespace
+{
+// Jazzy's online_signal_smoothing plugin API takes Eigen vectors for
+// positions/velocities/accelerations. Servo only smooths positions, so wrap.
+void smoothPositions(const std::shared_ptr<online_signal_smoothing::SmoothingBaseClass>& smoother,
+                     std::vector<double>& positions)
+{
+  Eigen::VectorXd p = Eigen::Map<Eigen::VectorXd>(positions.data(), positions.size());
+  Eigen::VectorXd v = Eigen::VectorXd::Zero(p.size());
+  Eigen::VectorXd a = Eigen::VectorXd::Zero(p.size());
+  smoother->doSmoothing(p, v, a);
+  Eigen::Map<Eigen::VectorXd>(positions.data(), positions.size()) = p;
+}
+
+void resetSmoother(const std::shared_ptr<online_signal_smoothing::SmoothingBaseClass>& smoother,
+                   const std::vector<double>& positions)
+{
+  Eigen::VectorXd p = Eigen::Map<const Eigen::VectorXd>(positions.data(), positions.size());
+  Eigen::VectorXd z = Eigen::VectorXd::Zero(p.size());
+  smoother->reset(p, z, z);
+}
+}  // namespace
+
 namespace moveit_servo
 {
 namespace
@@ -134,19 +157,6 @@ ServoCalcs::ServoCalcs(rclcpp::Node::SharedPtr node,
       [this](const control_msgs::msg::JointJog::SharedPtr msg) { return jointCmdCB(msg); });
 
   // ROS Server for allowing drift in some dimensions
-  drift_dimensions_server_ = node_->create_service<moveit_msgs::srv::ChangeDriftDimensions>(
-      "~/change_drift_dimensions", [this](const std::shared_ptr<moveit_msgs::srv::ChangeDriftDimensions::Request> req,
-                                          std::shared_ptr<moveit_msgs::srv::ChangeDriftDimensions::Response> res) {
-        return changeDriftDimensions(req, res);
-      });
-
-  // ROS Server for changing the control dimensions
-  control_dimensions_server_ = node_->create_service<moveit_msgs::srv::ChangeControlDimensions>(
-      "~/change_control_dimensions",
-      [this](const std::shared_ptr<moveit_msgs::srv::ChangeControlDimensions::Request> req,
-             std::shared_ptr<moveit_msgs::srv::ChangeControlDimensions::Response> res) {
-        return changeControlDimensions(req, res);
-      });
 
   // ROS Server to reset the status, e.g. so the arm can move again after a collision
   reset_servo_status_ = node_->create_service<std_srvs::srv::Empty>(
@@ -785,7 +795,7 @@ bool ServoCalcs::applyJointUpdate(const Eigen::ArrayXd& delta_theta, sensor_msgs
     joint_state.position[i] += delta_theta[i];
   }
 
-  smoother_->doSmoothing(joint_state.position);
+  smoothPositions(smoother_, joint_state.position);
 
   for (std::size_t i = 0; i < joint_state.position.size(); ++i)
   {
@@ -817,7 +827,7 @@ void ServoCalcs::insertRedundantPointsIntoTrajectory(trajectory_msgs::msg::Joint
 
 void ServoCalcs::resetLowPassFilters(const sensor_msgs::msg::JointState& joint_state)
 {
-  smoother_->reset(joint_state.position);
+  resetSmoother(smoother_, joint_state.position);
   updated_filters_ = true;
 }
 
@@ -989,7 +999,7 @@ void ServoCalcs::filteredHalt(trajectory_msgs::msg::JointTrajectory& joint_traje
   // Set done_stopping_ flag
   assert(original_joint_state_.position.size() >= num_joints_);
   joint_trajectory.points[0].positions = original_joint_state_.position;
-  smoother_->doSmoothing(joint_trajectory.points[0].positions);
+  smoothPositions(smoother_, joint_trajectory.points[0].positions);
   done_stopping_ = true;
   if (parameters_->publish_joint_velocities)
   {
@@ -1290,32 +1300,6 @@ void ServoCalcs::jointCmdCB(const control_msgs::msg::JointJog::SharedPtr msg)
 void ServoCalcs::collisionVelocityScaleCB(const std_msgs::msg::Float64::SharedPtr msg)
 {
   collision_velocity_scale_ = msg.get()->data;
-}
-
-void ServoCalcs::changeDriftDimensions(const std::shared_ptr<moveit_msgs::srv::ChangeDriftDimensions::Request> req,
-                                       std::shared_ptr<moveit_msgs::srv::ChangeDriftDimensions::Response> res)
-{
-  drift_dimensions_[0] = req->drift_x_translation;
-  drift_dimensions_[1] = req->drift_y_translation;
-  drift_dimensions_[2] = req->drift_z_translation;
-  drift_dimensions_[3] = req->drift_x_rotation;
-  drift_dimensions_[4] = req->drift_y_rotation;
-  drift_dimensions_[5] = req->drift_z_rotation;
-
-  res->success = true;
-}
-
-void ServoCalcs::changeControlDimensions(const std::shared_ptr<moveit_msgs::srv::ChangeControlDimensions::Request> req,
-                                         std::shared_ptr<moveit_msgs::srv::ChangeControlDimensions::Response> res)
-{
-  control_dimensions_[0] = req->control_x_translation;
-  control_dimensions_[1] = req->control_y_translation;
-  control_dimensions_[2] = req->control_z_translation;
-  control_dimensions_[3] = req->control_x_rotation;
-  control_dimensions_[4] = req->control_y_rotation;
-  control_dimensions_[5] = req->control_z_rotation;
-
-  res->success = true;
 }
 
 bool ServoCalcs::resetServoStatus(const std::shared_ptr<std_srvs::srv::Empty::Request> /*req*/,
