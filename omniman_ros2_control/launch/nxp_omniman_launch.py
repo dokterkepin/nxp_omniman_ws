@@ -315,6 +315,6 @@ def generate_launch_description():
             image_throttle,
             image_rectify,
             aruco_tracker,
-            # rplidar_node
+            rplidar_node
         ]
     )
