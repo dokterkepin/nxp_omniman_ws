@@ -19,11 +19,15 @@ teleop_twist_joy_node:
     scale_angular_turbo:
       yaw: 2.0
 
-    enable_button: 4        # LB — hold to move
+    # enable_button: 4        # LB — hold to move
+    require_enable_button: false
     enable_turbo_button: 5  # RB — hold for turbo
 
     # Official mecanum_drive_controller expects TwistStamped
-    publish_stamped_twist: true
+    # false: publish plain Twist on /cmd_vel. twist_to_twist_stamped relays it to
+    # /cmd_vel_stamped for the mecanum controller, and /cmd_vel stays available for
+    # anything recording base motion. Matches omniman_vla.
+    publish_stamped_twist: false
 
 # Bluetooth
 # teleop_twist_joy_node:

@@ -90,7 +90,6 @@ def generate_launch_description():
         output="both",
         remappings=[
             ("/mecanum_drive_controller/reference", "/cmd_vel_stamped"),
-            ("/mecanum_drive_controller/reference_unstamped", "/cmd_vel"),
         ],
     )
 
@@ -178,8 +177,21 @@ def generate_launch_description():
         package="teleop_twist_joy",
         executable="teleop_node",
         parameters=[joystick_config],
-        remappings=[("/cmd_vel", "/cmd_vel_stamped")],
+        # No cmd_vel remap: the joystick publishes plain Twist onto /cmd_vel, and
+        # twist_relay below converts it to /cmd_vel_stamped for the controller.
+        # Keeping /cmd_vel as the joystick's output means anything recording base
+        # motion (physical_ai_server) still sees it. Matches omniman_vla.
         condition=IfCondition(LaunchConfiguration("use_joy")),
+    )
+
+    # REQUIRED on Jazzy. MecanumDriveController only subscribes to ~/reference
+    # (TwistStamped) - the reference_unstamped topic that existed on Humble is
+    # gone, so plain Twist on /cmd_vel reaches nothing without this relay.
+    twist_relay = Node(
+        package="omniman_ros2_control",
+        executable="twist_to_twist_stamped.py",
+        name="twist_to_twist_stamped",
+        output="screen",
     )
 
     keyboard_node = Node(
@@ -189,7 +201,10 @@ def generate_launch_description():
         output="screen",
         prefix="xterm -e",
         condition=IfCondition(LaunchConfiguration("use_keyboard")),
-        remappings=[("/cmd_vel", "/cmd_vel_stamped")],
+        # No remap, same as the joystick: teleop_twist_keyboard publishes plain
+        # Twist, so sending it to /cmd_vel_stamped would be a type mismatch
+        # (the controller expects TwistStamped there) and would never connect.
+        # It goes to /cmd_vel and twist_relay converts it.
     )
 
     # rviz_node = Node(
@@ -315,6 +330,7 @@ def generate_launch_description():
             delay_gripper_controller,
             joy_node,
             teleop_joy_node,
+            twist_relay,
             keyboard_node,
             move_group_node,
             # rviz_node,

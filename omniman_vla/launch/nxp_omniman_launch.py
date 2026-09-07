@@ -50,7 +50,6 @@ def generate_launch_description():
         output='both',
         remappings=[
             ('/mecanum_drive_controller/reference', '/cmd_vel_stamped'),
-            ('/mecanum_drive_controller/reference_unstamped', '/cmd_vel'),
             ('/mecanum_drive_controller/tf_odometry', '/tf'),
         ],
     )
@@ -98,11 +97,24 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_joy')),
     )
 
+    # REQUIRED on Jazzy - see the note above. Converts Twist on /cmd_vel into
+    # TwistStamped on /cmd_vel_stamped for MecanumDriveController.
+    twist_relay = Node(
+        package='omniman_ros2_control',
+        executable='twist_to_twist_stamped.py',
+        name='twist_to_twist_stamped',
+        output='screen',
+    )
+
     # No cmd_vel remap: the joystick publishes plain Twist straight onto /cmd_vel,
-    # which is now both what the mecanum controller reads (reference_unstamped) and
-    # what physical_ai_server records as the base action (leader_mobile:/cmd_vel).
-    # Previously remapped to /cmd_vel_stamped, which drove the robot but bypassed
-    # /cmd_vel, so base motion never reached the dataset.
+    # which is what physical_ai_server records as the base action
+    # (leader_mobile:/cmd_vel). Remapping it to /cmd_vel_stamped would drive the
+    # robot but bypass /cmd_vel, so base motion would never reach the dataset.
+    #
+    # On Humble the mecanum controller also read /cmd_vel directly via
+    # reference_unstamped, so one topic served both. Jazzy removed that topic -
+    # MecanumDriveController now subscribes ONLY to ~/reference (TwistStamped) -
+    # so twist_relay below is required to get the wheels moving.
     teleop_joy_node = Node(
         package='teleop_twist_joy',
         executable='teleop_node',
@@ -178,6 +190,7 @@ def generate_launch_description():
             delay_arm_controller,
             joy_node,
             teleop_joy_node,
+            twist_relay,
             usb_cam,
             rplidar_node,
             # workspace_cam,

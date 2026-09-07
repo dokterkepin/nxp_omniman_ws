@@ -10,6 +10,8 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <!-- vln_commander.py: triggers the manipulation policy via /task/command -->
+  <!-- twist_to_twist_stamped.py relay -->
+  <exec_depend>omniman_ros2_control</exec_depend>
   <exec_depend>physical_ai_interfaces</exec_depend>
   <exec_depend>nav2_simple_commander</exec_depend>
   <exec_depend>ament_index_python</exec_depend>

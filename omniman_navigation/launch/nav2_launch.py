@@ -176,7 +176,7 @@ def generate_launch_description():
     # --- Twist → TwistStamped relay for mecanum controller ---
 
     twist_relay = Node(
-        package="omniman_navigation",
+        package="omniman_ros2_control",
         executable="twist_to_twist_stamped.py",
         name="twist_to_twist_stamped",
         output="screen",
