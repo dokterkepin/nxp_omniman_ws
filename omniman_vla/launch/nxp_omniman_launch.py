@@ -51,6 +51,7 @@ def generate_launch_description():
         remappings=[
             ('/mecanum_drive_controller/reference', '/cmd_vel_stamped'),
             ('/mecanum_drive_controller/reference_unstamped', '/cmd_vel'),
+            ('/mecanum_drive_controller/tf_odometry', '/tf'),
         ],
     )
 
@@ -180,6 +181,6 @@ def generate_launch_description():
             usb_cam,
             rplidar_node,
             # workspace_cam,
-            # teleop_inference_launch,
+            teleop_inference_launch,
         ]
     )

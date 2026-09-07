@@ -24,18 +24,24 @@ const initialState = {
     // NOTE: do NOT include the robot type here -- the UI builds the repo id as
     //   <userId>/<robotType>_<taskName>   (see InfoPanel.js)
     // so 'drive_pick_place' yields dokterkepin/omniman_drive_pick_place.
-    taskName: 'nav2_drive_pick_place',
+    // Dedicated base-only session: hold the leader arm still in its ready
+    // pose for the whole episode, drive/correct with the base only. The
+    // arm sub-vector will be near-constant in the recording; slice_dataset.py
+    // (omniman_vla/scripts) cuts it down to state[0:7]/action[7:10] afterward
+    // for training a clean base-only policy. Arm manipulation is unaffected --
+    // omniman_drive_pick_place_v3 already works and is not touched by this.
+    taskName: 'base_correction',
     taskType: '',
-    taskInstruction: ['pick everything on the table'],
+    taskInstruction: ['drive to align with the table, hold the arm still'],
     policyPath: '',
     recordInferenceMode: false,
     userId: 'dokterkepin',
     fps: 30,
     tags: [],
-    warmupTime: 1,
+    warmupTime: 5,
     episodeTime: 20,
     resetTime: 5,
-    numEpisodes: 1,
+    numEpisodes: 10,
     token: '',
     pushToHub: false,
     privateMode: false,

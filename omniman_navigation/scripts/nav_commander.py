@@ -1,107 +1,104 @@
 #!/usr/bin/env python3
 """
-Minimal Nav2 mission example using the Simple Commander API (BasicNavigator).
+Shuttle between HOME and GOAL, repeatedly.
 
-This is the programmatic equivalent of clicking "2D Goal Pose" in RViz, but
-from code. BasicNavigator wraps the Nav2 action servers (/navigate_to_pose,
-/navigate_through_poses, /follow_waypoints, ...) so you don't have to write
-raw rclcpp_action / rclpy.action clients yourself.
+Drives HOME -> GOAL -> HOME and counts that as one lap, for LAPS laps.
 
-Prereqs (already running in your stack):
-  - The full Nav2 bringup (planner, controller, bt_navigator, lifecycle mgr)
-  - A localization source publishing map -> odom (your EKF + slam_toolbox,
-    or AMCL if you switch to a saved map).
+Prereqs (already running):
+  - nav2_launch.py
+  - robot localized (AMCL)
 
-Run it (after `colcon build` + sourcing the workspace):
+Run:
   ros2 run omniman_navigation nav_commander.py
+  ros2 run omniman_navigation nav_commander.py --ros-args -p laps:=10
 """
 
-import rclpy
 import math
 import time
+
+import rclpy
 from geometry_msgs.msg import PoseStamped
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 
+HOME = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}
+GOAL = {'x': 1.0, 'y': -1.0, 'yaw': 0.0}
+LAPS = 100
+# Pause after each leg. Lets the base settle before the next goal is sent -
+# sending one immediately means the robot is still coasting when the new path
+# is computed, which starts the next leg from a pose that is already stale.
+SETTLE_S = 5.0
 
-def make_pose(navigator, x, y, yaw_deg=0.0, frame_id="map"):
+
+def make_pose(navigator, x, y, yaw_deg=0.0, frame_id='map'):
+    """Planar pose, yaw in degrees."""
     pose = PoseStamped()
     pose.header.frame_id = frame_id
     pose.header.stamp = navigator.get_clock().now().to_msg()
-    pose.pose.position.x = x
-    pose.pose.position.y = y
-    # Quaternion from yaw only (planar robot): z = sin(yaw/2), w = cos(yaw/2)
+    pose.pose.position.x = float(x)
+    pose.pose.position.y = float(y)
     yaw = math.radians(yaw_deg)
     pose.pose.orientation.z = math.sin(yaw / 2.0)
     pose.pose.orientation.w = math.cos(yaw / 2.0)
     return pose
 
 
+def go(navigator, target, label):
+    """Drive to one pose. Blocks until done. True on success."""
+    navigator.get_logger().info(
+        f'-> {label} (x={target["x"]:.2f}, y={target["y"]:.2f}, '
+        f'yaw={target["yaw"]:.0f})')
+    navigator.goToPose(
+        make_pose(navigator, target['x'], target['y'], target['yaw']))
+
+    while not navigator.isTaskComplete():
+        feedback = navigator.getFeedback()
+        if feedback:
+            navigator.get_logger().info(
+                f'   {feedback.distance_remaining:.2f} m remaining')
+
+    result = navigator.getResult()
+    if result == TaskResult.SUCCEEDED:
+        navigator.get_logger().info(f'   arrived at {label}')
+        return True
+
+    navigator.get_logger().error(f'   {label} failed: {result}')
+    return False
+
+
 def main():
     rclpy.init()
     navigator = BasicNavigator()
 
-    # ---- 1. Wait until Nav2 is fully up (all lifecycle nodes active) --------
-    # If you rely on EKF/slam_toolbox for the map->odom transform you do NOT
-    # need to call setInitialPose(). Only AMCL needs an initial pose. Uncomment
-    # the block below if you switch to AMCL localization on a saved map.
-    #
-    initial = make_pose(navigator, 0.0, 0.0, 0.0)
-    navigator.setInitialPose(initial)
+    navigator.declare_parameter('laps', LAPS)
+    laps = navigator.get_parameter('laps').value
 
-    navigator.waitUntilNav2Active()  # blocks until planner/controller/bt are active
+    navigator.waitUntilNav2Active()
 
-    # ---- 2. Send a single goal ---------------------------------------------
-    for i in range(100):
-        navigator.get_logger().info(f"=== Iteration {i} ===")
+    completed = 0
+    try:
+        for lap in range(1, laps + 1):
+            navigator.get_logger().info(f'===== lap {lap}/{laps} =====')
 
-        goal1 = make_pose(navigator, 0.0, 0.0, yaw_deg=0.0)
-        navigator.goToPose(goal1)
-        # ---- 3. Spin while the task runs, reading live feedback -----------------
-        while not navigator.isTaskComplete():
-            feedback = navigator.getFeedback()
-            if feedback:
-                remaining = feedback.distance_remaining
-                navigator.get_logger().info(f"Distance remaining: {remaining:.2f} m")
+            if not go(navigator, GOAL, 'goal'):
+                break
+            time.sleep(SETTLE_S)
 
-        result1 = navigator.getResult()
-        if result1 == TaskResult.SUCCEEDED:
-            navigator.get_logger().info("System Success.")
-            time.sleep(2.0)
-        elif result1 == TaskResult.CANCELED:
-            navigator.get_logger().warn("System Failed.")
+            if not go(navigator, HOME, 'home'):
+                break
+            time.sleep(SETTLE_S)
 
-        goal2 = make_pose(navigator, 1.0, -1.0, yaw_deg=90.0)
-        navigator.goToPose(goal2)
-        while not navigator.isTaskComplete():
-            feedback = navigator.getFeedback()
-            if feedback:
-                remaining = feedback.distance_remaining
-                navigator.get_logger().info(f"Distance remaining: {remaining:.2f} m")
+            completed = lap
+    except KeyboardInterrupt:
+        navigator.get_logger().warn('Interrupted.')
+    finally:
+        # Do not leave the robot driving on any exit path.
+        navigator.cancelTask()
 
-        result2 = navigator.getResult()
-        if result2 == TaskResult.SUCCEEDED:
-            navigator.get_logger().info("System Success.")
-            time.sleep(2.0)
-        elif result2 == TaskResult.CANCELED:
-            navigator.get_logger().warn("System Failed.")
+    navigator.get_logger().info(f'Completed {completed}/{laps} laps.')
 
-    # ---- 5. (Optional) Patrol through several waypoints ---------------------
-    # waypoints = [
-    #     make_pose(navigator, 1.5, 0.5, 90.0),
-    #     make_pose(navigator, 1.5, 2.0, 180.0),
-    #     make_pose(navigator, 0.0, 2.0, -90.0),
-    #     make_pose(navigator, 0.0, 0.0, 0.0),
-    # ]
-    # navigator.followWaypoints(waypoints)
-    # while not navigator.isTaskComplete():
-    #     fb = navigator.getFeedback()
-    #     if fb:
-    #         navigator.get_logger().info(f"On waypoint {fb.current_waypoint + 1}")
-
-    # navigator.lifecycleShutdown()
     navigator.destroy_node()
     rclpy.shutdown()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

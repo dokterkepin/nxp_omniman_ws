@@ -34,7 +34,11 @@ mecanum_drive_controller:
 
     base_frame_id: "base_footprint"
     odom_frame_id: "odom"
-    enable_odom_tf: false
+    # TRUE: mecanum_drive_controller is now the ONLY source of
+    # odom -> base_footprint. rf2o (laser odometry) and the robot_localization
+    # EKF have both been removed from the nav stack, so nothing else publishes
+    # that transform - AMCL only supplies map -> odom.
+    enable_odom_tf: true
     reference_timeout: 10.0
 
     pose_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.01]

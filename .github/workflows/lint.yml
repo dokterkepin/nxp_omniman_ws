@@ -1,0 +1,20 @@
+name: lint
+
+# Re-runs the exact same checks as the local pre-commit hook, on a clean
+# GitHub-hosted machine that has none of this laptop's history and can't be
+# skipped with --no-verify. Catches: forgetting to run `pre-commit install`
+# on a fresh clone, or bypassing the hook locally.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: pre-commit/action@v3.0.1

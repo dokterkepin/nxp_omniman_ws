@@ -2,50 +2,12 @@ bt_navigator:
   ros__parameters:
     global_frame: map
     robot_base_frame: base_footprint
-    odom_topic: /odometry/filtered
+    # Wheel odometry straight from ros2_control. rf2o and the EKF are gone;
+    # mecanum_drive_controller is the sole odometry source and publishes
+    # odom -> base_footprint itself (enable_odom_tf: true).
+    odom_topic: /mecanum_drive_controller/odometry
     bt_loop_duration: 10
     default_server_timeout: 20
-    # Service-robot tree: no Spin recovery, waits instead of manoeuvring around
-    # people, replans at 2 Hz. See the comments in the XML itself.
-    default_nav_to_pose_bt_xml: $(find-pkg-share omniman_navigation)/behavior_trees/navigate_to_pose_service_robot.xml
-    # MUST also be a Spin-free tree. bt_navigator loads BOTH trees at activation
-    # and BtActionNode waits for its action server in the constructor, so a
-    # <Spin> node here with "spin" removed from behavior_plugins throws
-    # "Action server spin not available", fails the load, and leaves
-    # bt_navigator inactive - stalling the entire lifecycle manager.
-    default_nav_through_poses_bt_xml: $(find-pkg-share omniman_navigation)/behavior_trees/navigate_through_poses_service_robot.xml
-    plugin_lib_names:
-      - nav2_compute_path_to_pose_action_bt_node
-      - nav2_compute_path_through_poses_action_bt_node
-      - nav2_follow_path_action_bt_node
-      - nav2_back_up_action_bt_node
-      - nav2_spin_action_bt_node
-      - nav2_wait_action_bt_node
-      - nav2_clear_costmap_service_bt_node
-      - nav2_is_stuck_condition_bt_node
-      - nav2_goal_reached_condition_bt_node
-      - nav2_goal_updated_condition_bt_node
-      - nav2_initial_pose_received_condition_bt_node
-      - nav2_reinitialize_global_localization_service_bt_node
-      - nav2_rate_controller_bt_node
-      - nav2_distance_controller_bt_node
-      - nav2_speed_controller_bt_node
-      - nav2_truncate_path_action_bt_node
-      - nav2_goal_updater_node_bt_node
-      - nav2_recovery_node_bt_node
-      - nav2_pipeline_sequence_bt_node
-      - nav2_round_robin_node_bt_node
-      - nav2_transform_available_condition_bt_node
-      - nav2_time_expired_condition_bt_node
-      - nav2_distance_traveled_condition_bt_node
-      - nav2_single_trigger_bt_node
-      - nav2_is_battery_low_condition_bt_node
-      - nav2_navigate_through_poses_action_bt_node
-      - nav2_navigate_to_pose_action_bt_node
-      - nav2_remove_passed_goals_action_bt_node
-      - nav2_planner_selector_bt_node
-      - nav2_controller_selector_bt_node
-      - nav2_goal_checker_selector_bt_node
 
 controller_server:
   ros__parameters:
@@ -65,7 +27,7 @@ controller_server:
       # counting while a person stands in the way. At 30 s a customer pausing to
       # chat was enough to declare failure and fire a recovery. A service robot
       # should wait for people to move, not start manoeuvring around them.
-      movement_time_allowance: 90.0
+      movement_time_allowance: 30.0
 
     general_goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
@@ -74,7 +36,10 @@ controller_server:
       # exactly where it makes the small lateral/oblique corrections we want to
       # avoid. Wider tolerances end the approach cleanly.
       xy_goal_tolerance: 0.12
-      yaw_goal_tolerance: 0.15
+      # 0.30 rad (17 deg) -> 0.10 rad (5.7 deg). Measured AMCL yaw uncertainty
+      # is 4.68 deg (1 sigma), so 17 deg was letting the robot stop ~3.7x further
+      # off than localization could actually resolve. Matched to what AMCL knows.
+      yaw_goal_tolerance: 0.10
       stateful: true
       # (xy_goal_tolerance_buffer removed - not a SimpleGoalChecker parameter,
       #  it was being silently ignored.)
@@ -108,12 +73,18 @@ controller_server:
       vx_max: 0.2
       vx_min: -0.15
       vy_max: 0.12
-      wz_max: 0.25
+      # 0.25 -> 0.5. A tighter yaw tolerance only converges if the controller has
+      # the authority to make small corrections stick. At 0.25 rad/s, with no
+      # acceleration limiting anywhere in the stack, fine rotation commands slip
+      # instead of turning - which is what made the robot hunt and then time out.
+      wz_max: 0.5
       motion_model: "Omni"
       # NOTE: Humble's MPPI has NO acceleration constraints. Its ControlConstraints
       # struct is {vx_max, vx_min, vy, wz} only - ax_max/ax_min/ay_max/ay_min/az_max
-      # were added in Iron and were silently discarded here. Acceleration limiting
-      # is done by velocity_smoother instead (see the velocity_smoother block).
+      # were added in Iron and are silently discarded here. mecanum_drive_controller
+      # has no acceleration limits either, so with velocity_smoother removed there
+      # is no acceleration limiting anywhere in the stack: a commanded step from
+      # 0 to vx_max reaches the wheels in a single 50 ms tick.
       critics:
         - "ConstraintCritic"
         - "CostCritic"
@@ -127,7 +98,7 @@ controller_server:
         cost_weight: 8.0
         threshold_to_consider: 2.0
       GoalAngleCritic:
-        cost_weight: 3.0
+        cost_weight: 8.0
         threshold_to_consider: 0.5
       PathAlignCritic:
         cost_weight: 8.0
@@ -176,16 +147,10 @@ behavior_server:
     costmap_topic: local_costmap/costmap_raw
     footprint_topic: local_costmap/published_footprint
     cycle_frequency: 10.0
-    # "spin" REMOVED deliberately. Recovery behaviours publish straight to
-    # /cmd_vel, bypassing both the velocity smoother and the collision monitor -
-    # so a spin recovery rotates the robot blind, and the single situation most
-    # likely to trigger it is a person standing in front of the robot. A service
-    # robot that is blocked should wait, not pirouette next to a customer.
-    #
-    # "backup" is kept as the last way out of a genuine trap, but note it is
-    # equally ungated: it reverses without collision checking. It only runs
-    # after "wait" has already failed.
-    behavior_plugins: ["backup", "wait"]
+    # "spin" is required: Nav2's stock behaviour tree contains a <Spin> node, and
+    # bt_navigator fails to load (leaving the whole lifecycle manager stalled) if
+    # the matching action server does not exist.
+    behavior_plugins: ["spin", "backup", "wait"]
     spin:
       plugin: "nav2_behaviors/Spin"
     backup:
@@ -210,11 +175,11 @@ map_server:
 
 amcl:
   ros__parameters:
-    alpha1: 0.4
-    alpha2: 1.5
-    alpha3: 2.0
+    alpha1: 0.5
+    alpha2: 0.5
+    alpha3: 0.4
     alpha4: 0.8
-    alpha5: 2.0
+    alpha5: 0.1
     base_frame_id: "base_footprint"
     beam_skip_distance: 0.5
     beam_skip_error_threshold: 0.9
@@ -226,9 +191,9 @@ amcl:
     laser_max_range: 12.0
     laser_min_range: 0.2
     laser_model_type: "likelihood_field"
-    max_beams: 60
+    max_beams: 180
     max_particles: 3000
-    min_particles: 1000
+    min_particles: 1500
     odom_frame_id: "odom"
     pf_err: 0.05
     pf_z: 0.99
@@ -237,10 +202,10 @@ amcl:
     resample_interval: 1
     robot_model_type: "nav2_amcl::OmniMotionModel"
     save_pose_rate: 0.5
-    sigma_hit: 0.2
+    sigma_hit: 0.1
     tf_broadcast: true
     transform_tolerance: 1.0
-    update_min_a: 0.05
+    update_min_a: 0.02
     update_min_d: 0.05
     z_hit: 0.5
     z_max: 0.05
@@ -275,17 +240,26 @@ local_costmap:
       # base_link is "0 0 0.09" (pure Z), so base_link measurements apply
       # directly here. Replaces an earlier asymmetric guess of
       # [[0.24, 0.20], [0.24, -0.20], [-0.18, -0.20], [-0.18, 0.20]].
+      # Circular footprint. robot_radius and footprint are mutually exclusive -
+      # if "footprint" is set to a non-empty polygon it WINS and robot_radius is
+      # ignored, so the polygon line must be removed, not just commented beside it.
+      #
+      # 0.204 m = the polygon's circumscribed radius, sqrt(0.127^2 + 0.160^2),
+      # i.e. the smallest circle that fully contains the real chassis.
       footprint: "[[0.127, 0.160], [0.127, -0.160], [-0.127, -0.160], [-0.127, 0.160]]"
-      plugins: ["obstacle_layer", "inflation_layer"] # inflation robot will stop it saw itself nearthis parameter
+      plugins: ["obstacle_layer", "keepout_filter", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
         footprint_clearing_enabled: true
         observation_sources: scan
         scan:
-          # /scan_filtered comes from the stock laser_filters chain
-          # (config/scan_filter.yaml): robot-outline polygon + speckle removal.
-          topic: /scan_filtered
+          # Raw scan. No filtering is needed: the lidar sits at
+          # (-0.070, 0, 0.167) and the chassis rear edge is only 0.057 m from
+          # it - well inside the sensor's 0.15 m range_min - so the robot
+          # cannot see any part of itself. Verified live: 520 consecutive
+          # scans with zero returns under 0.45 m.
+          topic: /scan
           max_obstacle_height: 2.0
           clearing: true
           marking: true
@@ -299,169 +273,20 @@ local_costmap:
           raytrace_min_range: 0.16
           obstacle_max_range: 10.0
           obstacle_min_range: 0.16
+      keepout_filter:
+        plugin: "nav2_costmap_2d::KeepoutFilter"
+        enabled: true
+        filter_info_topic: "/costmap_filter_info"
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
+        cost_scaling_factor: 8.0
         # Must exceed the circumscribed radius or the inflation layer cannot
         # produce a usable cost gradient. With the measured footprint that is
         # sqrt(0.127^2 + 0.160^2) = 0.204 m - considerably smaller than the
         # 0.31 m implied by the earlier guessed footprint, so this comes down
         # from 0.45 and is less likely to make doorways unplannable.
-        inflation_radius: 0.35
+        inflation_radius: 0.30
       always_send_full_costmap: true
-
-velocity_smoother:
-  ros__parameters:
-    smoothing_frequency: 20.0
-    scale_velocities: false
-    feedback: "OPEN_LOOP"
-    # Velocity caps match the MPPI constraints. Angular is left at 0.5 (above
-    # MPPI's wz_max 0.25) so RotationShim's 0.40 rad/s in-place turn is not clipped.
-    max_velocity: [0.2, 0.06, 0.5]
-    min_velocity: [-0.15, -0.06, -0.5]
-    # THIS is now the only acceleration limiter in the whole stack, because
-    # Humble's MPPI has no acceleration constraints at all. Previously nothing
-    # limited acceleration anywhere: MPPI could step 0 -> 0.2 m/s in one 50 ms
-    # tick, which breaks mecanum traction on an uneven floor. Ramped down hard.
-    max_accel: [0.3, 0.15, 0.8]
-    # Deceleration is allowed to be stronger than acceleration for stopping
-    # distance, but still far below the old -1.0/-2.0.
-    max_decel: [-0.5, -0.25, -1.2]
-    odom_topic: "/odometry/filtered"
-    odom_duration: 0.1
-    deadband_velocity: [0.0, 0.0, 0.0]
-
-# Independent safety layer. Reads the laser DIRECTLY and vetoes velocity
-# commands - it does not consult the costmap, the planner or the controller, so
-# it still works when those are stale, wrong, or busy. Sits at the very end of
-# the cmd_vel chain:
-#
-#   controller_server -> cmd_vel_nav -> velocity_smoother -> cmd_vel_smoothed
-#                                          -> collision_monitor -> cmd_vel
-#
-# NOTE: it consumes /scan_filtered, NOT /scan. The collision monitor's scan
-# source has no range filtering whatsoever, so the robot's own structure at
-# ~0.19 m would sit inside PolygonStop and latch a permanent emergency stop.
-collision_monitor:
-  ros__parameters:
-    base_frame_id: "base_footprint"
-    odom_frame_id: "odom"
-    cmd_vel_in_topic: "cmd_vel_smoothed"
-    cmd_vel_out_topic: "cmd_vel"
-    # NOTE: no state_topic here. This Humble build publishes no monitor-state
-    # topic (that was added in a later Nav2 release), so the parameter would be
-    # silently ignored. To see what the monitor is doing, watch the polygon
-    # topics below in RViz, or compare /cmd_vel_smoothed against /cmd_vel.
-    transform_tolerance: 0.2
-    source_timeout: 1.0
-    base_shift_correction: true
-    stop_pub_timeout: 2.0
-    # Graduated deceleration, then a direction-aware stop:
-    #
-    #   1.00 m -> 65% speed    (barely perceptible, reads as "being careful")
-    #   0.60 m -> 35% speed
-    #   predicted collision within 1.5 s -> stop
-    #   plus a tight static box as a last-resort backstop
-    #
-    # Zones are evaluated in listed order and the most restrictive action wins.
-    #
-    # WHY APPROACH RATHER THAN A STATIC STOP BOX:
-    # The first version used a box reaching 0.38 m forward and +/-0.26 laterally
-    # while the footprint is only +/-0.20 wide. Measured on the robot, 83% of the
-    # points triggering a stop were BESIDE the footprint (y between -0.259 and
-    # -0.222), never ahead of it - i.e. objects the robot was squeezing past and
-    # could not possibly hit while driving straight. The robot stalled 0.24 m
-    # short of its goal because a static box cannot tell "in my path" from
-    # "beside me".
-    #
-    # "approach" projects the ACTUAL footprint forward along the current
-    # velocity and stops only if a collision is genuinely predicted, so passing
-    # close alongside furniture no longer halts the robot.
-    polygons: ["FootprintApproach", "PolygonStop", "PolygonSlowNear", "PolygonSlowFar"]
-
-    # Direction-aware primary stop. Uses the real footprint from the costmap,
-    # simulated forward along the commanded velocity.
-    FootprintApproach:
-      type: "polygon"
-      action_type: "approach"
-      footprint_topic: "/local_costmap/published_footprint"
-      time_before_collision: 1.5
-      simulation_time_step: 0.05
-      max_points: 3
-      visualize: true
-      polygon_pub_topic: "polygon_approach"
-      enabled: true
-
-    # Points are a FLAT [x1,y1, x2,y2, ...] array in this Humble build, and the
-    # threshold parameter is max_points (newer Nav2 renamed it to min_points and
-    # switched to a nested string - neither works here).
-    #
-    # Last-resort backstop for anything "approach" misses (a sensor glitch, or
-    # an obstacle appearing inside the prediction horizon).
-    #
-    # Measured footprint is x: +/-0.127, y: +/-0.160 (SolidWorks, symmetric).
-    # Against that, this zone clears the chassis by ~5 cm on the flanks and
-    # ~7 cm at the rear, and reaches 0.30 m forward. At vx_max 0.2 m/s and
-    # max_decel 0.5 m/s^2 the stopping distance is only ~4 cm, so the forward
-    # margin is generous. Note these numbers were originally chosen against a
-    # larger guessed footprint, so they are now more conservative than intended
-    # rather than tighter - safe, but worth revisiting if the robot proves shy.
-    # Shrunk from [0.30,0.21,...,-0.20,-0.21] after it vetoed every command
-    # while approaching a pick target: chassis front edge is 0.127, stopping
-    # distance at full speed is ~0.04 m, so 0.30 m reached 17 cm past the
-    # bumper - far enough to make legitimate close-approach poses unreachable.
-    # 0.17 m front / 0.175 m sides clears the chassis by ~4 cm, comfortably
-    # past the 4 cm stopping distance, while no longer fighting the robot's
-    # actual job of parking next to furniture.
-    PolygonStop:
-      type: "polygon"
-      points: [0.17, 0.175, 0.17, -0.175, -0.17, -0.175, -0.17, 0.175]
-      action_type: "stop"
-      max_points: 3
-      visualize: true
-      polygon_pub_topic: "polygon_stop"
-      enabled: true
-
-    # Slowdown zones stay boxes on purpose - easing off when something is close
-    # alongside is CORRECT for a service robot squeezing past a table.
-    # MUST be larger than PolygonStop on every edge - this is the outer warning
-    # ring that eases speed down BEFORE the hard stop zone triggers. (An earlier
-    # edit accidentally sized this smaller than PolygonStop, defeating that.)
-    PolygonSlowNear:
-      type: "polygon"
-      points: [0.35, 0.28, 0.35, -0.28, -0.22, -0.28, -0.22, 0.28]
-      action_type: "slowdown"
-      slowdown_ratio: 0.35
-      max_points: 3
-      visualize: true
-      polygon_pub_topic: "polygon_slowdown_near"
-      enabled: true
-
-    PolygonSlowFar:
-      # Rear extent pulled in from -0.26 to -0.20. This is a judgement call, not
-      # a bug fix: a zone reaching 13 cm behind a robot that almost always drives
-      # forward mostly just triggers when reversing near furniture. -0.20 still
-      # clears the chassis rear (-0.127) by 7 cm.
-      #
-      # (An earlier version of this comment justified the change by claiming
-      # fixed structure sat ~12 cm behind the base. That was wrong - those
-      # returns were environment, confirmed by scan_origin_test.py: they came
-      # and went while the robot drove, which robot-mounted structure cannot do.)
-      type: "polygon"
-      points: [1.00, 0.36, 1.00, -0.36, -0.20, -0.36, -0.20, 0.36]
-      action_type: "slowdown"
-      slowdown_ratio: 0.65
-      max_points: 3
-      visualize: true
-      polygon_pub_topic: "polygon_slowdown_far"
-      enabled: true
-
-    observation_sources: ["scan"]
-    scan:
-      type: "scan"
-      topic: "/scan_filtered"
-      enabled: true
-
 global_costmap:
   global_costmap:
     ros__parameters:
@@ -477,10 +302,15 @@ global_costmap:
       # base_link is "0 0 0.09" (pure Z), so base_link measurements apply
       # directly here. Replaces an earlier asymmetric guess of
       # [[0.24, 0.20], [0.24, -0.20], [-0.18, -0.20], [-0.18, 0.20]].
+      # Circular footprint. robot_radius and footprint are mutually exclusive -
+      # if "footprint" is set to a non-empty polygon it WINS and robot_radius is
+      # ignored, so the polygon line must be removed, not just commented beside it.
+      # 0.204 m = the polygon's circumscribed radius, sqrt(0.127^2 + 0.160^2),
+      # i.e. the smallest circle that fully contains the real chassis.
       footprint: "[[0.127, 0.160], [0.127, -0.160], [-0.127, -0.160], [-0.127, 0.160]]"
       resolution: 0.05
       track_unknown_space: true
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      plugins: ["static_layer", "obstacle_layer", "keepout_filter", "inflation_layer"]
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: true
@@ -490,9 +320,12 @@ global_costmap:
         footprint_clearing_enabled: true
         observation_sources: scan
         scan:
-          # /scan_filtered comes from the stock laser_filters chain
-          # (config/scan_filter.yaml): robot-outline polygon + speckle removal.
-          topic: /scan_filtered
+          # Raw scan. No filtering is needed: the lidar sits at
+          # (-0.070, 0, 0.167) and the chassis rear edge is only 0.057 m from
+          # it - well inside the sensor's 0.15 m range_min - so the robot
+          # cannot see any part of itself. Verified live: 520 consecutive
+          # scans with zero returns under 0.45 m.
+          topic: /scan
           max_obstacle_height: 2.0
           clearing: true
           marking: true
@@ -506,6 +339,10 @@ global_costmap:
           raytrace_min_range: 0.16
           obstacle_max_range: 10.0
           obstacle_min_range: 0.16
+      keepout_filter:
+        plugin: "nav2_costmap_2d::KeepoutFilter"
+        enabled: true
+        filter_info_topic: "/costmap_filter_info"
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
@@ -514,5 +351,32 @@ global_costmap:
         # sqrt(0.127^2 + 0.160^2) = 0.204 m - considerably smaller than the
         # 0.31 m implied by the earlier guessed footprint, so this comes down
         # from 0.45 and is less likely to make doorways unplannable.
-        inflation_radius: 0.35
+        inflation_radius: 0.25
       always_send_full_costmap: true
+
+# --- Keepout filter support -------------------------------------------------
+#
+# The KeepoutFilter plugin does NOT read the mask image directly. It subscribes
+# to /costmap_filter_info, which tells it which topic carries the mask and how
+# to interpret its pixel values. So two extra nodes are needed:
+#
+#   keepout_mask.yaml -> filter_mask_server -> /keepout_filter_mask
+#                                                     ^
+#   costmap_filter_info_server -> /costmap_filter_info |
+#                                        -> KeepoutFilter in both costmaps
+#
+# Both are lifecycle nodes and must appear in a lifecycle manager's node_names.
+
+costmap_filter_info_server:
+  ros__parameters:
+    type: 0                                   # 0 = keepout / lanes filter
+    filter_info_topic: "/costmap_filter_info"
+    mask_topic: "/keepout_filter_mask"
+    base: 0.0
+    multiplier: 1.0
+
+filter_mask_server:
+  ros__parameters:
+    frame_id: "map"
+    topic_name: "/keepout_filter_mask"
+    yaml_filename: ""                         # set from the launch file
