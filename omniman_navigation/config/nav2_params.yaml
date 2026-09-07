@@ -134,7 +134,8 @@ planner_server:
     expected_planner_frequency: 20.0
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner"
+      # Jazzy renamed nav2 plugin classes from "pkg/Class" to "pkg::Class".
+      plugin: "nav2_navfn_planner::NavfnPlanner"
       # Raised from 0.05 as a direct consequence of the larger inflation_radius:
       # with a 0.45 m inflation, a goal set close to a wall falls in inflated
       # space and NavFn would fail to plan at all with a 5 cm tolerance.
@@ -152,11 +153,11 @@ behavior_server:
     # the matching action server does not exist.
     behavior_plugins: ["spin", "backup", "wait"]
     spin:
-      plugin: "nav2_behaviors/Spin"
+      plugin: "nav2_behaviors::Spin"
     backup:
-      plugin: "nav2_behaviors/BackUp"
+      plugin: "nav2_behaviors::BackUp"
     wait:
-      plugin: "nav2_behaviors/Wait"
+      plugin: "nav2_behaviors::Wait"
     global_frame: odom
     robot_base_frame: base_footprint
     transform_tolerance: 0.1
@@ -169,9 +170,20 @@ behavior_server:
     min_rotational_vel: 0.3
     rotational_acc_lim: 1.0
 
-map_server:
-  ros__parameters:
-    yaml_filename: ""
+# NOTE: there is deliberately NO "map_server:" section in this file.
+#
+# Jazzy's nav2_bringup/localization_launch.py passes the map as a "/**"
+# parameter override (parameters=[configured_params, {'yaml_filename': map}])
+# and no longer rewrites yaml_filename inside the params file the way Humble
+# did. In ROS 2 an exact node-name key beats a "/**" wildcard regardless of
+# argument order, so a "map_server: ros__parameters: yaml_filename: ''" block
+# here silently wins over the launch argument: map_server comes up active but
+# with no map, never publishes /map, and AMCL waits forever on "Waiting for
+# map....".
+#
+# Omitting the section lets the "/**" override apply, so map:=... works.
+# Do NOT re-add an empty "ros__parameters:" block either - rclcpp rejects a
+# parameter block with no entries and map_server then fails to start at all.
 
 amcl:
   ros__parameters:

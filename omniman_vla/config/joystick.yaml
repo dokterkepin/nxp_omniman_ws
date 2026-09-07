@@ -1,31 +1,4 @@
 # USB
-# teleop_twist_joy_node:
-#   ros__parameters:
-#     # Mecanum can strafe! So we map both X and Y linear axes.
-#     axis_linear:
-#       x: 1           # left stick up/down → forward/backward
-#       y: 0           # left stick left/right → strafe left/right
-#     scale_linear:
-#       x: 0.5         # max linear X speed (m/s)
-#       y: 0.5         # max linear Y speed (m/s)
-#     scale_linear_turbo:
-#       x: 1.0
-#       y: 1.0
-
-#     axis_angular:
-#       yaw: 3         # right stick left/right → rotation
-#     scale_angular:
-#       yaw: 1.0       # max angular speed (rad/s)
-#     scale_angular_turbo:
-#       yaw: 2.0
-
-#     enable_button: 4        # LB — hold to move
-#     enable_turbo_button: 5  # RB — hold for turbo
-
-#     # Official mecanum_drive_controller expects TwistStamped
-#     publish_stamped_twist: true
-
-# Bluetooth
 teleop_twist_joy_node:
   ros__parameters:
     # Mecanum can strafe! So we map both X and Y linear axes.
@@ -33,31 +6,60 @@ teleop_twist_joy_node:
       x: 1           # left stick up/down → forward/backward
       y: 0           # left stick left/right → strafe left/right
     scale_linear:
-      x: 0.3        # max linear X speed (m/s)
-      y: 0.3         # max linear Y speed (m/s)
+      x: 0.5         # max linear X speed (m/s)
+      y: 0.5         # max linear Y speed (m/s)
     scale_linear_turbo:
-      x: 1.5
-      y: 1.5
+      x: 1.0
+      y: 1.0
 
     axis_angular:
-      yaw: 2         # right stick left/right → rotation
+      yaw: 3         # right stick left/right → rotation
     scale_angular:
       yaw: 1.0       # max angular speed (rad/s)
     scale_angular_turbo:
       yaw: 2.0
 
-    # No hold-to-move deadman switch: require_enable_button:false makes the
-    # "normal" branch of joyCallback's if/else unconditional, so the base
-    # drives live off the sticks continuously, with no button held.
-    # Trade-off: stick drift or an accidental touch now drives the base
-    # immediately -- there is no hold-to-arm confirmation.
     require_enable_button: false
-    # enable_turbo_button still gates turbo independently of the line above.
-    enable_turbo_button: 7  # RB — hold for turbo
 
-    # false -> publishes geometry_msgs/Twist on /cmd_vel, the topic the mecanum
-    # controller now reads (use_stamped_vel: false in controllers_vla.yaml) AND the
-    # topic physical_ai_server records as the base action. Was true (TwistStamped on
-    # /cmd_vel_stamped), which drove the robot fine but bypassed /cmd_vel entirely,
-    # so base motion could never be recorded into the dataset.
+    # enable_button: 4        # LB — hold to move
+    enable_turbo_button: 5  # RB — hold for turbo
+
+    # Official mecanum_drive_controller expects TwistStamped
     publish_stamped_twist: false
+
+# Bluetooth
+# teleop_twist_joy_node:
+#   ros__parameters:
+#     # Mecanum can strafe! So we map both X and Y linear axes.
+#     axis_linear:
+#       x: 1           # left stick up/down → forward/backward
+#       y: 0           # left stick left/right → strafe left/right
+#     scale_linear:
+#       x: 0.3        # max linear X speed (m/s)
+#       y: 0.3         # max linear Y speed (m/s)
+#     scale_linear_turbo:
+#       x: 1.5
+#       y: 1.5
+
+#     axis_angular:
+#       yaw: 2         # right stick left/right → rotation
+#     scale_angular:
+#       yaw: 1.0       # max angular speed (rad/s)
+#     scale_angular_turbo:
+#       yaw: 2.0
+
+#     # No hold-to-move deadman switch: require_enable_button:false makes the
+#     # "normal" branch of joyCallback's if/else unconditional, so the base
+#     # drives live off the sticks continuously, with no button held.
+#     # Trade-off: stick drift or an accidental touch now drives the base
+#     # immediately -- there is no hold-to-arm confirmation.
+#     require_enable_button: false
+#     # enable_turbo_button still gates turbo independently of the line above.
+#     enable_turbo_button: 7  # RB — hold for turbo
+
+#     # false -> publishes geometry_msgs/Twist on /cmd_vel, the topic the mecanum
+#     # controller now reads (use_stamped_vel: false in controllers_vla.yaml) AND the
+#     # topic physical_ai_server records as the base action. Was true (TwistStamped on
+#     # /cmd_vel_stamped), which drove the robot fine but bypassed /cmd_vel entirely,
+#     # so base motion could never be recorded into the dataset.
+#     publish_stamped_twist: false

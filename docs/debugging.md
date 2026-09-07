@@ -124,3 +124,90 @@ ros2 topic echo /rosout --once
 ```bash
 ros2 topic echo /clock --once
 ```
+
+---
+
+## Process & Thread Debugging
+
+### `ps aux` — what is running
+
+```bash
+ps aux                      # everything
+ps aux | grep [r]viz        # brackets stop grep matching itself
+ps aux --sort=-%mem | head  # biggest memory users
+ps aux | cut -c1-95         # trim runaway command lines
+```
+
+The three letters: `a` = all users, `u` = detailed format, `x` = **include
+processes with no terminal** (daemons, background nodes).
+
+Columns:
+
+| column | meaning |
+|---|---|
+| `%CPU` | **average since the process started**, NOT current load |
+| `VSZ`  | virtual address space - often absurd, mostly ignore |
+| `RSS`  | resident memory in KB - the real RAM number |
+| `TTY`  | `?` = no terminal (daemon), `pts/0` = started from a terminal |
+| `STAT` | state + modifiers, see below |
+| `TIME` | total CPU time consumed |
+
+For *current* CPU use `top`, `htop`, or `pidstat 1`.
+
+### STAT codes
+
+```
+S  sleeping (normal)     R  running      D  uninterruptible I/O (cannot be killed)
+Z  zombie                T  stopped
+```
+
+Modifiers stack on: `N` low priority, `<` high priority, `L` **pages locked in
+memory (mlockall)**, `l` multi-threaded, `s` session leader, `+` foreground.
+
+`ros2_control_node` shows `SNLl+`. That `L` confirms `memlock` is working - the
+control loop has its memory pinned and cannot be swapped out.
+
+### Threads (what `ps aux` cannot show)
+
+`ros2_control`'s realtime loop is a **thread**, so the process shows
+`SCHED_OTHER` and tells you nothing. Use `-L`:
+
+```bash
+# threads of one process
+ps -Lo pid,tid,rtprio,cls,psr,comm -p $(pgrep -f ros2_control_node | head -1)
+
+# every realtime thread on the machine (-e = all processes)
+ps -eLo pid,tid,rtprio,cls,psr,comm --sort=-rtprio | awk 'NR==1 || $4!="TS"'
+```
+
+`rtprio` = realtime priority, `cls` = scheduling class (`FF` = SCHED_FIFO,
+`TS` = normal), `psr` = which CPU core. Expect one line with `50 FF`.
+
+`-e` and `-p` are alternatives (all vs one). `-L` turns processes into threads.
+
+### Finding and killing
+
+```bash
+pgrep -af aruco             # -a shows full command line, -f matches it too
+kill -INT <PID>             # kill takes NUMBERS
+pkill -INT -f <pattern>     # pkill takes NAMES/patterns
+```
+
+**`kill` takes PIDs, `pkill` takes names.** `pkill 19038` looks for a process
+*named* "19038", finds nothing, and silently does nothing.
+
+`-f` is needed for ROS nodes because they run from long paths; without it
+`pgrep` only sees the process name, truncated to 15 characters.
+
+**Always preview with `pgrep` before `pkill`** - `pkill -f` matches anything
+whose command line contains the pattern, including the shell you are typing in.
+
+Signals:
+
+```bash
+pkill -INT -f "ros2 launch omniman_ros2_control"   # SIGINT = Ctrl-C, CLEAN
+pkill -9   -f ros2_control_node                    # SIGKILL - NO cleanup
+```
+
+Signal the launch, not individual nodes - it propagates to every node it started.
+Killing a process does NOT means stop the hardware, beaware of this and check if there is a service call too kill the hardware instead of using this
