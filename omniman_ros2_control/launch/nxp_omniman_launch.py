@@ -254,25 +254,21 @@ def generate_launch_description():
         }]
     )
 
-    # Rectify raw camera images using image_proc so that aruco_tracker receives
-    # an undistorted image without triggering the stack-overflow bug in
-    # aruco_opencv 2.4.2's internal undistortion code path.
-    image_throttle = Node(
-        package="topic_tools",
-        executable="throttle",
-        arguments=["messages", "/image_raw", "5.0", "/image_raw_throttled"],
-    )
-
-    image_rectify = Node(
-        package="image_proc",
-        executable="rectify_node",
-        ros_arguments=['--log-level', 'ERROR'],
-        remappings=[
-            ("image",       "/image_raw_throttled"),
-            ("camera_info", "/camera_info"),
-            ("image_rect",  "/image_rect"),
-        ],
-    )
+    # aruco_tracker consumes /image_raw directly.
+    #
+    # The throttle + image_proc/rectify_node chain that used to sit here was
+    # removed: on Jazzy, rectify_node requests a finite DEADLINE QoS on
+    # camera_info that usb_cam (Deadline: Infinite) cannot satisfy, so DDS
+    # never matched them, rectify_node never received camera info, and
+    # /image_rect stayed silent. That left /aruco_detections empty.
+    #
+    # The stack-overflow crash in aruco_opencv's undistortion thread that the
+    # chain originally guarded against is still handled by the two mitigations
+    # on the node below: image_is_rectified=True (the crashing undistortion
+    # path is never entered) and an unlimited stack via the prefix.
+    #
+    # usb_cam already applies camera_calibration.yaml, and detection now runs
+    # at the full 30 fps instead of 5.
 
     aruco_tracker = Node(
         package="aruco_opencv",
@@ -281,7 +277,7 @@ def generate_launch_description():
         output="screen",
         prefix="bash -c 'ulimit -s unlimited; exec \"$@\"' --",
         parameters=[{
-            "cam_base_topic": "image_rect",
+            "cam_base_topic": "image_raw",
             "marker_size": 0.04,
             "marker_dict": "4X4_50",
             "image_is_rectified": True,
@@ -289,7 +285,7 @@ def generate_launch_description():
             "debug_publish_period": 0.0,
         }],
         remappings=[
-            ("/image_rect/camera_info", "/camera_info"),
+            ("/image_raw/camera_info", "/camera_info"),
         ],
     )
 
@@ -312,8 +308,6 @@ def generate_launch_description():
             move_group_node,
             # rviz_node,
             usb_cam,
-            image_throttle,
-            image_rectify,
             aruco_tracker,
             rplidar_node
         ]
