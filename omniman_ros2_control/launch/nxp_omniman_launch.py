@@ -251,6 +251,17 @@ def generate_launch_description():
             'frame_id': 'camera_optical_frame',
             'camera_info_url': calibration_url,
             'pixel_format': 'yuyv2rgb',
+            # Whitelist the image_transport publisher plugins. Without this,
+            # image_transport loads every plugin it can find, including
+            # compressedDepth, which only handles 16-bit/32-bit depth images
+            # and logs an error on every single rgb8 frame:
+            #   "Compression requires single-channel 32bit-floating point or
+            #    16bit raw depth images (input format is: rgb8)"
+            # Jazzy uses a whitelist (enable_pub_plugins), not a blacklist.
+            'image_raw.enable_pub_plugins': [
+                'image_transport/raw',
+                'image_transport/compressed',
+            ],
         }]
     )
 
