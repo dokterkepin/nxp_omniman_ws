@@ -25,7 +25,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   tl_expected
   urdf
   kdl_parser
-  orocos_kdl_vendor
+  orocos_kdl
 )
 
 ################################################################################
@@ -53,7 +53,8 @@ target_include_directories(gravity_compensation_controller PUBLIC
   $<INSTALL_INTERFACE:include/gravity_compensation_controller>
 )
 target_link_libraries(gravity_compensation_controller PUBLIC
-  ${controller_interface_LIBRARIES}
+  controller_interface::controller_interface
+  hardware_interface::mock_components
   pluginlib::pluginlib
   rclcpp::rclcpp
   rclcpp_lifecycle::rclcpp_lifecycle
@@ -62,15 +63,10 @@ target_link_libraries(gravity_compensation_controller PUBLIC
   ${tl_expected_LIBRARIES}
   ${urdf_LIBRARIES}
   ${kdl_parser_TARGETS}
-  ${orocos_kdl_vendor_TARGETS}
+  ${orocos_kdl_TARGETS}
   gravity_compensation_controller_parameters
 )
 
-# Humble (ros2_control 2.x) does not propagate include dirs via target exports
-# the way Jazzy does, so attach ament dependencies explicitly.
-ament_target_dependencies(gravity_compensation_controller PUBLIC
-  ${THIS_PACKAGE_INCLUDE_DEPENDS}
-)
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(gravity_compensation_controller PRIVATE "gravity_compensation_controller_BUILDING_DLL" "_USE_MATH_DEFINES")

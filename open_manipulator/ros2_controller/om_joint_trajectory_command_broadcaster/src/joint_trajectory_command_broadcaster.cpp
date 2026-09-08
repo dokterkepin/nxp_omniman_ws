@@ -316,13 +316,15 @@ controller_interface::return_type JointTrajectoryCommandBroadcaster::update(
     if (map_interface_to_joint_state_.count(interface_name) > 0) {
       interface_name = map_interface_to_joint_state_[interface_name];
     }
-    double value = state_interface.get_value();
-    name_if_value_mapping_[state_interface.get_prefix_name()][interface_name] = value;
+    auto value = state_interface.get_optional();
+    if (value) {
+      name_if_value_mapping_[state_interface.get_prefix_name()][interface_name] = *value;
+    }
   }
 
   // Publish JointTrajectory message with current positions
-  if (realtime_joint_trajectory_publisher_ && realtime_joint_trajectory_publisher_->trylock()) {
-    auto & traj_msg = realtime_joint_trajectory_publisher_->msg_;
+  if (realtime_joint_trajectory_publisher_) {
+    trajectory_msgs::msg::JointTrajectory traj_msg;
     traj_msg.header.stamp = rclcpp::Time(0, 0);
     traj_msg.joint_names = joint_names_;
 
@@ -356,7 +358,7 @@ controller_interface::return_type JointTrajectoryCommandBroadcaster::update(
     // Optionally set velocities/accelerations/time_from_start if needed
     traj_msg.points[0].time_from_start = rclcpp::Duration(0, 0);  // immediate
 
-    realtime_joint_trajectory_publisher_->unlockAndPublish();
+    realtime_joint_trajectory_publisher_->try_publish(traj_msg);
   }
 
   return controller_interface::return_type::OK;

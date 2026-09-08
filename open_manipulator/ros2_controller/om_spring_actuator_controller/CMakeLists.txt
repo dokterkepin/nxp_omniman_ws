@@ -44,7 +44,8 @@ target_include_directories(spring_actuator_controller PUBLIC
   $<INSTALL_INTERFACE:include/spring_actuator_controller>
 )
 target_link_libraries(spring_actuator_controller PUBLIC
-  ${controller_interface_LIBRARIES}
+  controller_interface::controller_interface
+  hardware_interface::mock_components
   pluginlib::pluginlib
   rclcpp::rclcpp
   rclcpp_lifecycle::rclcpp_lifecycle
@@ -52,11 +53,6 @@ target_link_libraries(spring_actuator_controller PUBLIC
   spring_actuator_controller_parameters
 )
 
-# Humble (ros2_control 2.x) does not propagate include dirs via target exports
-# the way Jazzy does, so attach ament dependencies explicitly.
-ament_target_dependencies(spring_actuator_controller PUBLIC
-  ${THIS_PACKAGE_INCLUDE_DEPENDS}
-)
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(spring_actuator_controller PRIVATE "spring_actuator_controller_BUILDING_DLL" "_USE_MATH_DEFINES")
