@@ -7,12 +7,7 @@
 #
 # ONE config for recording. physical_ai_server CANNOT record state and action
 # with different dimensions -- _create_dataset() builds BOTH from the same
-# total_joint_order (the concatenation of joint_order), so every recording is
-# N-in / N-out. Per-policy shapes are produced afterwards by slicing the parquet
-# (omniman_vla/scripts/slice_dataset.py), which needs no re-recording:
-#     recorded      state 10 / action 10
-#       -> arm      state  7 / action  7
-#       -> base     state  7 / action  3
+# total_joint_order (the concatenation of joint_order)
 #
 # WHY follower_mobile:/odom IS ABSENT
 # Measured base velocity reaches the commanded value in ~1 frame (33 ms), so
@@ -48,8 +43,6 @@ physical_ai_server:
       # no way to declare an asymmetric shape at record time -- omitting this
       # topic crashes on frame 1 with
       #   ValueError: observation.state of shape (7,) does not match (10,)
-      # Base velocity is removed from state AFTER recording instead, via
-      # omniman_vla/scripts/slice_dataset.py (state 10->7, action stays 10).
       joint_topic_list:
         - follower:/joint_states
         - follower_mobile:/mecanum_drive_controller/odometry

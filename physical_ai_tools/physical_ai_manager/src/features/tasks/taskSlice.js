@@ -26,13 +26,12 @@ const initialState = {
     // so 'drive_pick_place' yields dokterkepin/omniman_drive_pick_place.
     // Dedicated base-only session: hold the leader arm still in its ready
     // pose for the whole episode, drive/correct with the base only. The
-    // arm sub-vector will be near-constant in the recording; slice_dataset.py
+    // arm sub-vector will be near-constant in the recording; .py
     // (omniman_vla/scripts) cuts it down to state[0:7]/action[7:10] afterward
-    // for training a clean base-only policy. Arm manipulation is unaffected --
-    // omniman_drive_pick_place_v3 already works and is not touched by this.
-    taskName: 'base_correction',
+    // for training a clean base-only policy. Arm manipulation is unaffected 
+    taskName: 'pick_and_place',
     taskType: '',
-    taskInstruction: ['drive to align with the table, hold the arm still'],
+    taskInstruction: ['pick the object'],
     policyPath: '',
     recordInferenceMode: false,
     userId: 'dokterkepin',
@@ -41,7 +40,7 @@ const initialState = {
     warmupTime: 5,
     episodeTime: 20,
     resetTime: 5,
-    numEpisodes: 10,
+    numEpisodes: 1,
     token: '',
     pushToHub: false,
     privateMode: false,

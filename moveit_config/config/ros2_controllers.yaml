@@ -30,4 +30,4 @@ arm_controller:
       - velocity
 gripper_controller:
   ros__parameters:
-    joint: left_finger_prismatic_joint
+    joint: gripper_prismatic_joint

@@ -85,7 +85,7 @@
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="left_finger_prismatic_joint">
+            <joint name="gripper_prismatic_joint">
                 <command_interface name="position"/>
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
@@ -148,7 +148,7 @@
         <xacro:dynamixel_ros2_control name="PalmYaw" serial_device="${serial_port}" device_id="10" joint_name="palm_yaw_joint"
                                       />
         <xacro:dynamixel_ros2_control name="LeftFingerPrismatic" serial_device="${serial_port}" device_id="11"
-                                      joint_name="left_finger_prismatic_joint"
+                                      joint_name="gripper_prismatic_joint"
                                       use_prismatic="1"
                                       revolute_max="0.0" revolute_min="-2.5"
                                       prismatic_max="0.019" prismatic_min="-0.013"

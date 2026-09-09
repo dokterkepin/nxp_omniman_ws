@@ -23,6 +23,6 @@ moveit_simple_controller_manager:
   gripper_controller:
     type: GripperCommand
     joints:
-      - left_finger_prismatic_joint
+      - gripper_prismatic_joint
     action_ns: gripper_cmd
     default: true

@@ -43,7 +43,7 @@ class OmnimanHandTeleop(Node):
         super().__init__("hand_pose_publisher_node")
 
         # ---- Parameters --------------------------------------------------
-        self.camera_device = self.declare_parameter("camera_device", "/dev/video_c920").value
+        self.camera_device = self.declare_parameter("camera_device", "/dev/video0").value
         self.planning_frame = self.declare_parameter("planning_frame", "base_link").value
         self.gripper_action = self.declare_parameter(
             "gripper_action", "/gripper_controller/gripper_cmd").value
@@ -78,7 +78,7 @@ class OmnimanHandTeleop(Node):
         # Exponential smoothing on the output pose (0..1, lower = smoother/laggier).
         self.pose_smoothing = self.declare_parameter("pose_smoothing", 0.3).value
 
-        # Gripper limits (omniman left_finger_prismatic_joint: -0.010..0.019)
+        # Gripper limits (omniman gripper_prismatic_joint: -0.010..0.019)
         self.gripper_open = self.declare_parameter("gripper_open_position", 0.019).value
         self.gripper_close = self.declare_parameter("gripper_close_position", -0.010).value
         self.gripper_effort = self.declare_parameter("gripper_max_effort", 1.0).value
@@ -103,7 +103,7 @@ class OmnimanHandTeleop(Node):
         if not self.cap.isOpened():
             self.get_logger().error(
                 f"Could not open camera device {self.camera_device}. "
-                f"Set the 'camera_device' param (your C920 is /dev/video2 -> 2).")
+                f"Set the 'camera_device' param (your C920 is /dev/video -> 2).")
         self.hands = mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=2,            # detect both, but only act on the right hand
