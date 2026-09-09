@@ -1,3 +1,8 @@
 hand_pose_publisher_node:
   ros__parameters:
-    camera_device: "/dev/video_c920"    # udev symlink -> always the C920 regardless of /dev/videoX number
+    # Logitech C930c (046d:0891, serial 40EE39BE) enumerates as /dev/video0.
+    # /dev/video1 is the UVC metadata node -- it has no capture caps, so
+    # cv2.VideoCapture opens it and then never returns a frame.
+    # For a number-proof path, install the udev rule in the README and switch
+    # this to /dev/video_hand_cam.
+    camera_device: "/dev/video0"

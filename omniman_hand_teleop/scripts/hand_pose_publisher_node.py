@@ -103,7 +103,8 @@ class OmnimanHandTeleop(Node):
         if not self.cap.isOpened():
             self.get_logger().error(
                 f"Could not open camera device {self.camera_device}. "
-                f"Set the 'camera_device' param (your C920 is /dev/video -> 2).")
+                f"Set the 'camera_device' param in config/teleop.yaml "
+                f"(list capture nodes with: v4l2-ctl --list-devices).")
         self.hands = mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=2,            # detect both, but only act on the right hand
@@ -119,7 +120,7 @@ class OmnimanHandTeleop(Node):
 
         self.timer = self.create_timer(0.02, self.timer_callback)  # 50 Hz
         self.get_logger().info(
-            f"Omniman hand teleop started. Camera=/dev/video{self.camera_device}, "
+            f"Omniman hand teleop started. Camera={self.camera_device}, "
             f"controlling with the {CONTROL_HAND.upper()} hand. "
             f"Raise {self.open_finger_count}+ fingers = OPEN gripper.")
 
