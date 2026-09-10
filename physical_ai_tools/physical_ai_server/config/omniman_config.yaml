@@ -45,7 +45,7 @@ physical_ai_server:
       #   ValueError: observation.state of shape (7,) does not match (10,)
       joint_topic_list:
         - follower:/joint_states
-        - follower_mobile:/mecanum_drive_controller/odometry
+        # - follower_mobile:/mecanum_drive_controller/odometry
         - leader:/leader/joint_trajectory
         - leader_mobile:/cmd_vel
 

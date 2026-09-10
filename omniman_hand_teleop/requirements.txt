@@ -1,4 +1,8 @@
-# Python dependencies for dual-arm hand tracking
-mediapipe>=0.10.0
-opencv-python>=4.5.0
-numpy>=1.21.0
+# Python dependencies for the MediaPipe hand teleop node.
+#   pip install -r requirements.txt
+#
+# Install into a Python 3.12 env so ROS 2 Jazzy's rclpy can be imported.
+mediapipe==0.10.21
+opencv-contrib-python<5
+numpy<2
+PyYAML

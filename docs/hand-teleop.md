@@ -13,9 +13,27 @@ Webcam → MediaPipe landmarks → EMA smoothing → /hand_target_pose → MoveI
 
 ## Prerequisites
 
-- USB webcam (tested with Logitech C920 on `/dev/video_c920` via udev rule)
-- ROS2 Humble + MoveIt2
-- Python packages: `pip install mediapipe opencv-python`
+- USB webcam (default `/dev/video0`, see below to change)
+- ROS 2 Jazzy + MoveIt 2
+- A Python 3.12 environment for the MediaPipe node (see below)
+
+### Python environment (one-time setup)
+
+The node runs in its own environment. It must be Python 3.12 — that is the version ROS 2 Jazzy's `rclpy` is built for.
+
+```bash
+conda create -y -n hand_teleop python=3.12
+conda activate hand_teleop
+pip install -r ~/workspaces/nxp_omniman_ws/src/omniman_hand_teleop/requirements.txt
+```
+
+Activate it before every launch, then source ROS:
+
+```bash
+conda activate hand_teleop
+source /opt/ros/jazzy/setup.bash
+source ~/workspaces/nxp_omniman_ws/install/setup.bash
+```
 
 ### Camera udev rule (one-time setup)
 
