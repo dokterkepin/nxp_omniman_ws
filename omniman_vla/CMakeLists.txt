@@ -18,6 +18,7 @@ install(DIRECTORY
 install(PROGRAMS
   scripts/replay_arm.py
   scripts/replay_base.py
+  scripts/joy_discrete_base.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

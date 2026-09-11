@@ -119,11 +119,21 @@ wc -l ~/.cache/huggingface/lerobot/<user>/<task_name>/meta/episodes.jsonl
 
 Inspect episodes visually (same UI as the HF `visualize_dataset` Space, run locally):
 ```bash
+conda activate lerobot_jazzy
 cd ~/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot
-PYTHONPATH=src python3 -m lerobot.scripts.visualize_dataset_html \
-    --repo-id <user>/<task_name> --port 9091
+PYTHONPATH=src python -m lerobot.scripts.visualize_dataset_html \
+    --repo-id <user>/<task_name> \
+    --root /home/dokterkepin/dataset/<user>/<task_name> \
+    --host 0.0.0.0 --port 9091
 ```
-> Override `--port` — the default 9090 collides with rosbridge.
+Open `http://<this-pc-ip>:9091` (e.g. `http://192.168.51.114:9091`). Add `--episodes 0 5 10` to load only some episodes.
+
+- `--root` — needed when the dataset isn't in `~/.cache/huggingface/lerobot`.
+- `--host 0.0.0.0` — without it the viewer only answers on `127.0.0.1`, so other machines can't reach it.
+- `--port 9091` — the default 9090 collides with rosbridge.
+- Run it in `lerobot_jazzy` — system `python3` has no `flask`.
+
+Private alternative: drop `--host`, and from your laptop run `ssh -L 9091:127.0.0.1:9091 dokterkepin@192.168.51.114`, then open `http://localhost:9091`.
 
 Delete bad episodes via **Data Tools → Delete** (accepts `0,1,5-9`). Don't delete parquet files
 by hand; the metadata has to stay consistent.

@@ -1,12 +1,10 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, RegisterEventHandler
-from launch.conditions import IfCondition
+from launch.actions import IncludeLaunchDescription, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     Command,
     FindExecutable,
-    LaunchConfiguration,
     PathJoinSubstitution,
 )
 from launch_ros.actions import Node
@@ -16,20 +14,12 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     pkg_path = FindPackageShare('omniman_vla')
 
-    # Joystick is only for driving the BASE between recording locations -- it is not
-    # part of the VLA action space. Set false if driving from another machine.
-    use_joy_arg = DeclareLaunchArgument(
-        'use_joy',
-        default_value='true',
-        description='Start joy_linux + teleop_twist_joy for driving the mecanum base.',
-    )
-
     robot_controllers = PathJoinSubstitution(
         [pkg_path, 'config', 'controllers_vla.yaml']
     )
 
     joystick_config = PathJoinSubstitution(
-        [pkg_path, 'config', 'joystick.yaml']
+        [pkg_path, 'config', 'joystick_discrete.yaml']
     )
 
     robot_description_content = Command(
@@ -94,7 +84,6 @@ def generate_launch_description():
         name='joy_node',
         output='screen',
         parameters=[joystick_config],
-        condition=IfCondition(LaunchConfiguration('use_joy')),
     )
 
     # REQUIRED on Jazzy - see the note above. Converts Twist on /cmd_vel into
@@ -106,20 +95,15 @@ def generate_launch_description():
         output='screen',
     )
 
-    # No cmd_vel remap: the joystick publishes plain Twist straight onto /cmd_vel,
-    # which is what physical_ai_server records as the base action
-    # (leader_mobile:/cmd_vel). Remapping it to /cmd_vel_stamped would drive the
-    # robot but bypass /cmd_vel, so base motion would never reach the dataset.
-    #
-    # On Humble the mecanum controller also read /cmd_vel directly via
-    # reference_unstamped, so one topic served both. Jazzy removed that topic -
-    # MecanumDriveController now subscribes ONLY to ~/reference (TwistStamped) -
-    # so twist_relay below is required to get the wheels moving.
-    teleop_joy_node = Node(
-        package='teleop_twist_joy',
-        executable='teleop_node',
+    # Replaces teleop_twist_joy: fixed LeKiwi-style speed levels rather than
+    # proportional sticks, so the recorded base action only ever takes a
+    # handful of distinct values. Reads /joy from joy_node above.
+    joy_discrete_node = Node(
+        package='omniman_vla',
+        executable='joy_discrete_base.py',
+        name='joy_discrete_base',
+        output='screen',
         parameters=[joystick_config],
-        condition=IfCondition(LaunchConfiguration('use_joy')),
     )
 
     # arm_controller waits on joint_state_broadcaster.
@@ -182,14 +166,13 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            use_joy_arg,
             control_node,
             robot_state_publisher_node,
             joint_state_broadcaster_spawner,
             delay_mecanum_controller,
             delay_arm_controller,
             joy_node,
-            teleop_joy_node,
+            joy_discrete_node,
             twist_relay,
             usb_cam,
             rplidar_node,

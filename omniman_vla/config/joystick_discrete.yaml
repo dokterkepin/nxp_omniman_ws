@@ -1,0 +1,51 @@
+# Discrete-speed base teleop, LeKiwi style.
+#
+# Used by scripts/joy_discrete_base.py, which REPLACES teleop_twist_joy. Launch
+# with discrete_base:=true; running both would put two publishers on /cmd_vel.
+#
+# Every command is 0 or exactly one of the three levels below, so the recorded
+# base action has only a handful of distinct values - the same shape as
+# LeKiwi's keyboard data.
+#
+# Button and axis numbers below are a guess for an Xbox-style pad and almost
+# certainly need changing for your Bluetooth controller. To find yours:
+#
+#   ros2 run omniman_vla joy_discrete_base.py --ros-args -p debug:=true
+#
+# then press one control at a time and read the printed index.
+
+joy_discrete_base:
+  ros__parameters:
+    publish_rate: 30.0      # match recording fps so every frame has a command
+    joy_timeout: 0.5        # zero the base if /joy goes quiet (bluetooth drop)
+    debug: false
+
+    # Slowest first. These are LeKiwi's exact levels.
+    speed_xy: [0.1, 0.25, 0.4]            # m/s
+    speed_theta_deg: [30.0, 60.0, 90.0]   # deg/s, published as rad/s
+    start_level: 0
+
+    # D-pad reported as AXES (common on Xbox-style pads).
+    # Set both to -1 if your pad reports the D-pad as buttons instead.
+    axis_forward: 7
+    axis_strafe: 6
+    invert_forward: false
+    invert_strafe: false
+
+    # D-pad reported as BUTTONS. Leave at -1 when using the axes above.
+    button_forward: -1
+    button_backward: -1
+    button_left: -1
+    button_right: -1
+
+    # Rotation: shoulder buttons.
+    button_turn_left: 4
+    button_turn_right: 5
+
+    # Speed level up / down.
+    button_speed_up: 3
+    button_speed_down: 0
+
+    # Hold-to-drive button. -1 means the base drives without holding anything,
+    # matching the current teleop_twist_joy setup (require_enable_button: false).
+    button_enable: -1
