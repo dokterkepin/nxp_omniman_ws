@@ -33,6 +33,17 @@ SAFETY
     Publishes zero if /joy goes quiet for joy_timeout seconds, and zero on
     shutdown, so a dropped Bluetooth link stops the base instead of leaving the
     last command latched.
+
+TURNING IT OFF FOR INFERENCE
+    physical_ai_server also publishes /cmd_vel during inference, and this node
+    streams zeros whenever it runs, which drags every policy command back
+    toward zero. Set teleop_enabled false and this node publishes nothing:
+
+        ros2 param set /joy_discrete_base teleop_enabled false   # inference
+        ros2 param set /joy_discrete_base teleop_enabled true    # teleop / recording
+
+    Switching it off sends one stop first, so the base does not keep coasting
+    on the last joystick command.
 """
 
 import math
@@ -40,6 +51,7 @@ import signal
 import time
 
 from geometry_msgs.msg import Twist
+from rcl_interfaces.msg import SetParametersResult
 import rclpy
 from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
@@ -57,6 +69,8 @@ class JoyDiscreteBase(Node):
         super().__init__('joy_discrete_base')
 
         p = self.declare_parameter
+        # false = publish nothing on /cmd_vel (use during inference).
+        p('teleop_enabled', True)
         p('publish_rate', 30.0)
         p('joy_timeout', 0.5)
         p('debug', False)
@@ -94,8 +108,10 @@ class JoyDiscreteBase(Node):
             raise ValueError('speed_xy and speed_theta_deg must be the same length')
         self.level = min(max(int(g('start_level').value), 0), len(self.speed_xy) - 1)
 
+        self.teleop_enabled = bool(g('teleop_enabled').value)
         self.joy_timeout = float(g('joy_timeout').value)
         self.debug = bool(g('debug').value)
+        self.add_on_set_parameters_callback(self._on_params)
 
         self.axis_forward = int(g('axis_forward').value)
         self.axis_strafe = int(g('axis_strafe').value)
@@ -117,6 +133,18 @@ class JoyDiscreteBase(Node):
         self.get_logger().info(
             f'discrete base teleop ready - levels {self.speed_xy} m/s / '
             f'{g("speed_theta_deg").value} deg/s, starting at level {self.level}')
+
+    def _on_params(self, params):
+        for prm in params:
+            if prm.name == 'teleop_enabled':
+                on = bool(prm.value)
+                if self.teleop_enabled and not on:
+                    self.stop()
+                self.teleop_enabled = on
+                self.get_logger().info(
+                    'teleop ENABLED - publishing /cmd_vel' if on
+                    else 'teleop DISABLED - /cmd_vel left to other publishers')
+        return SetParametersResult(successful=True)
 
     # ---------------------------------------------------------------- input
 
@@ -174,6 +202,9 @@ class JoyDiscreteBase(Node):
     # --------------------------------------------------------------- output
 
     def _tick(self):
+        if not self.teleop_enabled:
+            return
+
         twist = Twist()
 
         stale = (
@@ -220,7 +251,9 @@ def main():
     node = JoyDiscreteBase()
 
     def _on_signal(_signum, _frame):
-        node.stop()
+        # When disabled a policy owns /cmd_vel; don't interrupt it with zeros.
+        if node.teleop_enabled:
+            node.stop()
         raise SystemExit
 
     signal.signal(signal.SIGINT, _on_signal)

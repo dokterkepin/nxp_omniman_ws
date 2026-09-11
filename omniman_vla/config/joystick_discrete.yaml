@@ -16,6 +16,10 @@
 
 joy_discrete_base:
   ros__parameters:
+    # true  = joystick drives the base (teleop, recording)
+    # false = publish nothing on /cmd_vel, so an inference policy has it alone
+    # Can be flipped live: ros2 param set /joy_discrete_base teleop_enabled false
+    teleop_enabled: true
     publish_rate: 30.0      # match recording fps so every frame has a command
     joy_timeout: 0.5        # zero the base if /joy goes quiet (bluetooth drop)
     debug: false

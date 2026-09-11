@@ -59,6 +59,35 @@ In RViz:
 
 ![Nav2 Navigation](images/nav2.png)
 
+### Control from a browser / iPad (Foxglove)
+
+`nav2_launch.py` also starts `foxglove_bridge` on port 8765 (turn it off with
+`foxglove:=false`). Install it once on the robot PC:
+
+```bash
+sudo apt install ros-jazzy-foxglove-bridge
+```
+
+On the iPad, open [app.foxglove.dev](https://app.foxglove.dev), choose
+**Open connection → Foxglove WebSocket**, and enter `ws://192.168.51.151:8765`.
+
+Panel setup:
+1. **3D** panel: set the display frame to `map`, enable `/map`, `/scan`,
+   `/plan` and the costmaps.
+2. In the 3D panel settings under **Publish**, set the pose topic to
+   `/goal_pose` and the pose estimate topic to `/initialpose`. Then use the
+   toolbar buttons the same way as RViz's **2D Pose Estimate** and **2D Goal Pose**.
+3. **Teleop** panel: topic `/cmd_vel`, for manual driving.
+
+Save it as a layout so you only do this once.
+
+> **If Safari won't connect:** app.foxglove.dev is served over `https`, and
+> Safari can refuse a plain `ws://` connection from an `https` page. The fix is
+> to serve the viewer over `http` on the LAN with Lichtblick (the open-source
+> Foxglove fork, works with the same bridge):
+> `docker run -d -p 8080:8080 ghcr.io/lichtblick-suite/lichtblick:latest`,
+> then open `http://<pc-ip>:8080` on the iPad.
+
 ---
 
 ## Multi-Machine Setup

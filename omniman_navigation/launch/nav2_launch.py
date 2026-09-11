@@ -1,5 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -26,6 +27,18 @@ def generate_launch_description():
             [pkg_path, "config", "nav2_params.yaml"]
         ),
         description="Full path to the Nav2 params file",
+    )
+
+    use_foxglove = DeclareLaunchArgument(
+        "foxglove",
+        default_value="true",
+        description="Start foxglove_bridge so a browser (e.g. iPad) can drive Nav2",
+    )
+
+    foxglove_port = DeclareLaunchArgument(
+        "foxglove_port",
+        default_value="8765",
+        description="Websocket port for foxglove_bridge",
     )
 
     params_file = LaunchConfiguration("params_file")
@@ -182,6 +195,25 @@ def generate_launch_description():
         output="screen",
     )
 
+    # --- Foxglove bridge (browser / iPad control) ---
+    #
+    # Serves every ROS topic over a websocket at ws://<robot-ip>:<foxglove_port>.
+    # Foxglove's 3D panel publishes goals to /goal_pose (bt_navigator listens)
+    # and poses to /initialpose (AMCL listens); its Teleop panel publishes Twist
+    # on /cmd_vel, which twist_relay below forwards to the mecanum controller.
+
+    foxglove_bridge = Node(
+        package="foxglove_bridge",
+        executable="foxglove_bridge",
+        name="foxglove_bridge",
+        output="screen",
+        parameters=[{
+            "port": LaunchConfiguration("foxglove_port"),
+            "address": "0.0.0.0",
+        }],
+        condition=IfCondition(LaunchConfiguration("foxglove")),
+    )
+
     # --- RViz ---
 
     rviz_config = PathJoinSubstitution(
@@ -199,6 +231,8 @@ def generate_launch_description():
     return LaunchDescription([
         map_file,
         nav2_params_file,
+        use_foxglove,
+        foxglove_port,
         localization_launch,
         filter_mask_server,
         costmap_filter_info_server,
@@ -209,5 +243,6 @@ def generate_launch_description():
         bt_navigator,
         lifecycle_manager,
         twist_relay,
+        foxglove_bridge,
         rviz_node,
     ])
