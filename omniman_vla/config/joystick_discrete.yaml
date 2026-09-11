@@ -40,8 +40,8 @@ joy_discrete_base:
 
     # Rotation: LB / RB. These are BUTTONS 6 and 7, which is unrelated to the
     # D-pad being AXES 6 and 7 above - axes and buttons are separate arrays.
-    button_turn_left: 6
-    button_turn_right: 7
+    button_turn_left: 4
+    button_turn_right: 5
 
     # Speed level up / down.
     button_speed_up: 3
