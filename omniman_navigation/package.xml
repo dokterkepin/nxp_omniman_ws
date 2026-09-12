@@ -34,6 +34,8 @@
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>action_msgs</exec_depend>
   <exec_depend>std_srvs</exec_depend>
+  <!-- web_ui_launch.py: serves web/index.html and bridges it to ROS -->
+  <exec_depend>rosbridge_server</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>rplidar_ros</exec_depend>
   <exec_depend>rviz2</exec_depend>

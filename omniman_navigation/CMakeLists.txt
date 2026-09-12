@@ -11,6 +11,7 @@ install(DIRECTORY
   config
   launch
   maps
+  web
   DESTINATION share/${PROJECT_NAME}
 )
 

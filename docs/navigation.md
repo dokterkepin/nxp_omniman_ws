@@ -59,6 +59,59 @@ In RViz:
 
 ![Nav2 Navigation](images/nav2.png)
 
+### Reading the costmap colours in RViz
+
+RViz paints a costmap with one colour per cost value (0-254, plus 255 for
+unknown). The exact palette is in `rviz_default_plugins` (`palette_builder.cpp`).
+
+| Colour | Cost | Meaning | What it does to planning |
+|---|---|---|---|
+| nothing (see-through) | 0 | Free space | Path may go anywhere here |
+| Blue -> purple -> red | 1-98 | Inflation: cost rising as you get nearer an obstacle | Legal, but the planner pays to go there, so it hugs the blue side |
+| **Cyan** | 99 | Inscribed: robot centre here means the footprint touches the obstacle | Treated as blocked |
+| **Magenta** | 100 | Lethal: the obstacle itself | Blocked |
+| Grey-green | 255 (-1) | Unknown, never observed | Blocked unless the map says otherwise |
+| Green | 101-127 | Invalid positive value | Should never appear - bad data |
+| Red to yellow | 128-254 | Invalid negative value | Should never appear - bad data |
+
+The underlying static map uses a different scheme: **white** free, **black**
+occupied, **grey** unknown.
+
+Faded, washed-out versions of the same colours are the *other* costmap drawn
+underneath at lower alpha. Two costmaps overlap around the robot, so the vivid
+patch is the local one and the pale wash is the global one.
+
+Blue is cheap, red is expensive, and both are still drivable. Only cyan,
+magenta and unknown actually block a path. If a goal lands on cyan or magenta,
+Nav2 rejects it.
+
+### Global vs local costmap
+
+|  | Global costmap | Local costmap |
+|---|---|---|
+| Topic | `/global_costmap/costmap` | `/local_costmap/costmap` |
+| Question it answers | "Which way round the building?" | "What is right in front of me now?" |
+| Used by | `planner_server` - the whole path | `controller_server` (MPPI) - the next few moves |
+| Frame | `map` | `odom` |
+| Size | the whole saved map | 3 x 3 m window that travels with the robot |
+| Update / publish | 2 Hz / 2 Hz | 10 Hz / 5 Hz |
+| Layers | static + obstacle + keepout + inflation | obstacle + keepout + inflation |
+| Inflation | radius 0.25 m, scaling 3.0 | radius 0.30 m, scaling 8.0 |
+
+The local costmap has no static layer, so it only knows what the lidar sees
+right now - that is what lets it dodge a person who was not on the map. The
+global costmap starts from the saved map, so it can plan a route through rooms
+the lidar cannot currently see.
+
+Two things this explains in RViz:
+- The local costmap is a **square that slides along with the robot, tilted
+  relative to the map**. It lives in `odom`, and `odom` drifts away from `map`
+  over time, so the tilt is normal.
+- The local costmap is inflated *more* aggressively (0.30 m, scaling 8.0) than
+  the global one, so a corridor can look passable in the global costmap and
+  nearly closed in the local one.
+
+
 ### Control from a browser / iPad (Foxglove)
 
 `nav2_launch.py` also starts `foxglove_bridge` on port 8765 (turn it off with

@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Omniman Nav</title>
+<!--
+  Touch UI for Nav2, made for an iPad. Served over plain http so Safari has no
+  https/ws mixed-content problem, and talks to ROS through its own rosbridge.
+  Nav2 only - policies are driven from the physical_ai_manager UI.
+
+  The map drawing comes from ros2djs (RobotWebTools); only the goal and pose
+  publishing is ours, because nav2djs still targets ROS 1's move_base.
+
+  ROS 2 note: nav_msgs/OccupancyGrid etc. are the ROS 1 style type names, which
+  rosbridge accepts, but ros2djs asks for them with png compression. Message
+  stamps must be {sec, nanosec}, not ROS 1's {secs, nsecs}.
+-->
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #15161a;
+               color: #e6e6e6; font: 15px system-ui, -apple-system, sans-serif;
+               -webkit-user-select: none; user-select: none; }
+  #app { display: flex; flex-direction: column; height: 100%; }
+  header { display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+           background: #1e2026; border-bottom: 1px solid #2c2f36; flex: none; }
+  #status { margin-left: auto; font-size: 13px; color: #9aa0aa; }
+  #status.ok { color: #4ade80; }
+  #status.bad { color: #f87171; }
+  button { font: inherit; color: #e6e6e6; background: #2a2d35; border: 1px solid #3a3e47;
+           border-radius: 10px; padding: 10px 14px; min-height: 44px; touch-action: manipulation; }
+  button.on { background: #2563eb; border-color: #2563eb; }
+  .sep { width: 1px; height: 28px; background: #3a3e47; margin: 0 4px; }
+  .layer { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #c9ced6;
+           padding: 8px 6px; }
+  .layer input { width: 20px; height: 20px; accent-color: #2563eb; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.scan { background: #ef4444; }
+  .dot.global { background: #d946ef; opacity: .55; }
+  .dot.local { background: #d946ef; }
+  #map { position: relative; flex: 1 1 auto; touch-action: none; }
+  /* Safari hands pinches to the page unless the canvas itself opts out. */
+  #map canvas { display: block; touch-action: none; }
+  #hint { position: absolute; left: 10px; bottom: 10px; font-size: 13px; color: #9aa0aa;
+          background: rgba(21,22,26,.75); padding: 6px 10px; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button id="mode-view" class="on">View</button>
+    <button id="mode-goal">Goal</button>
+    <button id="mode-init">Set pose</button>
+    <button id="rotate" title="Rotate the map 90&deg;">&#8635; Rotate</button>
+    <span class="sep"></span>
+    <label class="layer"><input type="checkbox" id="layer-scan" checked><span class="dot scan"></span>Scan</label>
+    <label class="layer"><input type="checkbox" id="layer-global" checked><span class="dot global"></span>Global</label>
+    <label class="layer"><input type="checkbox" id="layer-local" checked><span class="dot local"></span>Local</label>
+    <span id="status">connecting...</span>
+  </header>
+  <div id="map">
+    <div id="hint">drag to pan, pinch to zoom</div>
+  </div>
+</div>
+
+<script src="vendor/eventemitter2.min.js"></script>
+<script src="vendor/roslib.min.js"></script>
+<script src="vendor/easeljs.min.js"></script>
+<script src="vendor/ros2d.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var mapDiv = document.getElementById('map');
+  var statusEl = document.getElementById('status');
+  var hintEl = document.getElementById('hint');
+
+  // ---- colours ------------------------------------------------------------
+  // Everything drawn on the map reads from here - change a value, reload, done.
+  // Grid layers (drawn pixel by pixel) take rgb + alpha, where alpha is 0-255
+  // and 255 is fully opaque. Line and shape colours take CSS colours.
+
+  var COLORS = {
+    background:   '#15161a',                        // behind the map
+    // One solid colour per layer. alpha 255 means nothing blends with what is
+    // underneath, so each layer shows exactly the colour set here; where two
+    // layers cover the same cell, the one drawn later wins (order below).
+    globalCostmap: { rgb: [76, 0, 76], alpha: 255 },    // /global_costmap cost 100
+    localCostmap:  { rgb: [255, 0, 255], alpha: 255 },  // /local_costmap cost 100
+    scan:         '#ef4444',                        // /scan points
+    plan:         '#ff0000',                        // /plan line
+    robotFill:    '#3b82f6',                        // robot arrow
+    robotStroke:  '#ffffff',
+    goalPreview:  '#f59e0b',                        // arrow while dragging a goal
+    posePreview:  '#a78bfa'                         // arrow while setting the pose
+  };
+
+  var HINTS = {
+    view: 'drag to pan, pinch to zoom',
+    goal: 'drag from the target, release sets the heading - second finger cancels',
+    init: 'drag from where the robot really is - second finger cancels'
+  };
+  var mode = 'view';
+
+  // ---- ROS ----------------------------------------------------------------
+  // Same host as this page, so the address is never hard-coded. Port 9091 is
+  // this UI's own rosbridge: physical_ai_server runs its own on 9090 and the
+  // two stay separate. Override with ?ros=ws://host:port.
+  var wsUrl = new URLSearchParams(window.location.search).get('ros')
+              || 'ws://' + window.location.hostname + ':9091';
+  var ros = new ROSLIB.Ros({ url: wsUrl });
+
+  ros.on('connection', function () { setStatus('connected', 'ok'); });
+  ros.on('close', function () { setStatus('disconnected', 'bad'); });
+  ros.on('error', function () { setStatus('connection error', 'bad'); });
+
+  function setStatus(text, cls) {
+    statusEl.textContent = text;
+    statusEl.className = cls || '';
+  }
+
+  var goalTopic = new ROSLIB.Topic({
+    ros: ros, name: '/goal_pose', messageType: 'geometry_msgs/PoseStamped' });
+  var initTopic = new ROSLIB.Topic({
+    ros: ros, name: '/initialpose',
+    messageType: 'geometry_msgs/PoseWithCovarianceStamped' });
+  function stamp() {
+    var ms = Date.now();
+    return { sec: Math.floor(ms / 1000), nanosec: (ms % 1000) * 1e6 };
+  }
+
+  function quaternion(yaw) {
+    return { x: 0, y: 0, z: Math.sin(yaw / 2), w: Math.cos(yaw / 2) };
+  }
+
+  function publish(x, y, yaw) {
+    var pose = { position: { x: x, y: y, z: 0 }, orientation: quaternion(yaw) };
+    var header = { stamp: stamp(), frame_id: 'map' };
+
+    if (mode === 'goal') {
+      goalTopic.publish(new ROSLIB.Message({ header: header, pose: pose }));
+      setStatus('goal sent', 'ok');
+    } else {
+      // AMCL's own defaults: 0.5 m / 0.26 rad standard deviation, squared.
+      var cov = new Array(36).fill(0);
+      cov[0] = 0.25; cov[7] = 0.25; cov[35] = 0.06853;
+      initTopic.publish(new ROSLIB.Message({
+        header: header, pose: { pose: pose, covariance: cov } }));
+      setStatus('pose estimate sent', 'ok');
+    }
+  }
+
+  // ---- map view -----------------------------------------------------------
+
+  var viewer = new ROS2D.Viewer({
+    divID: 'map',
+    width: mapDiv.clientWidth,
+    height: mapDiv.clientHeight,
+    background: COLORS.background
+  });
+  var scene = viewer.scene;
+  var canvas = mapDiv.querySelector('canvas');
+
+  // Grid cells are 5 cm squares blown up to many pixels. Without this the
+  // browser interpolates between them and the whole map looks blurred, where
+  // RViz draws hard-edged cells. Resizing a canvas resets its context, so this
+  // has to be re-applied after every resize.
+  function crispPixels() {
+    var ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.mozImageSmoothingEnabled = false;
+    ctx.webkitImageSmoothingEnabled = false;
+  }
+  crispPixels();
+
+  // Everything lives in one container so the view can be rotated: the map is
+  // long and thin, and which way round it reads best depends on the room, not
+  // on the map's own axes. Rotating the stage itself would break hit testing,
+  // but globalToLocal() on a container handles rotation for us.
+  var world = new createjs.Container();
+  scene.addChild(world);
+  window.__world = world;   // handle for automated tests
+
+  // ROS2D.Viewer leaves the stage shifted down by the canvas height (its own
+  // way of flipping y). The world container places everything itself, so clear
+  // it or the map is drawn one screen too low.
+  scene.x = scene.y = 0;
+
+  var gridClient = new ROS2D.OccupancyGridClient({
+    ros: ros, rootObject: world, continuous: true });
+
+  // Child objects use canvas coordinates, where y grows downwards, so every
+  // ROS y becomes -y. The scene transform below turns those into pixels.
+  var plan = new createjs.Shape();
+  world.addChild(plan);
+  // Drawn here rather than with ROS2D.NavigationArrow: sizes are in metres, so
+  // the robot keeps its real footprint as you zoom, and the colours are ours.
+  var robot = new createjs.Shape();
+  robot.graphics.setStrokeStyle(0.03).beginStroke(COLORS.robotStroke).beginFill(COLORS.robotFill)
+    .moveTo(0.28, 0).lineTo(-0.18, 0.18).lineTo(-0.18, -0.18).closePath()
+    .endFill().endStroke();
+  robot.visible = false;
+  world.addChild(robot);
+  var scan = new createjs.Shape();
+  world.addChild(scan);
+  var marker = new createjs.Shape();   // the goal / pose being dragged
+  world.addChild(marker);
+
+
+  // Lethal cells of both costmaps, in RViz's magenta at RViz's alphas.
+  var globalLethal = new createjs.Bitmap();
+  var localLethal = new createjs.Bitmap();
+  // Bottom to top, so the more urgent layer is the one you see:
+  //   map -> global lethal -> local lethal
+  // The keepout mask is not drawn at all: the keepout filter marks those cells
+  // lethal in both costmaps, so they already show up as costmap cells.
+  world.addChildAt(globalLethal, 1);
+  world.addChildAt(localLethal, 2);
+
+  var fitted = false;
+
+  gridClient.on('change', function () {
+    // OccupancyGridClient adds a 1 m ROS2D.Grid of its own as an easeljs
+    // render work-around; it just leaves a cross at the origin, so hide it.
+    world.children.forEach(function (child) {
+      if (child instanceof ROS2D.Grid) { child.visible = false; }
+    });
+    // currentGrid.width/height are metres; pose is the map origin.
+    if (!fitted) { initOrientation(); fitted = true; }
+  });
+
+  // Which way up the map reads best is a room thing, not a map-file thing, so
+  // the default is fixed here and only the rotate button changes it. Safari
+  // private mode throws on storage, hence the try/catch below.
+  var ROTATION_KEY = 'omniman.nav.rotation';
+  var DEFAULT_ROTATION = 180;        // how this building's map reads right
+  var rotation = DEFAULT_ROTATION;   // degrees, 0 / 90 / 180 / 270
+
+  function savedRotation() {
+    try {
+      var v = window.localStorage.getItem(ROTATION_KEY);
+      return v === null ? null : parseInt(v, 10);
+    } catch (e) { return null; }
+  }
+
+  function rememberRotation() {
+    try { window.localStorage.setItem(ROTATION_KEY, String(rotation)); } catch (e) { /* ignore */ }
+  }
+
+  // The world is anchored at the map's centre (regX/regY), so rotating and
+  // zooming both happen about the middle of the view instead of a corner.
+  // How big the map can be drawn at a given rotation.
+  function scaleFor(g, deg) {
+    var turned = deg % 180 !== 0;
+    return Math.min(viewer.width / (turned ? g.height : g.width),
+                    viewer.height / (turned ? g.width : g.height));
+  }
+
+  function fit() {
+    var g = gridClient.currentGrid;
+    if (!g || !g.width) { return; }
+    var ox = g.pose.position.x, oy = g.pose.position.y;
+    world.regX = ox + g.width / 2;
+    world.regY = -(oy + g.height / 2);
+    world.x = viewer.width / 2;
+    world.y = viewer.height / 2;
+    world.rotation = rotation;
+    world.scaleX = world.scaleY = scaleFor(g, rotation);
+  }
+
+  // Fixed default, never guessed from the map's shape: the view should look the
+  // same every time you open the page. Only the rotate button changes it, and
+  // that choice is remembered.
+  function initOrientation() {
+    var saved = savedRotation();
+    rotation = (saved === null || isNaN(saved)) ? DEFAULT_ROTATION : saved;
+    fit();
+  }
+
+  function rotate() {
+    rotation = (rotation + 90) % 360;
+    rememberRotation();
+    fit();
+  }
+
+  function rosAt(event) {
+    var rect = canvas.getBoundingClientRect();
+    // globalToLocal undoes rotation, scale and pan in one step; the only thing
+    // left is the y flip between canvas and ROS.
+    var p = world.globalToLocal(event.clientX - rect.left, event.clientY - rect.top);
+    return { x: p.x, y: -p.y };
+  }
+
+  // ---- TF -----------------------------------------------------------------
+  // Just enough TF to place the laser: every transform is stored as planar
+  // (x, y, yaw) and resolved by walking parents up to 'map'. Good enough for a
+  // robot that drives on a flat floor, and it avoids needing a TF republisher.
+
+  var tf = {};   // child frame -> {parent, x, y, yaw}
+
+  function yawOf(q) {
+    return Math.atan2(2 * (q.w * q.z + q.x * q.y),
+                      1 - 2 * (q.y * q.y + q.z * q.z));
+  }
+
+  function onTf(msg) {
+    msg.transforms.forEach(function (t) {
+      tf[t.child_frame_id.replace(/^\//, '')] = {
+        parent: t.header.frame_id.replace(/^\//, ''),
+        x: t.transform.translation.x,
+        y: t.transform.translation.y,
+        yaw: yawOf(t.transform.rotation)
+      };
+    });
+  }
+
+  new ROSLIB.Topic({ ros: ros, name: '/tf', messageType: 'tf2_msgs/TFMessage',
+                     throttle_rate: 100 }).subscribe(onTf);
+  new ROSLIB.Topic({ ros: ros, name: '/tf_static',
+                     messageType: 'tf2_msgs/TFMessage' }).subscribe(onTf);
+
+  // Pose of `frame` in the map, or null while a link of the chain is missing.
+  function frameInMap(frame) {
+    var pose = { x: 0, y: 0, yaw: 0 };
+    var at = frame.replace(/^\//, '');
+    for (var hops = 0; hops < 16; hops++) {
+      if (at === 'map') { return pose; }
+      var t = tf[at];
+      if (!t) { return null; }
+      var c = Math.cos(t.yaw), sn = Math.sin(t.yaw);
+      pose = { x: t.x + c * pose.x - sn * pose.y,
+               y: t.y + sn * pose.x + c * pose.y,
+               yaw: t.yaw + pose.yaw };
+      at = t.parent;
+    }
+    return null;
+  }
+
+  // ---- live data ----------------------------------------------------------
+
+  new ROSLIB.Topic({
+    ros: ros, name: '/amcl_pose',
+    messageType: 'geometry_msgs/PoseWithCovarianceStamped'
+  }).subscribe(function (msg) {
+    var p = msg.pose.pose;
+    robot.x = p.position.x;
+    robot.y = -p.position.y;
+    robot.rotation = scene.rosQuaternionToGlobalTheta(p.orientation);
+    robot.visible = true;
+  });
+
+  new ROSLIB.Topic({
+    ros: ros, name: '/plan', messageType: 'nav_msgs/Path'
+  }).subscribe(function (msg) {
+    var g = plan.graphics.clear();
+    if (!msg.poses.length) { return; }
+    g.setStrokeStyle(0.05).beginStroke(COLORS.plan);
+    msg.poses.forEach(function (ps, i) {
+      var p = ps.pose.position;
+      if (i === 0) { g.moveTo(p.x, -p.y); } else { g.lineTo(p.x, -p.y); }
+    });
+    g.endStroke();
+  });
+
+  new ROSLIB.Topic({
+    ros: ros, name: '/scan', messageType: 'sensor_msgs/LaserScan',
+    throttle_rate: 200
+  }).subscribe(function (msg) {
+    var g = scan.graphics.clear();
+    if (!scan.visible) { return; }
+    // The scan is in the lidar's own frame; without TF we cannot place it.
+    var at = frameInMap(msg.header.frame_id);
+    if (!at) { return; }
+    g.beginFill(COLORS.scan);
+    var c = Math.cos(at.yaw), sn = Math.sin(at.yaw);
+    msg.ranges.forEach(function (r, i) {
+      if (!(r >= msg.range_min && r <= msg.range_max)) { return; }
+      var a = msg.angle_min + i * msg.angle_increment;
+      var lx = r * Math.cos(a), ly = r * Math.sin(a);
+      g.drawRect(at.x + c * lx - sn * ly - 0.02,
+                 -(at.y + sn * lx + c * ly) - 0.02, 0.04, 0.04);
+    });
+    g.endFill();
+  });
+
+  // Both costmaps go through here. The local one is published in `odom`, which
+  // drifts and rotates against `map`, so it is placed through TF; the global
+  // one is already in `map` and gets an identity transform.
+  function costmapLayer(topic, bitmap, color, throttle) {
+    new ROSLIB.Topic({
+      ros: ros, name: topic, messageType: 'nav_msgs/OccupancyGrid',
+      // png keeps a whole-building grid down to a few kB per update.
+      compression: 'png', throttle_rate: throttle
+    }).subscribe(function (msg) {
+      var at = frameInMap(msg.header.frame_id);
+      if (!at) { return; }              // TF not ready yet
+
+      var w = msg.info.width, h = msg.info.height, res = msg.info.resolution;
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      var ctx = c.getContext('2d');
+      var img = ctx.createImageData(w, h);
+      for (var row = 0; row < h; row++) {
+        for (var col = 0; col < w; col++) {
+          var i = (col + row * w) * 4;
+          // Canvas row 0 is the top, ROS row 0 the bottom.
+          // Lethal cells only (cost 100), painted in this layer's own colour.
+          if (msg.data[col + (h - row - 1) * w] === 100) {
+            img.data[i] = color.rgb[0];
+            img.data[i + 1] = color.rgb[1];
+            img.data[i + 2] = color.rgb[2];
+            img.data[i + 3] = color.alpha;
+          } else {
+            img.data[i + 3] = 0;
+          }
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+
+      // Anchor the image by its bottom-left pixel, which is the grid origin,
+      // then rotate about it by the frame's yaw.
+      var ox = msg.info.origin.position.x, oy = msg.info.origin.position.y;
+      var cos = Math.cos(at.yaw), sin = Math.sin(at.yaw);
+      bitmap.image = c;
+      bitmap.regX = 0;
+      bitmap.regY = h;
+      bitmap.scaleX = bitmap.scaleY = res;
+      bitmap.rotation = -at.yaw * 180 / Math.PI;
+      bitmap.x = at.x + cos * ox - sin * oy;
+      bitmap.y = -(at.y + sin * ox + cos * oy);
+    });
+  }
+
+  costmapLayer('/global_costmap/costmap', globalLethal, COLORS.globalCostmap, 1000);
+  costmapLayer('/local_costmap/costmap', localLethal, COLORS.localCostmap, 500);
+
+  // ---- input --------------------------------------------------------------
+  //
+  // One finger draws or pans. A SECOND finger always cancels whatever the first
+  // one was about to send - that is the escape hatch for a goal placed by
+  // accident - and then the two together pinch to zoom and pan. Nothing is
+  // published until every finger is off the glass.
+
+  var pointers = {};       // active pointerId -> last position
+  var pointerCount = 0;
+  var drag = null;         // the one-finger gesture in progress
+  var pinch = null;        // the two-finger gesture in progress
+
+  function clientXY(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function cancelDrag(why) {
+    if (!drag) { return; }
+    drag = null;
+    marker.graphics.clear();
+    if (why) { setStatus(why); }
+  }
+
+  // Anchor a world point under a screen point, at a given scale. Written out
+  // rather than using setTransform, because the world may be rotated.
+  function anchor(local, screen, scale) {
+    var rad = world.rotation * Math.PI / 180;
+    var cos = Math.cos(rad) * scale, sin = Math.sin(rad) * scale;
+    var vx = local.x - world.regX, vy = local.y - world.regY;
+    world.scaleX = world.scaleY = scale;
+    world.x = screen.x - (cos * vx - sin * vy);
+    world.y = screen.y - (sin * vx + cos * vy);
+  }
+
+  function midpoint() {
+    var ids = Object.keys(pointers);
+    var a = pointers[ids[0]], b = pointers[ids[1]];
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2,
+             spread: Math.hypot(a.x - b.x, a.y - b.y) };
+  }
+
+  function startPinch() {
+    var m = midpoint();
+    // Remember which world point sits under the midpoint, then keep it there.
+    pinch = { local: world.globalToLocal(m.x, m.y), spread: m.spread,
+              scale: world.scaleX };
+  }
+
+  canvas.addEventListener('pointerdown', function (e) {
+    canvas.setPointerCapture(e.pointerId);
+    pointers[e.pointerId] = clientXY(e);
+    pointerCount = Object.keys(pointers).length;
+
+    if (pointerCount === 1) {
+      drag = { from: rosAt(e), startX: e.clientX, startY: e.clientY,
+               worldX: world.x, worldY: world.y };
+    } else if (pointerCount === 2) {
+      cancelDrag('cancelled');
+      startPinch();
+    }
+  });
+
+  canvas.addEventListener('pointermove', function (e) {
+    if (!(e.pointerId in pointers)) { return; }
+    pointers[e.pointerId] = clientXY(e);
+
+    if (pinch && pointerCount >= 2) {
+      var m = midpoint();
+      if (pinch.spread > 0) {
+        anchor(pinch.local, m, pinch.scale * (m.spread / pinch.spread));
+      }
+      return;
+    }
+    if (!drag) { return; }
+    if (mode === 'view') {
+      world.x = drag.worldX + (e.clientX - drag.startX);
+      world.y = drag.worldY + (e.clientY - drag.startY);
+      return;
+    }
+    // Preview arrow: from the press point towards the finger.
+    var to = rosAt(e);
+    marker.graphics.clear()
+      .setStrokeStyle(0.06).beginStroke(mode === 'goal' ? COLORS.goalPreview
+                                                      : COLORS.posePreview)
+      .moveTo(drag.from.x, -drag.from.y).lineTo(to.x, -to.y).endStroke();
+  });
+
+  function liftPointer(e, publishIfDone) {
+    delete pointers[e.pointerId];
+    pointerCount = Object.keys(pointers).length;
+    if (pointerCount < 2) { pinch = null; }
+    // Lifting one finger of a pinch must not start or finish a drag.
+    if (pointerCount > 0) { cancelDrag(); return; }
+    if (!drag) { return; }
+
+    var from = drag.from;
+    drag = null;
+    marker.graphics.clear();
+    if (!publishIfDone || mode === 'view') { return; }
+
+    var to = rosAt(e);
+    // A tap with no drag keeps the current heading rather than snapping to 0.
+    var dx = to.x - from.x, dy = to.y - from.y;
+    var yaw = Math.hypot(dx, dy) < 0.05 ? robot.rotation * -Math.PI / 180
+                                        : Math.atan2(dy, dx);
+    publish(from.x, from.y, yaw);
+  }
+
+  canvas.addEventListener('pointerup', function (e) { liftPointer(e, true); });
+  canvas.addEventListener('pointercancel', function (e) { liftPointer(e, false); });
+
+  // Mouse wheel zooms about the cursor, for working at a desk.
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var at = clientXY(e);
+    var local = world.globalToLocal(at.x, at.y);
+    anchor(local, at, world.scaleX * (e.deltaY < 0 ? 1.1 : 1 / 1.1));
+  }, { passive: false });
+
+  // ---- buttons ------------------------------------------------------------
+
+  ['view', 'goal', 'init'].forEach(function (m) {
+    document.getElementById('mode-' + m).addEventListener('click', function () {
+      mode = m;
+      ['view', 'goal', 'init'].forEach(function (other) {
+        document.getElementById('mode-' + other).classList.toggle('on', other === m);
+      });
+      hintEl.textContent = HINTS[m];
+    });
+  });
+
+  [['layer-scan', scan], ['layer-global', globalLethal],
+   ['layer-local', localLethal]].forEach(function (pair) {
+    var box = document.getElementById(pair[0]);
+    box.addEventListener('change', function () { pair[1].visible = box.checked; });
+  });
+
+  // Legend dots are painted from the same table as the layers.
+  function css(color) {
+    return typeof color === 'string' ? color
+      : 'rgba(' + color.rgb.join(',') + ',' + (color.alpha / 255).toFixed(2) + ')';
+  }
+  [['scan', COLORS.scan], ['global', COLORS.globalCostmap],
+   ['local', COLORS.localCostmap]].forEach(function (pair) {
+    var dot = document.querySelector('.dot.' + pair[0]);
+    if (dot) { dot.style.background = css(pair[1]); dot.style.opacity = 1; }
+  });
+
+  document.getElementById('rotate').addEventListener('click', rotate);
+  window.addEventListener('resize', function () {
+    viewer.width = canvas.width = mapDiv.clientWidth;
+    viewer.height = canvas.height = mapDiv.clientHeight;
+    crispPixels();
+    fit();
+  });
+})();
+</script>
+</body>
+</html>
