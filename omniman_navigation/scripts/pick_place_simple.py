@@ -1,29 +1,38 @@
 #!/usr/bin/env python3
 """
-Pick-and-place shuttle with nav2 + two ACT policies.
+Pick-and-place shuttle with nav2 + one ACT policy, no correction step.
+
+Same mission as pick_place_shuttle.py, minus the base_correction policy: nav2
+drives, then the manipulate policy runs straight away. Use this when no
+base_correction checkpoint is trained, or to see how much the policy can
+absorb nav2's residual error on its own.
 
     home -> pick_area   nav2
-            correct     base_correction policy
             pick        manipulate policy
     ->      place_area  nav2
-            correct     base_correction policy
             place       manipulate policy (same checkpoint)
     -> home             nav2
 
 Everything tunable lives in config/mission.yaml - poses, policy paths,
 instructions, durations. Nothing here needs editing to change the mission.
 
-See pick_place_simple.py for the same mission without the correction step.
+KNOWING WHEN A POLICY IS DONE
+    physical_ai_server has no "task finished" signal, so each policy runs until
+    the arm returns to its home pose and stays there for finished_dwell_s
+    (TaskFinished). A reset between grasp attempts also passes through home,
+    but only briefly. There is no time limit - the checker alone decides.
 
 WAITING, NOT SLEEPING
     After each nav leg the mission waits for wheel odometry to show the base
     has actually stopped (BaseStill), rather than sleeping a fixed settle_s.
+    policy_on_arrival.py does the same for goals sent by hand from the iPad.
 
-WHY A CORRECTION STEP
+NAV2'S RESIDUAL ERROR
     Nav2 stops when SimpleGoalChecker is satisfied, which on this robot means up
     to ~5.7 deg and ~12 cm of residual error - and it cannot do better, because
-    AMCL only knows the yaw to ~4.7 deg (1 sigma). The base_correction policy
-    closes that gap visually, so it is not bound by the map-frame estimate.
+    AMCL only knows the yaw to ~4.7 deg (1 sigma). The manipulate policy has to
+    absorb that much variation in where the base ends up. A base_correction
+    policy used to run first to close the gap visually; it is not used now.
 
 MUTUAL EXCLUSION
     Nav2 drives the base over /cmd_vel; the policies drive the base over the SAME
@@ -36,8 +45,8 @@ Prereqs:
   - physical_ai_server_bringup.launch.py (serves /task/command)
 
 Run:
-  ros2 run omniman_navigation pick_place_shuttle.py
-  ros2 run omniman_navigation pick_place_shuttle.py --ros-args \
+  ros2 run omniman_navigation pick_place_simple.py
+  ros2 run omniman_navigation pick_place_simple.py --ros-args \
       -p mission_file:=/path/to/mission.yaml
 """
 
@@ -53,25 +62,34 @@ from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from nav_msgs.msg import Odometry
 from physical_ai_interfaces.msg import TaskStatus
 from physical_ai_interfaces.srv import SendCommand
+from sensor_msgs.msg import JointState
 
 # "Still" means every odometry twist component under these for still_time_s.
 # Same test as policy_on_arrival.py, which does this for hand-sent goals.
 STILL_LINEAR = 0.01     # m/s
 STILL_ANGULAR = 0.02    # rad/s
 
+# Arm joints checked against the home pose. The gripper is left out on
+# purpose - different tasks end it open or closed. The pose itself lives in
+# mission.yaml (settings.home_pose), in this order.
+ARM_JOINTS = [
+    'shoulder_yaw_joint',
+    'upper_shoulder_pitch_joint',
+    'arm_yaw_joint',
+    'forearm_pitch_joint',
+    'wrist_pitch_joint',
+    'palm_yaw_joint',
+]
+
 # physical_ai_server publishes /task/status on every inference tick (~30 Hz)
 # and goes quiet once inference ends, so an old INFERENCING is not trusted.
 STATUS_STALE_S = 1.0
-# How long a FINISH may take to actually end the server's inference loop.
-STOP_TIMEOUT_S = 3.0
 
 
 class State(Enum):
     NAV_TO_PICK = auto()
-    CORRECT_AT_PICK = auto()
     PICK = auto()
     NAV_TO_PLACE = auto()
-    CORRECT_AT_PLACE = auto()
     PLACE = auto()
     NAV_TO_HOME = auto()
     DONE = auto()
@@ -136,6 +154,88 @@ class BaseStill:
         return False
 
 
+class TaskFinished:
+    """Decides when the running policy has finished its task.
+
+    The arm goes back to its home pose in two situations: briefly, as a reset
+    before retrying (object still there), and for good once the task is done
+    (nothing left to do). So "finished" is a home visit that lasts longer than
+    any reset pause - finished_dwell_s in mission.yaml.
+
+    Positions only: at rest the arm jitters ~0.03 rad and its reported joint
+    velocities spike to ~0.5 rad/s, so a velocity test would never see it as
+    still. Being inside home_tolerance for the whole dwell is the stillness.
+    """
+
+    def __init__(self, node):
+        self.node = node
+        self.phase = None
+        self.phase_time = None
+        self.positions = {}
+        node.create_subscription(TaskStatus, '/task/status', self._on_status, 10)
+        node.create_subscription(JointState, '/joint_states', self._on_joints, 10)
+
+    def _on_status(self, msg):
+        self.phase = msg.phase
+        self.phase_time = time.monotonic()
+
+    def _on_joints(self, msg):
+        self.positions = dict(zip(msg.name, msg.position))
+
+    def inferencing(self):
+        return (self.phase == TaskStatus.INFERENCING
+                and self.phase_time is not None
+                and time.monotonic() - self.phase_time < STATUS_STALE_S)
+
+    def wait(self, settings, label):
+        """True when the task finished; False to abort. No time limit."""
+        log = self.node.get_logger()
+        home = settings['home_pose']
+        enter_tol = float(settings['home_tolerance'])
+        exit_tol = float(settings['home_exit_tolerance'])
+        dwell_needed = float(settings['finished_dwell_s'])
+
+        # 1. Inference has not really begun until the server reports it: the
+        #    model loads first, with the arm parked at home the whole time.
+        while not self.inferencing():
+            rclpy.spin_once(self.node, timeout_sec=0.05)
+
+        # 2. Time home visits until one lasts long enough.
+        #    Hysteresis: the arm arrives home inside enter_tol but only leaves
+        #    beyond exit_tol, so a joint resting near enter_tol cannot flap.
+        #    The arm starts at home, and that first stay is the policy getting
+        #    going, not a finish - only a return after leaving counts.
+        start = time.monotonic()
+        at_home = False
+        home_since = 0.0
+        started = False     # the first departure from home is the task beginning
+        while True:
+            rclpy.spin_once(self.node, timeout_sec=0.02)
+            if not self.inferencing():
+                log.error(f'   {label}: inference stopped from outside')
+                return False
+            if any(j not in self.positions for j in ARM_JOINTS):
+                continue
+
+            errors = [abs(self.positions[j] - h) for j, h in zip(ARM_JOINTS, home)]
+            worst = max(errors)
+            now = time.monotonic()
+            if at_home and worst > exit_tol:
+                kind = 'reset' if started else 'task started'
+                log.info(f'   left home after {now - home_since:.1f}s ({kind})')
+                at_home = False
+                started = True
+            elif not at_home and worst <= enter_tol:
+                at_home = True
+                home_since = now
+                if started:
+                    log.info('   back home')
+            elif at_home and started and now - home_since >= dwell_needed:
+                log.info(f'   {label} finished - home for {now - home_since:.1f}s '
+                         f'after {now - start:.1f}s')
+                return True
+
+
 class Actuator:
     """Arbiter: navigation and inference are never both active."""
 
@@ -143,23 +243,13 @@ class Actuator:
     # For a preventive stop that is the expected answer, not a failure.
     IDLE_MESSAGE = 'Not currently recording'
 
-    def __init__(self, node, client, fps, still):
+    def __init__(self, node, client, fps, still, finished, settings):
         self.node = node
         self.client = client
         self.fps = int(fps)
         self.still = still
-        self.phase = None
-        self.phase_time = None
-        node.create_subscription(TaskStatus, '/task/status', self._on_status, 10)
-
-    def _on_status(self, msg):
-        self.phase = msg.phase
-        self.phase_time = time.monotonic()
-
-    def inferencing(self):
-        return (self.phase == TaskStatus.INFERENCING
-                and self.phase_time is not None
-                and time.monotonic() - self.phase_time < STATUS_STALE_S)
+        self.finished = finished
+        self.settings = settings
 
     def _call(self, req, what, idle_ok=False):
         fut = self.client.call_async(req)
@@ -187,13 +277,9 @@ class Actuator:
         req.command = SendCommand.Request.FINISH
         if not self._call(req, 'policy finish', idle_ok=True):
             return False
-        start = time.monotonic()
-        while self.inferencing():
+        # Ends on the tick's READY, or when the server goes quiet (stale).
+        while self.finished.inferencing():
             rclpy.spin_once(self.node, timeout_sec=0.02)
-            if time.monotonic() - start > STOP_TIMEOUT_S:
-                self.node.get_logger().error(
-                    'policy finish: server still inferencing')
-                return False
         return True
 
     def release(self):
@@ -227,11 +313,11 @@ class Actuator:
         return self.still.wait(float(cfg['still_time_s']),
                                float(cfg['settle_timeout_s']))
 
-    def run_policy(self, path, instruction, duration_s, label):
-        """Run one ACT policy for a fixed time, then stop it.
+    def run_policy(self, path, instruction, label):
+        """Run one ACT policy until it finishes its task, then stop it.
 
-        physical_ai_server exposes no "policy finished" signal, so duration_s is
-        how long to trust it, not a completion check.
+        Finished means the arm left home, came back and stayed (TaskFinished).
+        There is no time limit.
         """
         # Never START while the previous policy's loop may still be alive.
         if not self.release():
@@ -248,22 +334,17 @@ class Actuator:
         if not self._call(req, f'{label} start'):
             return False
 
-        self.node.get_logger().info(f'   running {duration_s:.0f}s...')
-        time.sleep(float(duration_s))
+        self.node.get_logger().info('   running until finished...')
+        ok = self.finished.wait(self.settings, label)
         self.release()
         self.node.get_logger().info(f'   {label} done')
-        return True
+        return ok
 
 
 def run_mission(act, cfg):
     poses = cfg['poses']
-    corr = cfg['policies']['base_correction']
     man = cfg['policies']['manipulate']
     settings = cfg['settings']
-
-    def correct(where):
-        return act.run_policy(corr['path'], corr['instruction'],
-                              corr['duration_s'], f'correct @ {where}')
 
     state = State.NAV_TO_PICK
     while state not in (State.DONE, State.ABORT):
@@ -271,27 +352,19 @@ def run_mission(act, cfg):
         if state is State.NAV_TO_PICK:
             ok = act.navigate(poses['pick_area'], 'pick_area')
             ok = act.settle(settings) and ok
-            state = State.CORRECT_AT_PICK if ok else State.ABORT
-
-        elif state is State.CORRECT_AT_PICK:
-            state = State.PICK if correct('pick_area') else State.ABORT
+            state = State.PICK if ok else State.ABORT
 
         elif state is State.PICK:
-            ok = act.run_policy(man['path'], man['instruction_pick'],
-                                man['pick_duration_s'], 'pick')
+            ok = act.run_policy(man['path'], man['instruction_pick'], 'pick')
             state = State.NAV_TO_PLACE if ok else State.ABORT
 
         elif state is State.NAV_TO_PLACE:
             ok = act.navigate(poses['place_area'], 'place_area')
             ok = act.settle(settings) and ok
-            state = State.CORRECT_AT_PLACE if ok else State.ABORT
-
-        elif state is State.CORRECT_AT_PLACE:
-            state = State.PLACE if correct('place_area') else State.ABORT
+            state = State.PLACE if ok else State.ABORT
 
         elif state is State.PLACE:
-            ok = act.run_policy(man['path'], man['instruction_place'],
-                                man['place_duration_s'], 'place')
+            ok = act.run_policy(man['path'], man['instruction_place'], 'place')
             state = State.NAV_TO_HOME if ok else State.ABORT
 
         elif state is State.NAV_TO_HOME:
@@ -328,7 +401,8 @@ def main():
     nav.get_logger().info('waiting for Nav2...')
     nav.waitUntilNav2Active()
 
-    act = Actuator(nav, client, cfg['settings']['fps'], BaseStill(nav))
+    act = Actuator(nav, client, cfg['settings']['fps'], BaseStill(nav),
+                   TaskFinished(nav), cfg['settings'])
     try:
         final = run_mission(act, cfg)
         if final is State.DONE:

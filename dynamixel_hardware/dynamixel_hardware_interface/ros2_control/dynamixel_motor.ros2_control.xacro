@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="dynamixel_ros2_control" params="name serial_device device_id joint_name use_prismatic:=0 revolute_max:=0.0 revolute_min:=0.0 prismatic_max:=0.0 prismatic_min:=0.0 driver_mode:=0">
+    <xacro:macro name="dynamixel_ros2_control" params="name serial_device device_id joint_name use_prismatic:=0 revolute_max:=0.0 revolute_min:=0.0 prismatic_max:=0.0 prismatic_min:=0.0 driver_mode:=0 operating_mode:='' goal_current:=''">
         <ros2_control name="${name}" type="system">
             <hardware>
                 <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
@@ -52,6 +52,13 @@
                 <param name="Profile Acceleration">0</param>
                 <param name="Drive Mode">${driver_mode}</param>
                 <param name="Return Delay Time">0</param>
+                <!-- Optional, only emitted when set. Mode 5 is current based position, Goal Current caps grip force -->
+                <xacro:if value="${operating_mode != ''}">
+                    <param name="Operating Mode">${operating_mode}</param>
+                </xacro:if>
+                <xacro:if value="${goal_current != ''}">
+                    <param name="Goal Current">${goal_current}</param>
+                </xacro:if>
             </gpio>
             
             <transmission name="${joint_name}_transmission">

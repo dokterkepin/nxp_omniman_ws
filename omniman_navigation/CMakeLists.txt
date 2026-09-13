@@ -19,6 +19,7 @@ install(PROGRAMS
   scripts/nav_commander.py
   scripts/get_robot_pose.py
   scripts/pick_place_shuttle.py
+  scripts/pick_place_simple.py
   scripts/policy_on_arrival.py
   DESTINATION lib/${PROJECT_NAME}
 )

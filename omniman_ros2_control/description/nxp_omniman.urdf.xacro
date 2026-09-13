@@ -152,6 +152,7 @@
                                       use_prismatic="1"
                                       revolute_max="0.0" revolute_min="-2.5"
                                       prismatic_max="0.019" prismatic_min="-0.013"
+                                      operating_mode="5" goal_current="200"
                                       />
 
     </xacro:unless>
