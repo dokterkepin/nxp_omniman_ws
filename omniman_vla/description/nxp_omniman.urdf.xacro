@@ -69,6 +69,7 @@
                                   revolute_max="0.0" revolute_min="-2.5"
                                   prismatic_max="0.019" prismatic_min="-0.013"
                                   operating_mode="5" goal_current="200"
-                                  position_p_gain="400"
-                                  />
+                                  position_p_gain="400" profile_velocity="200" profile_acceleration="85"
+
+                                 />
 </robot>
