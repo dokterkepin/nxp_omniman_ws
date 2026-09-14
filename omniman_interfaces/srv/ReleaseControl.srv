@@ -1,0 +1,10 @@
+# Give control of the robot back to control_arbiter.
+
+# Must match the current owner, so one owner cannot release another's control.
+string owner
+
+# true: release whoever holds control. For an operator unsticking the robot.
+bool force
+---
+bool success
+string message

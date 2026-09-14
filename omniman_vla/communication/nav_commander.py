@@ -9,8 +9,8 @@ Prereqs (already running):
   - robot localized (AMCL)
 
 Run:
-  ros2 run omniman_navigation nav_commander.py
-  ros2 run omniman_navigation nav_commander.py --ros-args -p laps:=10
+  ros2 run omniman_vla nav_commander.py
+  ros2 run omniman_vla nav_commander.py --ros-args -p laps:=10
 """
 
 import math

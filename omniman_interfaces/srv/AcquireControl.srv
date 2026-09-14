@@ -1,0 +1,20 @@
+# Ask control_arbiter for control of the robot.
+
+# Who is asking, e.g. "nav" or "policy".
+string owner
+
+# Fully qualified name of the calling node, e.g. "/pick_place_mission". If that
+# node disappears while holding control, control is released automatically.
+# Leave empty to opt out of that (then only a release frees control).
+string node
+
+# false: refused while someone else holds control - wait and ask again.
+# true:  take control anyway; the previous owner sees /control/owner change and
+#        must stop. Meant for an operator, not for scripts.
+bool force
+---
+bool success
+string message
+
+# Who held control before this call ("" if nobody).
+string previous_owner

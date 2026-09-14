@@ -1,0 +1,15 @@
+# Ask policy_runner to run a policy until the arm reports it is finished.
+# The call returns once the policy has started (or was refused); follow
+# /control/owner and /policy_runner/status to see it finish.
+
+# Checkpoint to run. Empty: the runner's default policy_path parameter.
+string policy_path
+
+# Task instruction for the policy. Empty: the runner's default instruction.
+string instruction
+
+# Passed on to control_arbiter: true takes control from whoever holds it.
+bool force
+---
+bool success
+string message

@@ -6,7 +6,7 @@ Prereqs (already running):
   - nav2_launch.py (starts AMCL + map_server)
 
 Run:
-  ros2 run omniman_navigation get_robot_pose.py
+  ros2 run omniman_vla get_robot_pose.py
 """
 
 import math

@@ -12,11 +12,16 @@
   <!-- vln_commander.py: triggers the manipulation policy via /task/command -->
   <!-- twist_to_twist_stamped.py relay -->
   <exec_depend>omniman_ros2_control</exec_depend>
+  <!-- control_arbiter / policy_runner / pick_place_mission: the control lock -->
+  <exec_depend>omniman_interfaces</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
   <exec_depend>physical_ai_interfaces</exec_depend>
   <exec_depend>nav2_simple_commander</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
 
   <exec_depend>slam_toolbox</exec_depend>
+  <!-- slam_launch.py: configure/activate the slam_toolbox lifecycle node -->
+  <exec_depend>lifecycle_msgs</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
   <exec_depend>nav2_bt_navigator</exec_depend>
   <exec_depend>nav2_controller</exec_depend>
@@ -34,6 +39,7 @@
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>action_msgs</exec_depend>
   <exec_depend>std_srvs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
   <!-- web_ui_launch.py: serves web/index.html and bridges it to ROS -->
   <exec_depend>rosbridge_server</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>

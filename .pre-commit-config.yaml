@@ -67,7 +67,7 @@ repos:
     hooks:
       - id: mypy
         args: [--config-file=mypy.ini]
-        files: ^(omniman_hand_teleop|omniman_navigation)/scripts/.*\.py$
+        files: ^((omniman_hand_teleop|omniman_navigation)/scripts|omniman_vla/(commander|communication|recorder))/.*\.py$
         # pre-commit runs mypy in its own isolated venv, so ignore_missing_imports
         # in mypy.ini doesn't reach it for import-untyped (PyYAML ships no py.typed
         # marker) -- the stub package has to be installed into that venv directly.

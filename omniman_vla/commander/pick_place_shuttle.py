@@ -13,7 +13,7 @@ Pick-and-place shuttle with nav2 + two ACT policies.
 Everything tunable lives in config/mission.yaml - poses, policy paths,
 instructions, durations. Nothing here needs editing to change the mission.
 
-See pick_place_simple.py for the same mission without the correction step.
+See pick_place_mission.py for the same mission without the correction step.
 
 WAITING, NOT SLEEPING
     After each nav leg the mission waits for wheel odometry to show the base
@@ -36,12 +36,13 @@ Prereqs:
   - physical_ai_server_bringup.launch.py (serves /task/command)
 
 Run:
-  ros2 run omniman_navigation pick_place_shuttle.py
-  ros2 run omniman_navigation pick_place_shuttle.py --ros-args \
+  ros2 run omniman_vla pick_place_shuttle.py
+  ros2 run omniman_vla pick_place_shuttle.py --ros-args \
       -p mission_file:=/path/to/mission.yaml
 """
 
 import math
+import os
 import time
 from enum import Enum, auto
 
@@ -55,7 +56,7 @@ from physical_ai_interfaces.msg import TaskStatus
 from physical_ai_interfaces.srv import SendCommand
 
 # "Still" means every odometry twist component under these for still_time_s.
-# Same test as policy_on_arrival.py, which does this for hand-sent goals.
+# Same test as pick_place_mission.py uses.
 STILL_LINEAR = 0.01     # m/s
 STILL_ANGULAR = 0.02    # rad/s
 
@@ -64,6 +65,13 @@ STILL_ANGULAR = 0.02    # rad/s
 STATUS_STALE_S = 1.0
 # How long a FINISH may take to actually end the server's inference loop.
 STOP_TIMEOUT_S = 3.0
+
+
+def load_poses(mission_file):
+    """Places from poses.yaml beside the mission file (saved from the web UI)."""
+    path = os.path.join(os.path.dirname(os.path.realpath(mission_file)), 'poses.yaml')
+    with open(path) as f:
+        return yaml.safe_load(f) or {}
 
 
 class State(Enum):
@@ -311,6 +319,7 @@ def main():
 
     with open(mission_file) as f:
         cfg = yaml.safe_load(f)
+    cfg['poses'] = load_poses(mission_file)
     nav.get_logger().info(f'mission: {mission_file}')
 
     client = nav.create_client(SendCommand, '/task/command')

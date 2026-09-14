@@ -16,9 +16,18 @@ install(DIRECTORY
 )
 
 install(PROGRAMS
-  scripts/replay_arm.py
-  scripts/replay_base.py
-  scripts/joy_discrete_base.py
+  # recorder: data collection
+  recorder/replay_arm.py
+  recorder/replay_base.py
+  recorder/joy_discrete_base.py
+  # communication: the control lock and the nodes that take part in it
+  communication/control_arbiter.py
+  communication/policy_runner.py
+  communication/get_robot_pose.py
+  communication/nav_commander.py
+  # commander: missions
+  commander/pick_place_mission.py
+  commander/pick_place_shuttle.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

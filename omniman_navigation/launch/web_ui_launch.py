@@ -52,10 +52,17 @@ def generate_launch_description():
         }],
     )
 
-    # Static files only - no build step, no framework.
+    # The page's files, plus a small API that saves named places into
+    # config/poses.yaml - the file the mission scripts read, so a place saved
+    # on the iPad is the place the robot drives to.
+    # web_server.py sits in web/ next to the page. Started through python3,
+    # because installing a directory does not keep the executable bit.
     web_server = ExecuteProcess(
-        cmd=['python3', '-m', 'http.server', LaunchConfiguration('web_port'),
-             '--bind', '0.0.0.0', '--directory', web_dir],
+        cmd=['python3', PathJoinSubstitution([web_dir, 'web_server.py']),
+             '--port', LaunchConfiguration('web_port'),
+             '--web-dir', web_dir,
+             '--poses', PathJoinSubstitution([FindPackageShare('omniman_navigation'),
+                                              'config', 'poses.yaml'])],
         output='screen',
     )
 

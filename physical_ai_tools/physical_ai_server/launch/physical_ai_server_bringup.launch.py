@@ -20,13 +20,23 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription
+from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     pkg_dir = get_package_share_directory('physical_ai_server')
+
+    # Robot type the server is configured for as soon as it is up. Without it,
+    # nothing works until someone picks the robot in the web UI: START_INFERENCE
+    # fails with "'NoneType' object has no attribute 'get_publisher_msg_types'".
+    # robot_type:='' leaves it unset, as upstream does.
+    robot_type = DeclareLaunchArgument(
+        'robot_type', default_value='omniman',
+        description="Robot type to configure on launch ('' to skip)")
 
     # Include physical_ai_server.launch.py
     physical_ai_server_launch = IncludeLaunchDescription(
@@ -59,8 +69,22 @@ def generate_launch_description():
         output='screen'
     )
 
+    # `ros2 service call` waits for /set_robot_type to appear, calls it once and
+    # exits - no fixed delay needed. Picking a robot in the web UI later still
+    # works; it simply configures the server again.
+    set_robot_type = ExecuteProcess(
+        cmd=['ros2', 'service', 'call', '/set_robot_type',
+             'physical_ai_interfaces/srv/SetRobotType',
+             ['{robot_type: ', LaunchConfiguration('robot_type'), '}']],
+        output='screen',
+        condition=UnlessCondition(
+            PythonExpression(["'", LaunchConfiguration('robot_type'), "' == ''"])),
+    )
+
     return LaunchDescription([
+        robot_type,
         physical_ai_server_launch,
+        set_robot_type,
         rosbridge_websocket_node,
         rosbag_recorder_node,
         web_video_server_node,

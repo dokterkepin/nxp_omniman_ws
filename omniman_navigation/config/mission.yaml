@@ -8,20 +8,19 @@
 #           place      (pick_place policy, same checkpoint)
 #   -> home (nav2)
 #
-# pick_place_simple.py runs the same mission without the correct steps, and
-# ignores the base_correction entry below.
+# pick_place_mission.py runs the same mission without the correct steps, and
+# ignores the base_correction entry below. It hands the robot over through the
+# control lock and lets policy_runner.py decide when the arm is finished; the
+# arm settings for that are in policy_runner.yaml, not here.
 #
-# Poses are map-frame, yaw in DEGREES.
+# The places (home, pick_area, place_area) are NOT in this file: they live in
+# poses.yaml next to it, so the web UI can save them where the robot really is
+# without rewriting the comments here.
 # Policies are ACT checkpoints; both are 10-dim (7 arm/gripper + 3 base), so
 # they can drive the base as well as the arm. That is what makes the base
 # correction step possible - nav2 gets close (it leaves up to ~12 cm / ~5.7 deg
 # of error), and the policy closes the loop visually, which is not bounded by
 # AMCL's ~5 deg yaw uncertainty.
-
-poses:
-  home:       {x:  0.0, y:  0.0, yaw:    0.0}
-  pick_area:  {x:  1.2, y: -4.0, yaw: -100.0}
-  place_area: {x:  1.0, y: -1.0, yaw: -100.0}
 
 policies:
   # Only pick_place_shuttle.py uses this one. Several versions are trained
@@ -34,8 +33,8 @@ policies:
     path: /home/dokterkepin/output/omniman_pick_and_place/checkpoints/last/pretrained_model
     instruction_pick: "pick the object"
     instruction_place: "place the object"
-    # Fixed run times, pick_place_shuttle.py only. pick_place_simple.py has
-    # no time limit - it stops when the arm is done.
+    # Fixed run times, pick_place_shuttle.py only. With pick_place_mission.py
+    # policy_runner.py runs the policy until the arm is done.
     pick_duration_s: 500.0
     place_duration_s: 10.0
 
@@ -46,18 +45,3 @@ settings:
   # long it must stay stopped; settle_timeout_s gives up if it never does.
   still_time_s: 0.5
   settle_timeout_s: 5.0
-
-  # --- pick_place_simple.py: when is a policy finished? ---
-  # The arm's home pose (shoulder_yaw, upper_shoulder_pitch, arm_yaw,
-  # forearm_pitch, wrist_pitch, palm_yaw), measured at rest. No gripper.
-  home_pose: [0.077, 0.573, -0.079, -1.517, 1.436, -0.054]
-  # Every arm joint within this of home_pose counts as "at home". At rest the
-  # arm jitters up to ~0.03 rad, so this is ~3x that.
-  home_tolerance: 0.08
-  # Once home, the arm only counts as gone when some joint is beyond this.
-  # The gap to home_tolerance stops a joint resting near 0.08 from flapping.
-  home_exit_tolerance: 0.15
-  # Finished = back home for this long, after having left it once. Must be
-  # longer than the pause of a reset between grasp attempts, which also passes
-  # through home. Read the "left home after Xs (reset)" log lines to tune it.
-  finished_dwell_s: 5.0

@@ -1,0 +1,12 @@
+# Named places in the map frame, yaw in DEGREES.
+#
+# Written by the web UI ("Save here" stores where the robot really is), so it
+# is rewritten as a whole: hand edits are fine, extra comments are not kept.
+#
+#   home        - where pick_place_mission.py / pick_place_shuttle.py start and end
+#   pick_area   - where the missions drive to pick
+#   place_area  - where the missions drive to place
+# Any other name is just a saved place to drive to from the web UI.
+home: {x: 0.000, y: 0.000, yaw: 0.0}
+pick_area: {x: 1.200, y: -4.000, yaw: -100.0}
+place_area: {x: 1.000, y: -1.000, yaw: -100.0}

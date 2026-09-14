@@ -24,7 +24,7 @@
                color: #e6e6e6; font: 15px system-ui, -apple-system, sans-serif;
                -webkit-user-select: none; user-select: none; }
   #app { display: flex; flex-direction: column; height: 100%; }
-  header { display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px;
            background: #1e2026; border-bottom: 1px solid #2c2f36; flex: none; }
   #status { margin-left: auto; font-size: 13px; color: #9aa0aa; }
   #status.ok { color: #4ade80; }
@@ -32,6 +32,8 @@
   button { font: inherit; color: #e6e6e6; background: #2a2d35; border: 1px solid #3a3e47;
            border-radius: 10px; padding: 10px 14px; min-height: 44px; touch-action: manipulation; }
   button.on { background: #2563eb; border-color: #2563eb; }
+  button:disabled { opacity: .5; }
+  button.switch.enabled { background: #15803d; border-color: #16a34a; }
   .sep { width: 1px; height: 28px; background: #3a3e47; margin: 0 4px; }
   .layer { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #c9ced6;
            padding: 8px 6px; }
@@ -43,6 +45,17 @@
   #map { position: relative; flex: 1 1 auto; touch-action: none; }
   /* Safari hands pinches to the page unless the canvas itself opts out. */
   #map canvas { display: block; touch-action: none; }
+  /* Saved places: one always-visible bar of buttons under the header. */
+  #places-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+                overflow-x: auto; flex: none; background: #1a1c21;
+                border-bottom: 1px solid #2c2f36; }
+  #places-bar .bar-label { color: #9aa0aa; font-size: 13px; white-space: nowrap; }
+  #place-list { display: flex; gap: 6px; }
+  #place-list:empty::after { content: 'no saved places'; color: #6b7280; font-size: 13px; }
+  button.save { background: #1d4ed8; border-color: #2563eb; white-space: nowrap; margin-left: auto; }
+  .place { display: flex; }
+  .place .go { border-radius: 10px 0 0 10px; white-space: nowrap; }
+  .place .del { border-radius: 0 10px 10px 0; border-left: none; width: 36px; padding: 0; color: #fca5a5; }
   #hint { position: absolute; left: 10px; bottom: 10px; font-size: 13px; color: #9aa0aa;
           background: rgba(21,22,26,.75); padding: 6px 10px; border-radius: 8px; }
 </style>
@@ -58,8 +71,16 @@
     <label class="layer"><input type="checkbox" id="layer-scan" checked><span class="dot scan"></span>Scan</label>
     <label class="layer"><input type="checkbox" id="layer-global" checked><span class="dot global"></span>Global</label>
     <label class="layer"><input type="checkbox" id="layer-local" checked><span class="dot local"></span>Local</label>
+    <span class="sep"></span>
+    <button id="toggle-policy" class="switch" disabled>Policy: ?</button>
+    <button id="toggle-joy" class="switch" disabled>Joystick: ?</button>
     <span id="status">connecting...</span>
   </header>
+  <nav id="places-bar">
+    <span class="bar-label">Go to</span>
+    <div id="place-list"></div>
+    <button id="save-place" class="save" disabled>+ Save here</button>
+  </nav>
   <div id="map">
     <div id="hint">drag to pan, pinch to zoom</div>
   </div>
@@ -140,6 +161,7 @@
     var header = { stamp: stamp(), frame_id: 'map' };
 
     if (mode === 'goal') {
+      if (policyOwns()) { setStatus('policy owns the robot - turn Policy OFF first', 'bad'); return; }
       goalTopic.publish(new ROSLIB.Message({ header: header, pose: pose }));
       setStatus('goal sent', 'ok');
     } else {
@@ -345,6 +367,7 @@
     messageType: 'geometry_msgs/PoseWithCovarianceStamped'
   }).subscribe(function (msg) {
     var p = msg.pose.pose;
+    lastAmcl = { x: p.position.x, y: p.position.y, yaw: yawOf(p.orientation) };
     robot.x = p.position.x;
     robot.y = -p.position.y;
     robot.rotation = scene.rosQuaternionToGlobalTheta(p.orientation);
@@ -584,6 +607,263 @@
     var dot = document.querySelector('.dot.' + pair[0]);
     if (dot) { dot.style.background = css(pair[1]); dot.style.opacity = 1; }
   });
+
+  // ---- joystick switch ----------------------------------------------------
+  //
+  // A ROS parameter flipped live through the node's own set_parameters
+  // service:  /joy_discrete_base  teleop_enabled  - joystick drives the base.
+  // The button shows what the node reports back, never what was pressed, so a
+  // node that is down reads "?" instead of lying.
+
+  var BOOL = 1;   // rcl_interfaces/msg/ParameterType.PARAMETER_BOOL
+
+  function paramService(node, kind) {
+    return new ROSLIB.Service({
+      ros: ros, name: '/' + node + '/' + kind + '_parameters',
+      serviceType: 'rcl_interfaces/srv/' + (kind === 'set' ? 'SetParameters' : 'GetParameters')
+    });
+  }
+
+  function getBool(node, name, done) {
+    paramService(node, 'get').callService(new ROSLIB.ServiceRequest({ names: [name] }),
+      function (res) {
+        var v = res.values && res.values[0];
+        done(v && v.type === BOOL ? v.bool_value : null);
+      },
+      function () { done(null); });
+  }
+
+  function setBool(node, name, value, done) {
+    paramService(node, 'set').callService(new ROSLIB.ServiceRequest({
+      parameters: [{ name: name, value: { type: BOOL, bool_value: value } }]
+    }), function (res) {
+      var r = res.results && res.results[0];
+      done(!!(r && r.successful), r && r.reason);
+    }, function (err) { done(false, err); });
+  }
+
+  function showSwitch(button, label, value) {
+    button.disabled = value === null;
+    button.classList.toggle('enabled', value === true);
+    button.textContent = label + ': ' + (value === null ? '?' : value ? 'ON' : 'OFF');
+  }
+
+  var joyButton = document.getElementById('toggle-joy');
+  var joyState = null;
+
+  function refreshJoy() {
+    getBool('joy_discrete_base', 'teleop_enabled', function (value) {
+      joyState = value;
+      showSwitch(joyButton, 'Joystick', value);
+    });
+  }
+
+  joyButton.addEventListener('click', function () {
+    if (joyState === null) { return; }
+    joyButton.disabled = true;
+    setBool('joy_discrete_base', 'teleop_enabled', !joyState, function (ok, reason) {
+      if (!ok) { setStatus('joystick switch failed: ' + (reason || 'no reply'), 'bad'); }
+      refreshJoy();
+    });
+  });
+
+  showSwitch(joyButton, 'Joystick', null);
+  ros.on('connection', refreshJoy);
+  setInterval(refreshJoy, 3000);
+
+  // ---- policy switch: the control lock --------------------------------------
+  //
+  // One owner of the robot at a time (control_arbiter). The switch reads
+  // /control/owner: ON while "policy" holds control. You are the operator, so
+  // turning it ON takes control even mid-drive: navigation is cancelled first,
+  // then policy_runner runs the policy with force. Turning it OFF stops the
+  // run, which releases control. While the policy owns the robot, everything
+  // on this page that would drive it - Goal mode and the place buttons - is
+  // locked.
+
+  var POLICY = 'policy';
+  var policyButton = document.getElementById('toggle-policy');
+  var controlOwner = null;       // null until control_arbiter has been heard
+
+  var runPolicy = new ROSLIB.Service({
+    ros: ros, name: '/policy_runner/run', serviceType: 'omniman_interfaces/srv/RunPolicy' });
+  var stopPolicy = new ROSLIB.Service({
+    ros: ros, name: '/policy_runner/stop', serviceType: 'std_srvs/srv/Trigger' });
+  var releaseControl = new ROSLIB.Service({
+    ros: ros, name: '/control/release', serviceType: 'omniman_interfaces/srv/ReleaseControl' });
+  var cancelNav = new ROSLIB.Service({
+    ros: ros, name: '/navigate_to_pose/_action/cancel_goal',
+    serviceType: 'action_msgs/srv/CancelGoal' });
+
+  function policyOwns() { return controlOwner === POLICY; }
+
+  // Lock or unlock everything that would drive the base.
+  function applyNavLock() {
+    var locked = policyOwns();
+    document.getElementById('mode-goal').disabled = locked;
+    if (locked && mode === 'goal') { document.getElementById('mode-view').click(); }
+    document.querySelectorAll('#place-list .go').forEach(function (b) { b.disabled = locked; });
+    showSwitch(policyButton, 'Policy', controlOwner === null ? null : locked);
+  }
+
+  new ROSLIB.Topic({
+    ros: ros, name: '/control/owner', messageType: 'omniman_interfaces/msg/ControlOwner',
+    qos: { durability: 'transient_local' }
+  }).subscribe(function (msg) {
+    var was = controlOwner;
+    controlOwner = msg.owner;
+    applyNavLock();
+    if (was !== null && was !== controlOwner) {
+      setStatus('control: ' + (controlOwner || 'free'), 'ok');
+    }
+  });
+
+  policyButton.addEventListener('click', function () {
+    if (controlOwner === null) { return; }
+    policyButton.disabled = true;
+
+    if (policyOwns()) {
+      stopPolicy.callService(new ROSLIB.ServiceRequest({}), function () {
+        setStatus('policy stopped', 'ok');
+      }, function () {
+        // Runner gone: free the lock directly so the robot is not stuck.
+        releaseControl.callService(new ROSLIB.ServiceRequest({ owner: '', force: true }),
+          function () { setStatus('policy_runner not answering - control force-released', 'bad'); },
+          function (err) { setStatus('stop failed: ' + err, 'bad'); applyNavLock(); });
+      });
+      return;
+    }
+
+    // Cancel every navigation goal (an all-zero goal id means "all"), then
+    // take control for the policy.
+    var zeroId = { goal_id: { uuid: new Array(16).fill(0) }, stamp: { sec: 0, nanosec: 0 } };
+    var start = function () {
+      runPolicy.callService(new ROSLIB.ServiceRequest({ policy_path: '', instruction: '', force: true }),
+        function (res) {
+          setStatus(res.success ? res.message : 'policy refused: ' + res.message,
+                    res.success ? 'ok' : 'bad');
+          applyNavLock();
+        },
+        function (err) { setStatus('policy_runner not answering: ' + err, 'bad'); applyNavLock(); });
+    };
+    cancelNav.callService(new ROSLIB.ServiceRequest({ goal_info: zeroId }), start, start);
+  });
+
+  showSwitch(policyButton, 'Policy', null);
+
+  // ---- saved places -------------------------------------------------------
+  //
+  // A bar of buttons, one per place: tap one to drive there. Stored on the
+  // robot PC in config/poses.yaml through web_server.py, the same file the
+  // mission scripts read. "Save here" stores where the
+  // robot really is - its localized pose - so the spot is exact, not a guess
+  // off the map. Nothing is drawn on the map for them.
+
+  var lastAmcl = null;
+  var places = {};
+  var PLACE_NAME = /^[A-Za-z0-9_-]{1,40}$/;
+
+  // Current robot pose in the map: live TF first, the last AMCL estimate if TF
+  // is not complete yet. yaw in radians.
+  function robotPose() {
+    return frameInMap('base_footprint') || lastAmcl;
+  }
+
+  function api(method, path, body) {
+    return fetch(path, {
+      method: method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store'
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) { throw new Error(data.error || r.statusText); }
+        return data;
+      });
+    });
+  }
+
+  function renderPlaceList() {
+    var list = document.getElementById('place-list');
+    list.innerHTML = '';
+    Object.keys(places).forEach(function (name) {
+      var p = places[name];
+      var row = document.createElement('div');
+      row.className = 'place';
+
+      var go = document.createElement('button');
+      go.className = 'go';
+      go.textContent = name;
+      go.title = 'x ' + p.x.toFixed(2) + '  y ' + p.y.toFixed(2) + '  ' + p.yaw.toFixed(0) + '\u00b0';
+      go.addEventListener('click', function () { goTo(name); });
+
+      var del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = '\u2715';
+      del.title = 'Delete ' + name;
+      del.addEventListener('click', function () {
+        if (!window.confirm('Delete "' + name + '"?')) { return; }
+        api('DELETE', '/api/places/' + encodeURIComponent(name))
+          .then(setPlaces)
+          .catch(function (e) { setStatus('delete failed: ' + e.message, 'bad'); });
+      });
+
+      row.appendChild(go);
+      row.appendChild(del);
+      list.appendChild(row);
+    });
+  }
+
+  function setPlaces(data) {
+    places = data || {};
+    renderPlaceList();
+    applyNavLock();
+  }
+
+  function loadPlaces() {
+    api('GET', '/api/places').then(setPlaces).catch(function () { /* server down: keep last */ });
+  }
+
+  function goTo(name) {
+    var p = places[name];
+    if (!p) { return; }
+    if (policyOwns()) { setStatus('policy owns the robot - turn Policy OFF first', 'bad'); return; }
+    var pose = { position: { x: p.x, y: p.y, z: 0 },
+                 orientation: quaternion(p.yaw * Math.PI / 180) };
+    goalTopic.publish(new ROSLIB.Message({
+      header: { stamp: stamp(), frame_id: 'map' }, pose: pose }));
+    setStatus('going to ' + name, 'ok');
+  }
+
+  document.getElementById('save-place').addEventListener('click', function () {
+    var pose = robotPose();
+    if (!pose) { setStatus('robot pose unknown - set the pose first', 'bad'); return; }
+    var name = window.prompt('Name for this place (e.g. pick_area):', '');
+    if (name === null) { return; }
+    name = name.trim();
+    if (!PLACE_NAME.test(name)) {
+      setStatus('name: letters, digits, _ or - only', 'bad');
+      return;
+    }
+    if (places[name] && !window.confirm('"' + name + '" exists. Replace it with where the robot is now?')) {
+      return;
+    }
+    api('POST', '/api/places', {
+      name: name, x: pose.x, y: pose.y, yaw: pose.yaw * 180 / Math.PI
+    }).then(function (data) {
+      setPlaces(data);
+      setStatus('saved ' + name, 'ok');
+    }).catch(function (e) { setStatus('save failed: ' + e.message, 'bad'); });
+  });
+
+
+  // "Save here" only works once the robot is localized.
+  setInterval(function () {
+    document.getElementById('save-place').disabled = !robotPose();
+  }, 500);
+
+  loadPlaces();
+  setInterval(loadPlaces, 5000);   // pick up places saved from another device
 
   document.getElementById('rotate').addEventListener('click', rotate);
   window.addEventListener('resize', function () {

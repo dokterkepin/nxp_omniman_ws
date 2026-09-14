@@ -1,0 +1,29 @@
+# Parameters for policy_runner.py. Nothing here is task-specific: a caller of
+# ~/run can override policy_path and instruction for each run.
+policy_runner:
+  ros__parameters:
+    # Name this runner holds control under (control_arbiter).
+    owner_name: policy
+
+    # Defaults when ~/run does not name a policy or instruction.
+    policy_path: /home/dokterkepin/output/omniman_pick_and_place/checkpoints/last/pretrained_model
+    instruction: "pick the object"
+    fps: 30
+
+    # The arm's home pose (shoulder_yaw, upper_shoulder_pitch, arm_yaw,
+    # forearm_pitch, wrist_pitch, palm_yaw), measured at rest. No gripper.
+    home_pose: [0.077, 0.573, -0.079, -1.517, 1.436, -0.054]
+    # Every arm joint within this of home_pose counts as "at home". The policy
+    # does not return to exactly the same pose: after a place it came to rest
+    # 0.118 rad off (upper_shoulder_pitch) and was never seen as home at 0.08.
+    # 0.20 covers that with margin, while task poses are much further out.
+    home_tolerance: 0.20
+    # Once home, the arm only counts as gone when some joint is beyond this.
+    # The gap to home_tolerance stops a joint resting near the edge from flapping.
+    home_exit_tolerance: 0.30
+    # Finished = back home for this long, after having left it once. Must be
+    # longer than the pause of a reset between grasp attempts, which also passes
+    # through home. Read the "left home after Xs (reset)" log lines to tune it.
+    finished_dwell_s: 5.0
+    # Give up, and give control back, if inference has not begun by then.
+    warmup_timeout_s: 60.0
