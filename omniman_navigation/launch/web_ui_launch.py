@@ -61,7 +61,7 @@ def generate_launch_description():
         cmd=['python3', PathJoinSubstitution([web_dir, 'web_server.py']),
              '--port', LaunchConfiguration('web_port'),
              '--web-dir', web_dir,
-             '--poses', PathJoinSubstitution([FindPackageShare('omniman_navigation'),
+             '--poses', PathJoinSubstitution([FindPackageShare('omniman_vla'),
                                               'config', 'poses.yaml'])],
         output='screen',
     )

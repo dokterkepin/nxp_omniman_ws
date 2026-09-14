@@ -284,7 +284,7 @@ def main():
     rclpy.init()
     nav = BasicNavigator(node_name='pick_place_mission')
 
-    default_cfg = f"{get_package_share_directory('omniman_navigation')}/config/mission.yaml"
+    default_cfg = f"{get_package_share_directory('omniman_vla')}/config/mission.yaml"
     nav.declare_parameter('mission_file', default_cfg)
     mission_file = nav.get_parameter('mission_file').value
     with open(mission_file) as f:
@@ -296,7 +296,7 @@ def main():
     # waitUntilNav2Active() publishes THAT to /initialpose until it hears back on
     # /amcl_pose - so skipping this clobbers a good AMCL estimate with garbage.
     # Assumes the robot is physically at home when launched.
-    nav.setInitialPose(make_pose(nav, cfg['poses']['home']))
+    # nav.setInitialPose(make_pose(nav, cfg['poses']['home']))
     nav.get_logger().info('waiting for Nav2...')
     nav.waitUntilNav2Active()
 

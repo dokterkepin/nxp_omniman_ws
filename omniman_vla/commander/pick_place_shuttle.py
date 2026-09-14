@@ -313,7 +313,7 @@ def main():
     rclpy.init()
     nav = BasicNavigator()
 
-    default_cfg = f"{get_package_share_directory('omniman_navigation')}/config/mission.yaml"
+    default_cfg = f"{get_package_share_directory('omniman_vla')}/config/mission.yaml"
     nav.declare_parameter('mission_file', default_cfg)
     mission_file = nav.get_parameter('mission_file').value
 

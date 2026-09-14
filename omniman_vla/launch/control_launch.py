@@ -22,7 +22,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     runner_params = PathJoinSubstitution(
-        [FindPackageShare('omniman_navigation'), 'config', 'policy_runner.yaml'])
+        [FindPackageShare('omniman_vla'), 'config', 'policy_runner.yaml'])
 
     control_arbiter = Node(
         package='omniman_vla',
