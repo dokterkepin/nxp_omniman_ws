@@ -107,8 +107,6 @@ ros2 service call /control/release omniman_interfaces/srv/ReleaseControl \
   "{owner: '', force: true}"                   # unstick: free control, whoever has it
 ```
 
----
-
 ## policy_runner
 
 Runs one policy on physical_ai_server while holding control as `"policy"`.
@@ -132,7 +130,6 @@ programs from starting a policy at the same moment.
 **finished**, watch `/policy_runner/status` go back to `idle`.
 
 ### How it knows the arm is finished
-
 There is no "task done" message from physical_ai_server, so the runner watches
 the arm.
 
@@ -164,7 +161,6 @@ inference running - watching for the arm to finish
    back home
 arm finished - home for 5.0s - ending run
 ```
-
 ### Other ways a run ends
 
 It stops the policy (and releases control if it still has it) when:
@@ -190,9 +186,6 @@ ros2 topic echo /policy_runner/status
 
 ros2 service call /policy_runner/stop std_srvs/srv/Trigger
 ```
-
----
-
 ## The web UI
 
 The iPad page is in `omniman_navigation`, but three of its controls belong to
@@ -211,7 +204,7 @@ this package:
 A button showing **`?`** means the page gets no answer from that node, usually
 because it is not running.
 
----
+--
 
 ## Writing your own commander
 
@@ -283,8 +276,6 @@ release your owner → call /policy_runner/run → wait for status "idle" → ac
 
 The `Control` and `Policy` classes in `commander/pick_place_mission.py` already
 do all of this and follow the rules above — copy them to start.
-
----
 
 ## Config files
 

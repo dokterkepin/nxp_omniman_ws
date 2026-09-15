@@ -14,6 +14,17 @@ This starts:
 - **slam_toolbox** — builds the map
 - **RViz** — visualization
 
+> **Start with the robot at its zero.** The map's origin (0,0) and yaw 0 are
+> not picked by `slam_launch.py` — SLAM copies wheel odometry, and odometry
+> zeroes itself when the robot bringup (`mecanum_drive_controller`) starts. If
+> the robot is moved or rotated after the bringup but before SLAM, the map
+> comes out rotated and its origin is not where the robot started mapping.
+>
+> 1. Put the robot on its start marker: robot **centre** (`base_footprint`)
+>    on the marker, facing the direction you want as "straight".
+> 2. Start the robot bringup.
+> 3. Launch `slam_launch.py` without touching the robot.
+
 Odometry comes from `mecanum_drive_controller`, which publishes
 `odom -> base_footprint` itself (`enable_odom_tf: true` in `controllers.yaml`).
 `rf2o_laser_odometry` and the `robot_localization` EKF were removed — the
@@ -58,6 +69,56 @@ In RViz:
 > plain `Twist`. A relay node (`twist_to_twist_stamped.py`) bridges this gap when user would like to teleoperate with joystick (use_joy:=true).
 
 ![Nav2 Navigation](images/nav2.png)
+
+### Drawing a keepout mask in GIMP
+
+A keepout mask is a black-and-white image the same size as your map: black
+cells become no-go zones, everything else is left as Nav2 already sees it.
+`filter_mask_server` serves it on `/keepout_filter_mask`, and each costmap's
+`KeepoutFilter` layer marks those cells lethal.
+
+1. Open the saved map itself in GIMP (e.g. `maps/my_map_v5.pgm`) and draw on
+   top of it — starting from it guarantees the mask ends up the same size,
+   resolution and origin as the map, which is required for it to line up.
+2. Pick **Rectangle Select** (`R`) and drag a box over the zone. This works
+   because a map started at the robot's zero (see SLAM above) comes out
+   straight, so walls run along the image edges. In the tool options, keep
+   **Feather edges** off — feathering blends the edge into grey, and a grey
+   pixel is neither clearly free nor clearly blocked.
+
+   ![Rectangle Select](images/gimp_rectangle_tools.png)
+
+3. Set the foreground colour to black, then **Edit → Fill with FG Color**.
+   **Select → None**, and repeat for every zone.
+4. *(Only for a map that came out tilted:)* a rectangle can't sit flush against
+   a tilted wall — use **Free Select** (`F`) instead, click each corner, close
+   with Enter, and turn **Antialiasing** off in its tool options.
+5. When every zone is drawn, **Colors → Threshold** the whole image — this
+   snaps every pixel back to pure black/white, cleaning up any grey that
+   slipped in along an edge.
+6. **File → Export As**, name it `keepout_mask.pgm` (matching what
+   `nav2_launch.py` expects, unless you've pointed it elsewhere), save into
+   `omniman_navigation/maps/`, and pick the **Raw** PNM format.
+
+   ![Exporting into maps/](images/gimp_save_keepoutfilter.png)
+
+7. Write (or update) `keepout_mask.yaml` next to it, copying `resolution` and
+   `origin` from the *map's own* `.yaml` — not the old mask's, if the map has
+   changed since:
+
+   ```yaml
+   image: keepout_mask.pgm
+   mode: trinary
+   resolution: 0.020          # copy from the map's .yaml
+   origin: [x, y, 0]          # copy from the map's .yaml
+   negate: 0
+   occupied_thresh: 0.65
+   free_thresh: 0.25
+   ```
+
+> **Check it lines up:** the mask's pixel dimensions must match the map's
+> exactly (`Image → Canvas Size` in GIMP). A mask built on an older map, or
+> resized along the way, silently marks the wrong cells.
 
 ### Reading the costmap colours in RViz
 
@@ -110,38 +171,6 @@ Two things this explains in RViz:
 - The local costmap is inflated *more* aggressively (0.30 m, scaling 8.0) than
   the global one, so a corridor can look passable in the global costmap and
   nearly closed in the local one.
-
-
-### Control from a browser / iPad (Foxglove)
-
-`nav2_launch.py` also starts `foxglove_bridge` on port 8765 (turn it off with
-`foxglove:=false`). Install it once on the robot PC:
-
-```bash
-sudo apt install ros-jazzy-foxglove-bridge
-```
-
-On the iPad, open [app.foxglove.dev](https://app.foxglove.dev), choose
-**Open connection → Foxglove WebSocket**, and enter `ws://192.168.51.151:8765`.
-
-Panel setup:
-1. **3D** panel: set the display frame to `map`, enable `/map`, `/scan`,
-   `/plan` and the costmaps.
-2. In the 3D panel settings under **Publish**, set the pose topic to
-   `/goal_pose` and the pose estimate topic to `/initialpose`. Then use the
-   toolbar buttons the same way as RViz's **2D Pose Estimate** and **2D Goal Pose**.
-3. **Teleop** panel: topic `/cmd_vel`, for manual driving.
-
-Save it as a layout so you only do this once.
-
-> **If Safari won't connect:** app.foxglove.dev is served over `https`, and
-> Safari can refuse a plain `ws://` connection from an `https` page. The fix is
-> to serve the viewer over `http` on the LAN with Lichtblick (the open-source
-> Foxglove fork, works with the same bridge):
-> `docker run -d -p 8080:8080 ghcr.io/lichtblick-suite/lichtblick:latest`,
-> then open `http://<pc-ip>:8080` on the iPad.
-
----
 
 ## Multi-Machine Setup
 

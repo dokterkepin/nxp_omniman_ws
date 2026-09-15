@@ -19,7 +19,7 @@ def generate_launch_description():
     )
 
     joystick_config = PathJoinSubstitution(
-        [pkg_path, 'config', 'joystick_discrete.yaml']
+        [pkg_path, 'config', 'joystick.yaml']
     )
 
     robot_description_content = Command(
@@ -98,7 +98,7 @@ def generate_launch_description():
     # Replaces teleop_twist_joy: fixed LeKiwi-style speed levels rather than
     # proportional sticks, so the recorded base action only ever takes a
     # handful of distinct values. Reads /joy from joy_node above.
-    joy_discrete_node = Node(
+    joy_discrete_node = Node(  # noqa: F841
         package='omniman_vla',
         executable='joy_discrete_base.py',
         name='joy_discrete_base',
@@ -180,7 +180,7 @@ def generate_launch_description():
             delay_mecanum_controller,
             delay_arm_controller,
             joy_node,
-            joy_discrete_node,
+            # joy_discrete_node,
             twist_relay,
             usb_cam,
             rplidar_node,

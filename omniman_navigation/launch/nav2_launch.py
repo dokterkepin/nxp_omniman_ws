@@ -16,7 +16,7 @@ def generate_launch_description():
     map_file = DeclareLaunchArgument(
         "map",
         default_value=PathJoinSubstitution(
-            [pkg_path, "maps", "my_map_v4.yaml"]
+            [pkg_path, "maps", "my_map_v5.yaml"]
         ),
         description="Full path to the map yaml file",
     )
@@ -67,7 +67,7 @@ def generate_launch_description():
     # their own manager below.
 
     keepout_mask_file = PathJoinSubstitution(
-        [pkg_path, "maps", "keepout_mask.yaml"]
+        [pkg_path, "maps", "keepout_mask_v2.yaml"]
     )
 
     filter_mask_server = Node(

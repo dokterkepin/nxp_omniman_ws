@@ -6,8 +6,8 @@ slam_toolbox:
     ceres_preconditioner: SCHUR_JACOBI
     ceres_trust_strategy: LEVENBERG_MARQUARDT
     ceres_dogleg_type: TRADITIONAL_DOGLEG
-    ceres_loss_function: None
-    ceres_scan_matcher_num_threads: 16
+    ceres_loss_function: HuberLoss
+    ceres_scan_matcher_num_threads: 32
 
     # ROS Parameters
     odom_frame: odom
@@ -19,7 +19,7 @@ slam_toolbox:
 
     # Throttle / performance
     map_update_interval: 5.0
-    resolution: 0.05
+    resolution: 0.02
     min_laser_range: 0.2
     max_laser_range: 12.0
     minimum_time_interval: 0.5
