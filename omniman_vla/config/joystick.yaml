@@ -19,13 +19,10 @@ teleop_twist_joy_node:
     scale_angular_turbo:
       yaw: 1.0
 
-    require_enable_button: false
+    require_enable_button: true
 
     enable_button: 4        # LB — hold to move
     enable_turbo_button: 5  # RB — hold for turbo
-
-    # Official mecanum_drive_controller expects TwistStamped
-    publish_stamped_twist: false
 
 # Bluetooth
 # teleop_twist_joy_node:
