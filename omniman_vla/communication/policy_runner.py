@@ -183,6 +183,8 @@ class PolicyRunner(Node):
     def on_run(self, request, response):
         path = request.policy_path or self.get_parameter('policy_path').value
         instruction = request.instruction or self.get_parameter('instruction').value
+        self.get_logger().info(f'run requested: "{instruction}" ({path})')
+
         if not path:
             response.success = False
             response.message = 'no policy_path given and no default set'

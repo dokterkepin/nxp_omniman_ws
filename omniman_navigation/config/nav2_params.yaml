@@ -35,11 +35,11 @@ controller_server:
       # 5 cm / 2.9 deg window, so it hunts around the goal - and goal-hunting is
       # exactly where it makes the small lateral/oblique corrections we want to
       # avoid. Wider tolerances end the approach cleanly.
-      xy_goal_tolerance: 0.12
+      xy_goal_tolerance: 0.1
       # 0.30 rad (17 deg) -> 0.10 rad (5.7 deg). Measured AMCL yaw uncertainty
       # is 4.68 deg (1 sigma), so 17 deg was letting the robot stop ~3.7x further
       # off than localization could actually resolve. Matched to what AMCL knows.
-      yaw_goal_tolerance: 0.10
+      yaw_goal_tolerance: 0.1
       stateful: true
       # (xy_goal_tolerance_buffer removed - not a SimpleGoalChecker parameter,
       #  it was being silently ignored.)

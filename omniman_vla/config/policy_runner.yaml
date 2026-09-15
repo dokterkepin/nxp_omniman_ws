@@ -6,7 +6,7 @@ policy_runner:
     owner_name: policy
 
     # Defaults when ~/run does not name a policy or instruction.
-    policy_path: /home/dokterkepin/output/omniman_pick_and_place/checkpoints/last/pretrained_model
+    policy_path: /home/dokterkepin/output/omniman_pick_and_place_v2/checkpoints/last/pretrained_model
     instruction: "pick the object"
     fps: 30
 

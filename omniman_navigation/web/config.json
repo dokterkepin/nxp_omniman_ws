@@ -1,0 +1,88 @@
+{
+  "_comment": "Settings for index.html. Edit, save, reload the page - no rebuild on a symlink install. Rates are milliseconds between updates: 1000 = 1 Hz.",
+
+  "rosbridge_port": 9091,
+
+  "rates_ms": {
+    "tf": 1000,
+    "amcl_pose": 1000,
+    "plan": 1000,
+    "scan": 1000,
+    "global_costmap": 1000,
+    "local_costmap": 1000,
+    "places_refresh": 1000,
+    "save_button_check": 1000
+  },
+
+  "_render_comment": "Background redraws per second. The map also redraws at once on every touch and on new data, so a low value does not make panning lag.",
+  "render_fps": 1,
+
+  "topics": {
+    "map": "/map",
+    "tf": "/tf",
+    "tf_static": "/tf_static",
+    "amcl_pose": "/amcl_pose",
+    "plan": "/plan",
+    "scan": "/scan",
+    "global_costmap": "/global_costmap/costmap",
+    "local_costmap": "/local_costmap/costmap",
+    "goal_pose": "/goal_pose",
+    "initial_pose": "/initialpose",
+    "control_owner": "/control/owner",
+    "policy_run": "/policy_runner/run",
+    "policy_stop": "/policy_runner/stop",
+    "control_release": "/control/release",
+    "nav_cancel": "/navigate_to_pose/_action/cancel_goal"
+  },
+
+  "frames": {
+    "map": "map",
+    "robot": "base_footprint"
+  },
+
+  "_colors_comment": "Grid layers take rgb + alpha (0-255, 255 = opaque). Everything else takes a CSS colour.",
+  "colors": {
+    "background": "#15161a",
+    "global_costmap": { "rgb": [76, 0, 76], "alpha": 255 },
+    "local_costmap": { "rgb": [255, 0, 255], "alpha": 255 },
+    "scan": "#ef4444",
+    "plan": "#ff0000",
+    "robot_fill": "#3b82f6",
+    "robot_stroke": "#ffffff",
+    "goal_preview": "#f59e0b",
+    "pose_preview": "#a78bfa"
+  },
+
+  "_sizes_comment": "Metres on the map, so they keep their real size when zooming.",
+  "sizes": {
+    "scan_point": 0.04,
+    "plan_width": 0.05,
+    "preview_width": 0.06,
+    "robot_front": 0.28,
+    "robot_back": 0.18,
+    "robot_half_width": 0.18,
+    "robot_stroke": 0.03
+  },
+
+  "view": {
+    "default_rotation_deg": 180,
+    "rotation_storage_key": "omniman.nav.rotation",
+    "wheel_zoom_step": 1.1,
+    "tap_max_drag_m": 0.05
+  },
+
+  "_covariance_comment": "Sent with Set pose. AMCL's own defaults: 0.5 m and 0.26 rad standard deviation, squared.",
+  "initial_pose_covariance": {
+    "x": 0.25,
+    "y": 0.25,
+    "yaw": 0.06853
+  },
+
+  "policy_owner_name": "policy",
+
+  "hints": {
+    "view": "drag to pan, pinch to zoom",
+    "goal": "drag from the target, release sets the heading - second finger cancels",
+    "init": "drag from where the robot really is - second finger cancels"
+  }
+}
