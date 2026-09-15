@@ -15,9 +15,9 @@ teleop_twist_joy_node:
     axis_angular:
       yaw: 3         # right stick left/right → rotation
     scale_angular:
-      yaw: 1.0       # max angular speed (rad/s)
+      yaw: 0.5      # max angular speed (rad/s)
     scale_angular_turbo:
-      yaw: 2.0
+      yaw: 1.0
 
     require_enable_button: false
 

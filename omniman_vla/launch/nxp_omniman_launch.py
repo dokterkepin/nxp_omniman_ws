@@ -86,6 +86,12 @@ def generate_launch_description():
         parameters=[joystick_config],
     )
 
+    teleop_joy_node = Node(
+        package="teleop_twist_joy",
+        executable="teleop_node",
+        parameters=[joystick_config],
+    )
+
     # REQUIRED on Jazzy - see the note above. Converts Twist on /cmd_vel into
     # TwistStamped on /cmd_vel_stamped for MecanumDriveController.
     twist_relay = Node(
@@ -181,6 +187,7 @@ def generate_launch_description():
             delay_arm_controller,
             joy_node,
             # joy_discrete_node,
+            teleop_joy_node,
             twist_relay,
             usb_cam,
             rplidar_node,
