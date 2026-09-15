@@ -24,6 +24,6 @@ policy_runner:
     # Finished = back home for this long, after having left it once. Must be
     # longer than the pause of a reset between grasp attempts, which also passes
     # through home. Read the "left home after Xs (reset)" log lines to tune it.
-    finished_dwell_s: 5.0
+    finished_dwell_s: 10.0
     # Give up, and give control back, if inference has not begun by then.
     warmup_timeout_s: 60.0
