@@ -10,10 +10,10 @@ P-controller instead of a learned policy.
               idle | searching | aligning | aligned | failed: <why>
 
 A run: acquire control as owner_name ("align"), then
-  SEARCHING  no cup in view: sweep the base search_angle_deg each way from
-             where it started, first toward the side the cup was last seen on.
-             search_angle_deg 0 = no sweep: wait lost_s for the cup, then
-             fail - or with lost_s 0, stand still and wait for it for ever
+  SEARCHING  no cup in view: turn at search_speed for up to search_time_s,
+             toward the side the cup was last seen on (search_direction if
+             it was never seen), until the cup shows. search_time_s 0 = do
+             not turn: wait lost_s for it, or with lost_s 0 wait for ever
   ALIGNING   cup in view: one P-controller per axis, each clamped to
              [min_*, max_*] and zero inside its tolerance
                cup x (left/right)  -> angular_z  x_correction: rotate
@@ -41,13 +41,12 @@ turn left (+angular_z) or slide left (+linear_y); cup higher than aim (further
 away) -> forward (+linear_x).
 
 A run also ends - base stopped, control given back if still held - when
-  - the cup is not found in the whole sweep, or is lost and not found again
+  - the cup does not show within search_time_s of turning
   - the base has moved max_travel_m from where the run started
   - timeout_s passes
-max_travel_m, timeout_s and lost_s at 0 switch that limit off: the run then
-only ends aligned, or by ~/stop / the web UI switch.
   - control is taken away (a forced acquire)
   - ~/stop is called, or the node shuts down
+max_travel_m, timeout_s and lost_s at 0 switch that limit off.
 
 Needs cup_detector.py running (GPU PC, lerobot_jazzy env). This node itself is
 plain ROS - no torch.
@@ -80,11 +79,9 @@ from vision_msgs.msg import Detection2DArray
 
 CALL_TIMEOUT_S = 15.0
 
-# Search sweep target counts as reached within this, rad.
-YAW_REACHED = 0.03
-
 # Extra wait for the first detection of a run: the detector only starts once
 # it discovers this node's subscription, which is made when the run starts.
+# Turning before then could turn a cup that is in view out of it.
 FIRST_DETECTION_S = 2.0
 
 BUSY = ('searching', 'aligning')
@@ -122,7 +119,7 @@ class VisualAlign(Node):
             'min_score', 'k_angular', 'max_angular', 'min_angular', 'k_lateral',
             'max_lateral', 'k_forward', 'max_forward', 'min_linear', 'k_heading',
             'tolerance_heading_deg', 'max_travel_m', 'detection_timeout_s', 'lost_s',
-            'search_speed', 'search_angle_deg', 'search_direction', 'timeout_s',
+            'search_speed', 'search_time_s', 'search_direction', 'timeout_s',
         ])
 
         # Same threading as policy_runner.py: service handlers wait on other
@@ -165,8 +162,8 @@ class VisualAlign(Node):
         # Heading strafe holds: where the cup was first seen this run.
         self.hold_yaw = 0.0
         self.hold_set = False
-        self.sweep = []
         self.search_since = 0.0
+        self.search_side = 1
 
         self.create_subscription(
             ControlOwner, '/control/owner', self.on_owner, latched, callback_group=group)
@@ -219,10 +216,8 @@ class VisualAlign(Node):
         return math.copysign(min(max(abs(k * error), lo), hi), error)
 
     def start_search(self):
-        """Sweep search_angle_deg each way from here, cup's last side first."""
-        side = self.last_side or (1 if self.p('search_direction') >= 0 else -1)
-        a = math.radians(self.p('search_angle_deg'))
-        self.sweep = [wrap(self.yaw + side * a), wrap(self.yaw - side * a)] if a > 0 else []
+        """Turn toward the side the cup was last seen on, else search_direction."""
+        self.search_side = self.last_side or (1 if self.p('search_direction') >= 0 else -1)
         self.search_since = time.monotonic()
         self.set_state('searching')
 
@@ -358,22 +353,8 @@ class VisualAlign(Node):
                         self.hold_yaw = self.yaw
                         self.hold_set = True
                     self.set_state('aligning')
-                elif not self.sweep and self.p('search_angle_deg') <= 0:
-                    # No sweep: give the cup lost_s to show up, then give up.
-                    # lost_s 0: no giving up, wait (stopped) until it shows.
-                    wait = self.p('lost_s') + (FIRST_DETECTION_S if self.cup_x is None else 0.0)
-                    if self.p('lost_s') > 0.0 and now - self.search_since > wait:
-                        result = 'failed: cup not in view'
                 else:
-                    err = wrap(self.sweep[0] - self.yaw)
-                    if abs(err) < YAW_REACHED:
-                        self.sweep.pop(0)
-                    if self.sweep:
-                        wz = math.copysign(self.p('search_speed'),
-                                           wrap(self.sweep[0] - self.yaw))
-                        cmd = (0.0, 0.0, wz)
-                    else:
-                        result = 'failed: cup not found'
+                    result, cmd = self.search_command(now)
 
             if self.state == 'aligning':
                 if fresh:
@@ -396,6 +377,23 @@ class VisualAlign(Node):
             self.end_run(result)
         else:
             self.drive(*cmd)
+
+    def search_command(self, now):
+        """(result, cmd) while the cup is not in view."""
+        waited = now - self.search_since
+        first = FIRST_DETECTION_S if self.cup_x is None else 0.0
+        turn_s = self.p('search_time_s')
+        if turn_s <= 0.0:
+            # No turning: give the cup lost_s to show up, or wait for ever.
+            lost_s = self.p('lost_s')
+            if 0.0 < lost_s < waited - first:
+                return 'failed: cup not in view', (0.0, 0.0, 0.0)
+            return None, (0.0, 0.0, 0.0)
+        if waited < first:
+            return None, (0.0, 0.0, 0.0)
+        if waited - first < turn_s:
+            return None, (0.0, 0.0, self.search_side * self.p('search_speed'))
+        return f'failed: cup not found after turning {turn_s:.0f}s', (0.0, 0.0, 0.0)
 
     def align_command(self):
         """(linear_x, linear_y, angular_z) for the latest cup position."""

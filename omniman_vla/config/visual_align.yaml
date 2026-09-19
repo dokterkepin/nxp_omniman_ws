@@ -30,7 +30,7 @@ visual_align:
     # x 299-343, y 201-260 (middle half of the episodes).
     aim_x: 320.0
     tolerance_x: 30.0
-    aim_y: 350.0
+    aim_y: 300.0
     tolerance_y: 30.0
     # Aligned = this many detections in a row with every axis in tolerance.
     settle_frames: 5
@@ -67,11 +67,14 @@ visual_align:
     detection_timeout_s: 0.5
     lost_s: 0.0
 
-    # No cup in view: sweep this far each way from where the run started.
-    # 0 = no sweep: wait lost_s for the cup, then fail with "cup not in view".
+    # No cup in view: turn at search_speed (rad/s) for up to search_time_s
+    # until it shows, then align. Not found by then -> stop, "cup not found".
+    # 10 s at 0.3 rad/s is about half a turn.
+    # 0 = do not turn: wait lost_s for the cup instead (lost_s 0 = for ever).
     search_speed: 0.3
-    search_angle_deg: 0.0
-    # +1 = sweep left first, -1 = right, when the cup was never seen.
+    search_time_s: 10.0
+    # Which way to turn: toward the side the cup was last seen on; if it was
+    # never seen this run, +1 = left (counter-clockwise), -1 = right.
     search_direction: 1
 
     # Give up, stop and release control after this long. 0 = no limit.
