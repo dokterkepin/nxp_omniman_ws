@@ -31,6 +31,9 @@
     "control_owner": "/control/owner",
     "policy_run": "/policy_runner/run",
     "policy_stop": "/policy_runner/stop",
+    "align_run": "/visual_align/run",
+    "align_stop": "/visual_align/stop",
+    "align_status": "/visual_align/status",
     "control_release": "/control/release",
     "nav_cancel": "/navigate_to_pose/_action/cancel_goal"
   },
@@ -79,6 +82,7 @@
   },
 
   "policy_owner_name": "policy",
+  "align_owner_name": "align",
 
   "hints": {
     "view": "drag to pan, pinch to zoom",

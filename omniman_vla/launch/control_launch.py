@@ -3,6 +3,7 @@ The control lock and the policy runner.
 
     control_arbiter  /control/owner, /control/acquire, /control/release
     policy_runner    /policy_runner/run, /policy_runner/stop, /policy_runner/status
+    visual_align     /visual_align/run, /visual_align/stop, /visual_align/status
 
 Anything that wants to take part in the lock - pick_place_mission.py, the web
 UI's Policy switch - needs these two running. Programs that never acquire
@@ -23,6 +24,8 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     runner_params = PathJoinSubstitution(
         [FindPackageShare('omniman_vla'), 'config', 'policy_runner.yaml'])
+    align_params = PathJoinSubstitution(
+        [FindPackageShare('omniman_vla'), 'config', 'visual_align.yaml'])
 
     control_arbiter = Node(
         package='omniman_vla',
@@ -39,4 +42,13 @@ def generate_launch_description():
         parameters=[runner_params],
     )
 
-    return LaunchDescription([control_arbiter, policy_runner])
+    # Needs cup_detector.py running on the GPU PC; idle until ~/run is called.
+    visual_align = Node(
+        package='omniman_vla',
+        executable='visual_align.py',
+        name='visual_align',
+        output='screen',
+        parameters=[align_params],
+    )
+
+    return LaunchDescription([control_arbiter, policy_runner, visual_align])

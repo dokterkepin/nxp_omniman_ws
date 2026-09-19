@@ -72,6 +72,7 @@
     <label class="layer"><input type="checkbox" id="layer-global" checked><span class="dot global"></span>Global</label>
     <label class="layer"><input type="checkbox" id="layer-local" checked><span class="dot local"></span>Local</label>
     <span class="sep"></span>
+    <button id="toggle-align" class="switch" disabled>Align: ?</button>
     <button id="toggle-policy" class="switch" disabled>Policy: ?</button>
     <span id="status">connecting...</span>
   </header>
@@ -152,7 +153,7 @@ function start(CFG) {
     var header = { stamp: stamp(), frame_id: CFG.frames.map };
 
     if (mode === 'goal') {
-      if (policyOwns()) { setStatus('policy owns the robot - turn Policy OFF first', 'bad'); return; }
+      if (driveLocked()) { setStatus(controlOwner + ' owns the robot - turn it OFF first', 'bad'); return; }
       goalTopic.publish(new ROSLIB.Message({ header: header, pose: pose }));
       setStatus('goal sent', 'ok');
     } else {
@@ -646,15 +647,28 @@ function start(CFG) {
   // run, which releases control. While the policy owns the robot, everything
   // on this page that would drive it - Goal mode and the place buttons - is
   // locked.
+  //
+  // The Align switch works the same way for visual_align (owner "align"): it
+  // moves the base until the cup is in place for the pick, then turns itself
+  // OFF and says "aligned" or why it failed. Unlike Policy it never forces -
+  // it is refused while the policy or a mission holds control - and it is
+  // disabled while the policy owns the robot. Policy ON during an align takes
+  // control from it, which stops the align.
 
   var POLICY = CFG.policy_owner_name;
+  var ALIGN = CFG.align_owner_name;
   var policyButton = document.getElementById('toggle-policy');
+  var alignButton = document.getElementById('toggle-align');
   var controlOwner = null;       // null until control_arbiter has been heard
 
   var runPolicy = new ROSLIB.Service({
     ros: ros, name: TOPICS.policy_run, serviceType: 'omniman_interfaces/srv/RunPolicy' });
   var stopPolicy = new ROSLIB.Service({
     ros: ros, name: TOPICS.policy_stop, serviceType: 'std_srvs/srv/Trigger' });
+  var runAlign = new ROSLIB.Service({
+    ros: ros, name: TOPICS.align_run, serviceType: 'std_srvs/srv/Trigger' });
+  var stopAlign = new ROSLIB.Service({
+    ros: ros, name: TOPICS.align_stop, serviceType: 'std_srvs/srv/Trigger' });
   var releaseControl = new ROSLIB.Service({
     ros: ros, name: TOPICS.control_release, serviceType: 'omniman_interfaces/srv/ReleaseControl' });
   var cancelNav = new ROSLIB.Service({
@@ -662,14 +676,20 @@ function start(CFG) {
     serviceType: 'action_msgs/srv/CancelGoal' });
 
   function policyOwns() { return controlOwner === POLICY; }
+  function alignOwns() { return controlOwner === ALIGN; }
+  // Nav goals from this page would fight whoever drives the base now.
+  function driveLocked() { return policyOwns() || alignOwns(); }
 
   // Lock or unlock everything that would drive the base.
   function applyNavLock() {
-    var locked = policyOwns();
+    var locked = driveLocked();
     document.getElementById('mode-goal').disabled = locked;
     if (locked && mode === 'goal') { document.getElementById('mode-view').click(); }
     document.querySelectorAll('#place-list .go').forEach(function (b) { b.disabled = locked; });
-    showSwitch(policyButton, 'Policy', controlOwner === null ? null : locked);
+    var known = controlOwner !== null;
+    showSwitch(policyButton, 'Policy', known ? policyOwns() : null);
+    showSwitch(alignButton, 'Align', known ? alignOwns() : null);
+    if (policyOwns()) { alignButton.disabled = true; }
   }
 
   new ROSLIB.Topic({
@@ -717,6 +737,48 @@ function start(CFG) {
   });
 
   showSwitch(policyButton, 'Policy', null);
+
+  // How an align run ended - it turns itself OFF, so say why.
+  new ROSLIB.Topic({
+    ros: ros, name: TOPICS.align_status, messageType: 'std_msgs/msg/String',
+    qos: { durability: 'transient_local' }
+  }).subscribe(function (msg) {
+    if (msg.data === 'aligned') { setStatus('aligned - cup in place', 'ok'); }
+    else if (msg.data.indexOf('failed') === 0) { setStatus('align ' + msg.data, 'bad'); }
+    else if (msg.data === 'searching' || msg.data === 'aligning') { setStatus(msg.data + '...', 'ok'); }
+  });
+
+  alignButton.addEventListener('click', function () {
+    if (controlOwner === null) { return; }
+    alignButton.disabled = true;
+
+    if (alignOwns()) {
+      stopAlign.callService(new ROSLIB.ServiceRequest({}), function () {
+        setStatus('align stopped', 'ok');
+      }, function () {
+        // visual_align gone: free the lock directly so the robot is not stuck.
+        releaseControl.callService(new ROSLIB.ServiceRequest({ owner: '', force: true }),
+          function () { setStatus('visual_align not answering - control force-released', 'bad'); },
+          function (err) { setStatus('stop failed: ' + err, 'bad'); applyNavLock(); });
+      });
+      return;
+    }
+
+    // Cancel every navigation goal first (Nav2 would keep driving), then ask
+    // visual_align to take control - politely: refused if someone holds it.
+    var zeroId = { goal_id: { uuid: new Array(16).fill(0) }, stamp: { sec: 0, nanosec: 0 } };
+    var start = function () {
+      runAlign.callService(new ROSLIB.ServiceRequest({}),
+        function (res) {
+          if (!res.success) { setStatus('align refused: ' + res.message, 'bad'); }
+          applyNavLock();
+        },
+        function (err) { setStatus('visual_align not answering: ' + err, 'bad'); applyNavLock(); });
+    };
+    cancelNav.callService(new ROSLIB.ServiceRequest({ goal_info: zeroId }), start, start);
+  });
+
+  showSwitch(alignButton, 'Align', null);
 
   // ---- saved places -------------------------------------------------------
   //
@@ -794,7 +856,7 @@ function start(CFG) {
   function goTo(name) {
     var p = places[name];
     if (!p) { return; }
-    if (policyOwns()) { setStatus('policy owns the robot - turn Policy OFF first', 'bad'); return; }
+    if (driveLocked()) { setStatus(controlOwner + ' owns the robot - turn it OFF first', 'bad'); return; }
     var pose = { position: { x: p.x, y: p.y, z: 0 },
                  orientation: quaternion(p.yaw * Math.PI / 180) };
     goalTopic.publish(new ROSLIB.Message({

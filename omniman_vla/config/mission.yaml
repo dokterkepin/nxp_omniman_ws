@@ -8,8 +8,9 @@
 #           place      (pick_place policy, same checkpoint)
 #   -> home (nav2)
 #
-# pick_place_mission.py runs the same mission without the correct steps, and
-# ignores the base_correction entry below. It hands the robot over through the
+# pick_place_mission.py runs the same mission with visual_align.py as the
+# correct step before the pick (none before the place), and ignores the
+# base_correction entry below. It hands the robot over through the
 # control lock and lets policy_runner.py decide when the arm is finished; the
 # arm settings for that are in policy_runner.yaml, not here.
 #
@@ -40,6 +41,10 @@ policies:
 
 settings:
   fps: 30
+  # pick_place_mission.py: after arriving at pick_area, move the base until the
+  # cup is in place in the wrist camera (visual_align.py + cup_detector.py)
+  # before starting the pick policy. false = start the pick right away.
+  align_before_pick: true
   # After each nav leg the mission waits for wheel odometry to show the base
   # has actually stopped, instead of sleeping a fixed time. still_time_s is how
   # long it must stay stopped; settle_timeout_s gives up if it never does.

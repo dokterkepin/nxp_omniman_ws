@@ -20,11 +20,13 @@ install(PROGRAMS
   recorder/replay_arm.py
   recorder/replay_base.py
   recorder/joy_discrete_base.py
+  recorder/trim_state.py
   # communication: the control lock and the nodes that take part in it
   communication/control_arbiter.py
   communication/policy_runner.py
-  communication/get_robot_pose.py
-  communication/nav_commander.py
+  communication/visual_align.py
+  # perception: detectors (GPU PC, lerobot_jazzy env)
+  perception/cup_detector.py
   # commander: missions
   commander/pick_place_mission.py
   commander/pick_place_shuttle.py

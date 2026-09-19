@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """
 Pick and place with Nav2 and one policy, handing the robot over through the
-control lock (control_arbiter). No correction step.
+control lock (control_arbiter).
 
     acquire "nav" -> drive to pick_area  -> base still -> release "nav"
+    visual_align  -> move the base until the cup is in place (holds "align")
     policy_runner -> pick   (holds "policy" until the arm is finished)
     acquire "nav" -> drive to place_area -> base still -> release "nav"
     policy_runner -> place
     acquire "nav" -> drive home          -> release "nav"
 
-This script only ever holds "nav". It asks policy_runner to run each policy and
-waits for the run to end - the runner releases "policy" when the arm reports it
-is finished - before taking "nav" again. Acquiring is polite: while someone
-else holds control, the mission waits its turn. If control is taken away while
+This script only ever holds "nav". It asks visual_align to put the cup in
+place and policy_runner to run each policy, and waits for each to end - the
+runner releases "policy" when the arm reports it is finished - before taking
+"nav" again. Acquiring is polite: while someone else holds control, the
+mission waits its turn. If control is taken away while
 driving (an operator forcing it from the web UI), navigation is cancelled and
 the mission stops.
 
@@ -24,7 +26,8 @@ instructions from config/mission.yaml.
 Prereqs:
   - nav2_launch.py, robot localized
   - physical_ai_server_bringup.launch.py
-  - control_launch.py (control_arbiter + policy_runner)
+  - control_launch.py (control_arbiter + policy_runner + visual_align)
+  - cup_detector.py, if settings.align_before_pick is on
 
 Run:
   ros2 run omniman_vla pick_place_mission.py
@@ -46,6 +49,7 @@ from omniman_interfaces.msg import ControlOwner
 from omniman_interfaces.srv import AcquireControl, ReleaseControl, RunPolicy
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import String
+from std_srvs.srv import Trigger
 
 # "Still" means every odometry twist component under these for still_time_s.
 STILL_LINEAR = 0.01     # m/s
@@ -220,6 +224,50 @@ class Policy:
         return True
 
 
+class Align:
+    """Asks visual_align to centre the cup, then waits for aligned / failed."""
+
+    def __init__(self, node):
+        self.node = node
+        self.status = ''
+        node.create_subscription(String, '/visual_align/status', self._on_status, LATCHED)
+        self.run_client = node.create_client(Trigger, '/visual_align/run')
+
+    def _on_status(self, msg):
+        self.status = msg.data
+
+    def run(self):
+        log = self.node.get_logger()
+        log.info('align -> centre the cup')
+        res = call(self.node, self.run_client, Trigger.Request())
+        if res is None:
+            log.error('visual_align not answering - is control_launch.py running?')
+            return False
+        if not res.success:
+            log.error(f'   align refused: {res.message}')
+            return False
+
+        # searching / aligning -> aligned | failed: ...; the result stays
+        # latched, so only a result after having been busy is this run's -
+        # unless the run was so short that the busy states were missed.
+        busy_seen = False
+        start = time.monotonic()
+        while True:
+            rclpy.spin_once(self.node, timeout_sec=0.05)
+            done = self.status == 'aligned' or self.status.startswith('failed')
+            if not done:
+                busy_seen = True
+            elif busy_seen or time.monotonic() - start > 3.0:
+                break
+        ok = self.status == 'aligned'
+        took = time.monotonic() - start
+        if ok:
+            log.info(f'   aligned after {took:.1f}s')
+        else:
+            log.error(f'   align {self.status} after {took:.1f}s')
+        return ok
+
+
 class Mission:
 
     def __init__(self, nav, cfg):
@@ -230,6 +278,7 @@ class Mission:
         self.still = BaseStill(nav)
         self.control = Control(nav, NAV)
         self.policy = Policy(nav)
+        self.align = Align(nav)
 
     def drive(self, place):
         """Hold "nav" for one leg: drive, wait for the base to stop, release."""
@@ -262,10 +311,20 @@ class Mission:
         self.control.release()
         return ok
 
+    def align_cup(self):
+        """Centre the cup before picking; skipped if align_before_pick is off."""
+        if not self.settings.get('align_before_pick', False):
+            return True
+        if not self.align.run():
+            return False
+        return self.still.wait(float(self.settings['still_time_s']),
+                               float(self.settings['settle_timeout_s']))
+
     def run(self):
         path = self.policy_cfg['path']
         steps = [
             lambda: self.drive('pick_area'),
+            self.align_cup,
             lambda: self.policy.run(path, self.policy_cfg['instruction_pick'], 'pick'),
             lambda: self.drive('place_area'),
             lambda: self.policy.run(path, self.policy_cfg['instruction_place'], 'place'),
