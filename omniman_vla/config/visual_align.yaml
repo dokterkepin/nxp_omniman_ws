@@ -23,14 +23,14 @@ visual_align:
     #            base forward/back too - the forward axis (k_forward) takes
     #            that out, since the cup's y in the image moves with it.
     #   rotate - turn (angular_z). What the base_correct demos did.
-    x_correction: strafe
+    x_correction: rotate
 
     # Where the cup should end up in the image (640x480), and how close counts
     # as there. After correcting in the base_correct demos the cup sat at
     # x 299-343, y 201-260 (middle half of the episodes).
     aim_x: 320.0
     tolerance_x: 30.0
-    aim_y: 245.0
+    aim_y: 350.0
     tolerance_y: 30.0
     # Aligned = this many detections in a row with every axis in tolerance.
     settle_frames: 5
@@ -57,11 +57,15 @@ visual_align:
 
     # Safety: give up if the base ends up this far from where the run started
     # (the arm could reach the box before the cup looks right).
-    max_travel_m: 0.20
+    # 0 = no limit.
+    max_travel_m: 0.0
 
     # A detection older than this is "not in view"; lost for lost_s -> search.
+    # detection_timeout_s stays on: without it the base would keep driving on
+    # the last position seen after the camera loses the cup.
+    # lost_s 0 = never give up, stand still until the cup is seen again.
     detection_timeout_s: 0.5
-    lost_s: 1.0
+    lost_s: 0.0
 
     # No cup in view: sweep this far each way from where the run started.
     # 0 = no sweep: wait lost_s for the cup, then fail with "cup not in view".
@@ -70,5 +74,5 @@ visual_align:
     # +1 = sweep left first, -1 = right, when the cup was never seen.
     search_direction: 1
 
-    # Give up, stop and release control after this long.
-    timeout_s: 30.0
+    # Give up, stop and release control after this long. 0 = no limit.
+    timeout_s: 0.0

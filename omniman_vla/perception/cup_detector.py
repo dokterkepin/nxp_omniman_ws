@@ -31,23 +31,34 @@ import os
 import cv2
 import numpy as np
 import rclpy
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import CompressedImage
 from ultralytics import YOLO
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
 
 
+def declare_from_yaml(node, names):
+    """Declare parameters with no default: every value must come from the
+    params file. Any number type is accepted (300 or 300.0). Raises, naming
+    the missing ones, if the file does not set them all."""
+    for name in names:
+        node.declare_parameter(name, descriptor=ParameterDescriptor(dynamic_typing=True))
+    missing = [n for n in names if node.get_parameter(n).type_ == Parameter.Type.NOT_SET]
+    if missing:
+        raise RuntimeError(
+            f'{node.get_name()}: not set in the params file: {", ".join(missing)} '
+            '- run it with --params-file config/visual_align.yaml')
+
+
 class CupDetector(Node):
 
     def __init__(self):
         super().__init__('cup_detector')
-        self.declare_parameter('model', '~/models/yolov8s-worldv2.pt')
-        # Text prompts - any of them counts as the target.
-        self.declare_parameter('classes', ['paper cup', 'cup with yellow lid'])
-        self.declare_parameter('image_topic', '/image_raw/compressed')
-        self.declare_parameter('min_score', 0.3)
-        self.declare_parameter('device', 'cuda:0')
+        # All values come from config/visual_align.yaml - none are set here.
+        declare_from_yaml(self, ['model', 'classes', 'image_topic', 'min_score', 'device'])
 
         path = os.path.expanduser(self.get_parameter('model').value)
         classes = list(self.get_parameter('classes').value)

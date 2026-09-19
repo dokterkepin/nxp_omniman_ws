@@ -12,7 +12,8 @@ P-controller instead of a learned policy.
 A run: acquire control as owner_name ("align"), then
   SEARCHING  no cup in view: sweep the base search_angle_deg each way from
              where it started, first toward the side the cup was last seen on.
-             search_angle_deg 0 = no sweep: wait lost_s for the cup, then fail
+             search_angle_deg 0 = no sweep: wait lost_s for the cup, then
+             fail - or with lost_s 0, stand still and wait for it for ever
   ALIGNING   cup in view: one P-controller per axis, each clamped to
              [min_*, max_*] and zero inside its tolerance
                cup x (left/right)  -> angular_z  x_correction: rotate
@@ -43,6 +44,8 @@ A run also ends - base stopped, control given back if still held - when
   - the cup is not found in the whole sweep, or is lost and not found again
   - the base has moved max_travel_m from where the run started
   - timeout_s passes
+max_travel_m, timeout_s and lost_s at 0 switch that limit off: the run then
+only ends aligned, or by ~/stop / the web UI switch.
   - control is taken away (a forced acquire)
   - ~/stop is called, or the node shuts down
 
@@ -66,7 +69,9 @@ from omniman_interfaces.msg import ControlOwner
 from omniman_interfaces.srv import AcquireControl, ReleaseControl
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import String
@@ -93,40 +98,32 @@ def wrap(a):
     return math.atan2(math.sin(a), math.cos(a))
 
 
+def declare_from_yaml(node, names):
+    """Declare parameters with no default: every value must come from the
+    params file. Any number type is accepted (300 or 300.0). Raises, naming
+    the missing ones, if the file does not set them all."""
+    for name in names:
+        node.declare_parameter(name, descriptor=ParameterDescriptor(dynamic_typing=True))
+    missing = [n for n in names if node.get_parameter(n).type_ == Parameter.Type.NOT_SET]
+    if missing:
+        raise RuntimeError(
+            f'{node.get_name()}: not set in the params file: {", ".join(missing)} '
+            '- run it with --params-file config/visual_align.yaml')
+
+
 class VisualAlign(Node):
 
     def __init__(self):
         super().__init__('visual_align')
-        self.declare_parameter('owner_name', 'align')
-        self.declare_parameter('detections_topic', '/cup_detector/detections')
-        self.declare_parameter('cmd_vel_topic', '/cmd_vel')
-        self.declare_parameter('odom_topic', '/mecanum_drive_controller/odometry')
-        self.declare_parameter('rate_hz', 20.0)
-        self.declare_parameter('x_correction', 'rotate')     # rotate | strafe
-        self.declare_parameter('aim_x', 320.0)
-        self.declare_parameter('tolerance_x', 30.0)
-        self.declare_parameter('aim_y', 245.0)
-        self.declare_parameter('tolerance_y', 30.0)
-        self.declare_parameter('settle_frames', 5)
-        self.declare_parameter('min_score', 0.3)
-        self.declare_parameter('k_angular', 0.003)
-        self.declare_parameter('max_angular', 0.5)
-        self.declare_parameter('min_angular', 0.10)
-        self.declare_parameter('k_lateral', 0.0005)
-        self.declare_parameter('max_lateral', 0.08)
-        self.declare_parameter('k_forward', 0.0005)
-        self.declare_parameter('max_forward', 0.08)
-        self.declare_parameter('min_linear', 0.02)
-        self.declare_parameter('k_heading', 1.0)
-        self.declare_parameter('tolerance_heading_deg', 2.0)
-        self.declare_parameter('max_travel_m', 0.20)
-        self.declare_parameter('detection_timeout_s', 0.5)
-        self.declare_parameter('lost_s', 1.0)
-        self.declare_parameter('search_speed', 0.3)
-        self.declare_parameter('search_angle_deg', 45.0)
-        # +1 = sweep left (CCW) first, -1 = right, when the cup was never seen.
-        self.declare_parameter('search_direction', 1)
-        self.declare_parameter('timeout_s', 30.0)
+        # All values come from config/visual_align.yaml - none are set here.
+        declare_from_yaml(self, [
+            'owner_name', 'detections_topic', 'cmd_vel_topic', 'odom_topic', 'rate_hz',
+            'x_correction', 'aim_x', 'tolerance_x', 'aim_y', 'tolerance_y', 'settle_frames',
+            'min_score', 'k_angular', 'max_angular', 'min_angular', 'k_lateral',
+            'max_lateral', 'k_forward', 'max_forward', 'min_linear', 'k_heading',
+            'tolerance_heading_deg', 'max_travel_m', 'detection_timeout_s', 'lost_s',
+            'search_speed', 'search_angle_deg', 'search_direction', 'timeout_s',
+        ])
 
         # Same threading as policy_runner.py: service handlers wait on other
         # services, so reentrant + multithreaded, and the lock is never held
@@ -337,12 +334,12 @@ class VisualAlign(Node):
         if self.state not in BUSY:
             return
         now = time.monotonic()
-        if now - self.started_at > self.p('timeout_s'):
+        if 0.0 < self.p('timeout_s') < now - self.started_at:
             self.end_run(f'failed: timeout after {self.p("timeout_s"):.0f}s')
             return
 
         travelled = math.dist(self.pos, self.start_pos)
-        if travelled > self.p('max_travel_m'):
+        if 0.0 < self.p('max_travel_m') < travelled:
             self.end_run(f'failed: moved {travelled:.2f} m, more than max_travel_m')
             return
 
@@ -363,8 +360,9 @@ class VisualAlign(Node):
                     self.set_state('aligning')
                 elif not self.sweep and self.p('search_angle_deg') <= 0:
                     # No sweep: give the cup lost_s to show up, then give up.
+                    # lost_s 0: no giving up, wait (stopped) until it shows.
                     wait = self.p('lost_s') + (FIRST_DETECTION_S if self.cup_x is None else 0.0)
-                    if now - self.search_since > wait:
+                    if self.p('lost_s') > 0.0 and now - self.search_since > wait:
                         result = 'failed: cup not in view'
                 else:
                     err = wrap(self.sweep[0] - self.yaw)
