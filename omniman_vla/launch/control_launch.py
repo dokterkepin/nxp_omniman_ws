@@ -4,6 +4,7 @@ The control lock and the policy runner.
     control_arbiter  /control/owner, /control/acquire, /control/release
     policy_runner    /policy_runner/run, /policy_runner/stop, /policy_runner/status
     visual_align     /visual_align/run, /visual_align/stop, /visual_align/status
+    color_detector   /color_detector/detections, /color_detector/debug/compressed
 
 Anything that wants to take part in the lock - pick_place_mission.py, the web
 UI's Policy switch - needs these two running. Programs that never acquire
@@ -42,7 +43,7 @@ def generate_launch_description():
         parameters=[runner_params],
     )
 
-    # Needs cup_detector.py running on the GPU PC; idle until ~/run is called.
+    # Aligns to what color_detector finds; idle until ~/run is called.
     visual_align = Node(
         package='omniman_vla',
         executable='visual_align.py',
@@ -51,4 +52,14 @@ def generate_launch_description():
         parameters=[align_params],
     )
 
-    return LaunchDescription([control_arbiter, policy_runner, visual_align])
+    # Finds the align targets by colour; plain OpenCV, no GPU. Idle until
+    # visual_align (or the debug image) subscribes.
+    color_detector = Node(
+        package='omniman_vla',
+        executable='color_detector.py',
+        name='color_detector',
+        output='screen',
+        parameters=[align_params],
+    )
+
+    return LaunchDescription([control_arbiter, policy_runner, visual_align, color_detector])

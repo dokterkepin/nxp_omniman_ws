@@ -8,5 +8,5 @@
 #   place_area  - where the missions drive to place
 # Any other name is just a saved place to drive to from the web UI.
 home: {x: 0.000, y: 0.000, yaw: 0.0}
-pick_area: {x: 1.200, y: -4.000, yaw: -100.0}
-place_area: {x: 1.000, y: -1.000, yaw: -100.0}
+pick_area: {x: -0.072, y: -3.031, yaw: -90.0}
+place_area: {x: -0.165, y: 0.519, yaw: 90.0}

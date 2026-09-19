@@ -1,11 +1,49 @@
-# Parameters for cup_detector.py and visual_align.py - the base correction
-# step between Nav2 and the pick policy.
+# Parameters for color_detector.py, visual_align.py and cup_detector.py - the
+# base correction step between Nav2 and the policy.
+
+color_detector:
+  ros__parameters:
+    image_topic: /image_raw/compressed
+    # Priority order: the first target in this list that is in view is the one
+    # visual_align aligns to. When placing, the held cup (yellow) is in view -
+    # put black first, or leave yellow out:
+    #   ros2 param set /color_detector targets "['black']"
+    # Each target below needs all five settings.
+    targets: ["yellow", "black"]
+
+    # HSV in OpenCV units: H 0-180, S 0-255, V 0-255. hsv_low H above
+    # hsv_high H wraps around 180 (red).
+    # min_area    px, smaller blobs are ignored
+    # min_fill    blob / its rotated box, 0 = off (solid square ~0.9)
+    # max_aspect  long / short side of that box, 0 = off
+    #
+    # The cup's yellow lid. Overexposed on this camera: hue 27-30 and very
+    # bright set it apart from the cardboard (hue 19-22, V ~172), saturation
+    # does not. 173/173 aligned frames found, no false hits.
+    yellow:
+      hsv_low: [25, 70, 210]
+      hsv_high: [34, 255, 255]
+      min_area: 600
+      min_fill: 0.0
+      max_aspect: 0.0
+    # The black mark / container: V ~34 on cardboard of V ~170. The shape check
+    # keeps out the black aluminium rails (long and thin).
+    black:
+      hsv_low: [0, 0, 0]
+      hsv_high: [180, 255, 80]
+      min_area: 2000
+      min_fill: 0.75
+      max_aspect: 2.5
+
+# YOLO-World detector - not used by default (visual_align reads
+# color_detector). Kept to switch back: set detections_topic below to
+# /cup_detector/detections and run cup_detector.py on the GPU PC.
 
 cup_detector:
   ros__parameters:
     # YOLO-World: finds objects from text prompts, no training.
     model: ~/models/yolov8s-worldv2.pt
-    classes: ["paper cup", "cup with yellow lid"]
+    classes: ["paper cup", "cup with yellow lid", "black square", "black rectangle", "brown box", "brown rectangle", "brown square", "brown box"]
     image_topic: /image_raw/compressed
     min_score: 0.3
     device: cuda:0
@@ -13,7 +51,7 @@ cup_detector:
 visual_align:
   ros__parameters:
     owner_name: align
-    detections_topic: /cup_detector/detections
+    detections_topic: /color_detector/detections
     cmd_vel_topic: /cmd_vel
     odom_topic: /mecanum_drive_controller/odometry
     rate_hz: 20.0
@@ -67,14 +105,13 @@ visual_align:
     detection_timeout_s: 0.5
     lost_s: 0.0
 
-    # No cup in view: turn at search_speed (rad/s) for up to search_time_s
-    # until it shows, then align. Not found by then -> stop, "cup not found".
+    # Nothing in view: turn at search_speed (rad/s) for up to search_time_s
+    # until a target shows, then align. Not found by then -> stop, "not found".
     # 10 s at 0.3 rad/s is about half a turn.
-    # 0 = do not turn: wait lost_s for the cup instead (lost_s 0 = for ever).
+    # 0 = do not turn: wait lost_s for it instead (lost_s 0 = for ever).
     search_speed: 0.3
     search_time_s: 10.0
-    # Which way to turn: toward the side the cup was last seen on; if it was
-    # never seen this run, +1 = left (counter-clockwise), -1 = right.
+    # Which way to search: +1 = left (counter-clockwise), -1 = right.
     search_direction: 1
 
     # Give up, stop and release control after this long. 0 = no limit.

@@ -355,7 +355,7 @@ def main():
     # waitUntilNav2Active() publishes THAT to /initialpose until it hears back on
     # /amcl_pose - so skipping this clobbers a good AMCL estimate with garbage.
     # Assumes the robot is physically at home when launched.
-    # nav.setInitialPose(make_pose(nav, cfg['poses']['home']))
+    nav.setInitialPose(make_pose(nav, cfg['poses']['home']))
     nav.get_logger().info('waiting for Nav2...')
     nav.waitUntilNav2Active()
 

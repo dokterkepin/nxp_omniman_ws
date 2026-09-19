@@ -10,10 +10,10 @@ P-controller instead of a learned policy.
               idle | searching | aligning | aligned | failed: <why>
 
 A run: acquire control as owner_name ("align"), then
-  SEARCHING  no cup in view: turn at search_speed for up to search_time_s,
-             toward the side the cup was last seen on (search_direction if
-             it was never seen), until the cup shows. search_time_s 0 = do
-             not turn: wait lost_s for it, or with lost_s 0 wait for ever
+  SEARCHING  nothing in view: turn at search_speed for up to search_time_s,
+             always in search_direction (+1 left, -1 right), until a target
+             shows. search_time_s 0 = do not turn: wait lost_s for it, or
+             with lost_s 0 wait for ever
   ALIGNING   cup in view: one P-controller per axis, each clamped to
              [min_*, max_*] and zero inside its tolerance
                cup x (left/right)  -> angular_z  x_correction: rotate
@@ -48,8 +48,10 @@ A run also ends - base stopped, control given back if still held - when
   - ~/stop is called, or the node shuts down
 max_travel_m, timeout_s and lost_s at 0 switch that limit off.
 
-Needs cup_detector.py running (GPU PC, lerobot_jazzy env). This node itself is
-plain ROS - no torch.
+Aligns to the FIRST detection on detections_topic, whatever it is: with
+color_detector.py (started by control_launch.py) that is the first of its
+`targets` in view - the cup's yellow lid, the black mark, anything given a
+colour range. Plain ROS - no torch.
 
 Run (with control_arbiter):
   ros2 launch omniman_vla control_launch.py
@@ -152,7 +154,6 @@ class VisualAlign(Node):
         self.cup_y = None
         self.cup_seen_at = 0.0
         self.cup_new = False
-        self.last_side = 0          # +1 cup was left of aim, -1 right, 0 never seen
         self.settled = 0
 
         self.have_odom = False
@@ -163,7 +164,6 @@ class VisualAlign(Node):
         self.hold_yaw = 0.0
         self.hold_set = False
         self.search_since = 0.0
-        self.search_side = 1
 
         self.create_subscription(
             ControlOwner, '/control/owner', self.on_owner, latched, callback_group=group)
@@ -216,8 +216,6 @@ class VisualAlign(Node):
         return math.copysign(min(max(abs(k * error), lo), hi), error)
 
     def start_search(self):
-        """Turn toward the side the cup was last seen on, else search_direction."""
-        self.search_side = self.last_side or (1 if self.p('search_direction') >= 0 else -1)
         self.search_since = time.monotonic()
         self.set_state('searching')
 
@@ -275,7 +273,6 @@ class VisualAlign(Node):
             self.started_at = time.monotonic()
             self.cup_x = None
             self.cup_new = False
-            self.last_side = 0
             self.settled = 0
             self.start_pos = self.pos
             self.hold_set = False
@@ -321,7 +318,6 @@ class VisualAlign(Node):
             self.cup_y = best.bbox.center.position.y
             self.cup_seen_at = time.monotonic()
             self.cup_new = True
-            self.last_side = 1 if self.cup_x < self.p('aim_x') else -1
 
     # ---- control loop -------------------------------------------------------
 
@@ -365,12 +361,12 @@ class VisualAlign(Node):
                         if self.settled >= self.p('settle_frames'):
                             result = 'aligned'
                             self.get_logger().info(
-                                f'   cup at x={self.cup_x:.0f} y={self.cup_y:.0f}, '
+                                f'   target at x={self.cup_x:.0f} y={self.cup_y:.0f}, '
                                 f'base moved {travelled:.2f} m')
                     else:
                         self.settled = 0
                 elif now - self.cup_seen_at > self.p('lost_s'):
-                    self.get_logger().warn('   cup lost - searching again')
+                    self.get_logger().warn('   target lost - searching again')
                     self.start_search()
 
         if result is not None:
@@ -387,13 +383,14 @@ class VisualAlign(Node):
             # No turning: give the cup lost_s to show up, or wait for ever.
             lost_s = self.p('lost_s')
             if 0.0 < lost_s < waited - first:
-                return 'failed: cup not in view', (0.0, 0.0, 0.0)
+                return 'failed: target not in view', (0.0, 0.0, 0.0)
             return None, (0.0, 0.0, 0.0)
         if waited < first:
             return None, (0.0, 0.0, 0.0)
         if waited - first < turn_s:
-            return None, (0.0, 0.0, self.search_side * self.p('search_speed'))
-        return f'failed: cup not found after turning {turn_s:.0f}s', (0.0, 0.0, 0.0)
+            side = 1.0 if self.p('search_direction') >= 0 else -1.0
+            return None, (0.0, 0.0, side * abs(self.p('search_speed')))
+        return f'failed: target not found after turning {turn_s:.0f}s', (0.0, 0.0, 0.0)
 
     def align_command(self):
         """(linear_x, linear_y, angular_z) for the latest cup position."""
