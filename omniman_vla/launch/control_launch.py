@@ -1,19 +1,24 @@
 """
-The control lock and the policy runner.
+Everything that coordinates the robot - run it on the PC with the GPU and
+physical_ai_server, NOT on the robot. The robot launch (nxp_omniman_launch.py)
+only brings up hardware: controllers, camera, lidar, joystick.
 
     control_arbiter  /control/owner, /control/acquire, /control/release
     policy_runner    /policy_runner/run, /policy_runner/stop, /policy_runner/status
-    visual_align     /visual_align/run, /visual_align/stop, /visual_align/status
     color_detector   /color_detector/detections, /color_detector/debug/compressed
+    visual_align     /visual_align/run, /visual_align/stop, /visual_align/status
 
-Anything that wants to take part in the lock - pick_place_mission.py, the web
-UI's Policy switch - needs these two running. Programs that never acquire
-control are unaffected.
+Anything that takes part in the lock - pick_place_mission.py, the web UI's
+Policy and Align switches - needs this running; without it they report
+"control_arbiter not answering" and nothing moves. The joystick is not part of
+the lock and always works.
+
+color_detector and visual_align read config/visual_align.yaml on THIS PC and
+pick up saved edits within a second - no restart, nothing to change on the
+robot. Run only one copy of this launch on the network.
 
 Run:
   ros2 launch omniman_vla control_launch.py
-
-Also started by nxp_omniman_launch.py, so usually nothing to run by hand.
 """
 
 from launch import LaunchDescription
@@ -41,15 +46,6 @@ def generate_launch_description():
         parameters=[runner_params],
     )
 
-    # Aligns to what color_detector finds; idle until ~/run is called. It and
-    # color_detector read config/visual_align.yaml themselves - no parameters.
-    visual_align = Node(
-        package='omniman_vla',
-        executable='visual_align.py',
-        name='visual_align',
-        output='screen',
-    )
-
     # Finds the align targets by colour; plain OpenCV, no GPU. Idle until
     # visual_align (or the debug image) subscribes.
     color_detector = Node(
@@ -59,4 +55,12 @@ def generate_launch_description():
         output='screen',
     )
 
-    return LaunchDescription([control_arbiter, policy_runner, visual_align, color_detector])
+    # Aligns to the first thing color_detector finds; idle until ~/run.
+    visual_align = Node(
+        package='omniman_vla',
+        executable='visual_align.py',
+        name='visual_align',
+        output='screen',
+    )
+
+    return LaunchDescription([control_arbiter, policy_runner, color_detector, visual_align])

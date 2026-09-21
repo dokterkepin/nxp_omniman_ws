@@ -26,8 +26,8 @@ instructions from config/mission.yaml.
 Prereqs:
   - nav2_launch.py, robot localized
   - physical_ai_server_bringup.launch.py
-  - control_launch.py (control_arbiter + policy_runner + visual_align)
-  - cup_detector.py, if settings.align_before_pick is on
+  - control_launch.py on the GPU PC (control_arbiter, policy_runner,
+    color_detector, visual_align)
 
 Run:
   ros2 run omniman_vla pick_place_mission.py

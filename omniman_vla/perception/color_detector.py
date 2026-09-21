@@ -22,7 +22,7 @@ vs ~172), not saturation. The black mark and container are the only near-black
 aluminium rails out.
 
 Inference only runs while something subscribes to ~/detections or the debug
-image. Plain OpenCV, no GPU: runs on the robot PC (control_launch.py).
+image. Plain OpenCV, no GPU; started by control_launch.py (GPU PC).
 
 Settings: config/visual_align.yaml, section color_detector - read from the
 file directly (no ROS parameters). Saved edits (targets, colour ranges)

@@ -12,7 +12,7 @@ color_detector:
   # visual_align aligns to. When placing, the held cup (yellow) is in view -
   # put black first, or leave yellow out, e.g. targets: ["black"].
   # Each target below needs all five settings.
-  targets: ["yellow", "black"]
+  targets: ["yellow"]
 
   # HSV in OpenCV units: H 0-180, S 0-255, V 0-255. hsv_low H above
   # hsv_high H wraps around 180 (red).
@@ -33,10 +33,10 @@ color_detector:
   # keeps out the black aluminium rails (long and thin).
   black:
     hsv_low: [0, 0, 0]
-    hsv_high: [220, 60, 60]
+    hsv_high: [180, 255, 110]
     min_area: 2000
-    min_fill: 0.0
-    max_aspect: 0.0
+    min_fill: 0.6
+    max_aspect: 2.5
 
 # YOLO-World detector - not used by default (visual_align reads
 # color_detector). Kept to switch back: set detections_topic below to
