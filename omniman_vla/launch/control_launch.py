@@ -25,8 +25,6 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     runner_params = PathJoinSubstitution(
         [FindPackageShare('omniman_vla'), 'config', 'policy_runner.yaml'])
-    align_params = PathJoinSubstitution(
-        [FindPackageShare('omniman_vla'), 'config', 'visual_align.yaml'])
 
     control_arbiter = Node(
         package='omniman_vla',
@@ -43,13 +41,13 @@ def generate_launch_description():
         parameters=[runner_params],
     )
 
-    # Aligns to what color_detector finds; idle until ~/run is called.
+    # Aligns to what color_detector finds; idle until ~/run is called. It and
+    # color_detector read config/visual_align.yaml themselves - no parameters.
     visual_align = Node(
         package='omniman_vla',
         executable='visual_align.py',
         name='visual_align',
         output='screen',
-        parameters=[align_params],
     )
 
     # Finds the align targets by colour; plain OpenCV, no GPU. Idle until
@@ -59,7 +57,6 @@ def generate_launch_description():
         executable='color_detector.py',
         name='color_detector',
         output='screen',
-        parameters=[align_params],
     )
 
     return LaunchDescription([control_arbiter, policy_runner, visual_align, color_detector])

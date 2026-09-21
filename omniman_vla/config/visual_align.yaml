@@ -1,118 +1,123 @@
-# Parameters for color_detector.py, visual_align.py and cup_detector.py - the
+# Settings for color_detector.py, visual_align.py and cup_detector.py - the
 # base correction step between Nav2 and the policy.
+#
+# The nodes read this file directly (not ROS parameters, no --ros-args), each
+# its own section below. Save an edit and it applies within a second - no
+# restart; only topics and rate_hz are read once at start. Note: a node reads
+# the copy of this file on the PC it runs on.
 
 color_detector:
-  ros__parameters:
-    image_topic: /image_raw/compressed
-    # Priority order: the first target in this list that is in view is the one
-    # visual_align aligns to. When placing, the held cup (yellow) is in view -
-    # put black first, or leave yellow out:
-    #   ros2 param set /color_detector targets "['black']"
-    # Each target below needs all five settings.
-    targets: ["yellow", "black"]
+  image_topic: /image_raw/compressed
+  # Priority order: the first target in this list that is in view is the one
+  # visual_align aligns to. When placing, the held cup (yellow) is in view -
+  # put black first, or leave yellow out, e.g. targets: ["black"].
+  # Each target below needs all five settings.
+  targets: ["yellow", "black"]
 
-    # HSV in OpenCV units: H 0-180, S 0-255, V 0-255. hsv_low H above
-    # hsv_high H wraps around 180 (red).
-    # min_area    px, smaller blobs are ignored
-    # min_fill    blob / its rotated box, 0 = off (solid square ~0.9)
-    # max_aspect  long / short side of that box, 0 = off
-    #
-    # The cup's yellow lid. Overexposed on this camera: hue 27-30 and very
-    # bright set it apart from the cardboard (hue 19-22, V ~172), saturation
-    # does not. 173/173 aligned frames found, no false hits.
-    yellow:
-      hsv_low: [25, 70, 210]
-      hsv_high: [34, 255, 255]
-      min_area: 600
-      min_fill: 0.0
-      max_aspect: 0.0
-    # The black mark / container: V ~34 on cardboard of V ~170. The shape check
-    # keeps out the black aluminium rails (long and thin).
-    black:
-      hsv_low: [0, 0, 0]
-      hsv_high: [180, 255, 80]
-      min_area: 2000
-      min_fill: 0.75
-      max_aspect: 2.5
+  # HSV in OpenCV units: H 0-180, S 0-255, V 0-255. hsv_low H above
+  # hsv_high H wraps around 180 (red).
+  # min_area    px, smaller blobs are ignored
+  # min_fill    blob / its rotated box, 0 = off (solid square ~0.9)
+  # max_aspect  long / short side of that box, 0 = off
+  #
+  # The cup's yellow lid. Overexposed on this camera: hue 27-30 and very
+  # bright set it apart from the cardboard (hue 19-22, V ~172), saturation
+  # does not. 173/173 aligned frames found, no false hits.
+  yellow:
+    hsv_low: [25, 70, 210]
+    hsv_high: [34, 255, 255]
+    min_area: 600
+    min_fill: 0.0
+    max_aspect: 0.0
+  # The black mark / container: V ~34 on cardboard of V ~170. The shape check
+  # keeps out the black aluminium rails (long and thin).
+  black:
+    hsv_low: [0, 0, 0]
+    hsv_high: [220, 60, 60]
+    min_area: 2000
+    min_fill: 0.0
+    max_aspect: 0.0
 
 # YOLO-World detector - not used by default (visual_align reads
 # color_detector). Kept to switch back: set detections_topic below to
 # /cup_detector/detections and run cup_detector.py on the GPU PC.
 
 cup_detector:
-  ros__parameters:
-    # YOLO-World: finds objects from text prompts, no training.
-    model: ~/models/yolov8s-worldv2.pt
-    classes: ["paper cup", "cup with yellow lid", "black square", "black rectangle", "brown box", "brown rectangle", "brown square", "brown box"]
-    image_topic: /image_raw/compressed
-    min_score: 0.3
-    device: cuda:0
+  # YOLO-World: finds objects from text prompts, no training.
+  model: ~/models/yolov8s-worldv2.pt
+  classes: ["paper cup", "cup with yellow lid", "black square", "black rectangle", "brown box", "brown rectangle", "brown square", "brown box"]
+  image_topic: /image_raw/compressed
+  min_score: 0.3
+  device: cuda:0
 
 visual_align:
-  ros__parameters:
-    owner_name: align
-    detections_topic: /color_detector/detections
-    cmd_vel_topic: /cmd_vel
-    odom_topic: /mecanum_drive_controller/odometry
-    rate_hz: 20.0
+  owner_name: align
+  detections_topic: /color_detector/detections
+  cmd_vel_topic: /cmd_vel
+  odom_topic: /mecanum_drive_controller/odometry
+  rate_hz: 20.0
 
-    # How to fix the cup's left/right error:
-    #   strafe - slide sideways (linear_y). Strafing slips, which moves the
-    #            base forward/back too - the forward axis (k_forward) takes
-    #            that out, since the cup's y in the image moves with it.
-    #   rotate - turn (angular_z). What the base_correct demos did.
-    x_correction: rotate
+  # How to fix the cup's left/right error:
+  #   strafe - slide sideways (linear_y). Strafing slips, which moves the
+  #            base forward/back too - the forward axis (k_forward) takes
+  #            that out, since the cup's y in the image moves with it.
+  #   rotate - turn (angular_z). What the base_correct demos did.
+  x_correction: rotate
 
-    # Where the cup should end up in the image (640x480), and how close counts
-    # as there. After correcting in the base_correct demos the cup sat at
-    # x 299-343, y 201-260 (middle half of the episodes).
-    aim_x: 320.0
-    tolerance_x: 30.0
-    aim_y: 300.0
-    tolerance_y: 30.0
-    # Aligned = this many detections in a row with every axis in tolerance.
-    settle_frames: 5
-    min_score: 0.3
+  # Where the cup should end up in the image (640x480), and how close counts
+  # as there. After correcting in the base_correct demos the cup sat at
+  # x 299-343, y 201-260 (middle half of the episodes).
+  aim_x: 320.0
+  tolerance_x: 30.0
+  aim_y: 300.0
+  tolerance_y: 30.0
+  # Aligned = this many detections in a row with every axis in tolerance.
+  settle_frames: 5
+  min_score: 0.3
 
-    # Each axis: speed = k * pixel error, then clamped to [min, max]. Below
-    # the min the wheels do not move the base at all - tune on the robot.
-    # rotate: rad/s per px
-    k_angular: 0.003
-    max_angular: 0.5
-    min_angular: 0.10
-    # strafe: m/s per px of x error
-    k_lateral: 0.0005
-    max_lateral: 0.08
-    # forward/back: m/s per px of y error. 0 = never drive forward or back.
-    k_forward: 0.0005
-    max_forward: 0.08
-    min_linear: 0.02
-    # strafe only: hold the heading the cup was first seen at, rad/s per rad
-    # of error. 0 = never turn. Nothing else corrects heading, so if strafing
-    # slowly twists the base, set 1.0.
-    k_heading: 0.0
-    tolerance_heading_deg: 2.0
+  # Each axis: speed = k * pixel error, then clamped to [min, max]. Below
+  # the min the wheels do not move the base at all - tune on the robot.
+  # rotate: rad/s per px
+  k_angular: 0.003
+  max_angular: 0.5
+  min_angular: 0.10
+  # strafe: m/s per px of x error
+  k_lateral: 0.0005
+  max_lateral: 0.08
+  # forward/back: m/s per px of y error. 0 = never drive forward or back.
+  k_forward: 0.0005
+  max_forward: 0.08
+  min_linear: 0.02
+  # strafe only: hold the heading the cup was first seen at, rad/s per rad
+  # of error. 0 = never turn. Nothing else corrects heading, so if strafing
+  # slowly twists the base, set 1.0.
+  k_heading: 0.0
+  tolerance_heading_deg: 2.0
 
-    # Safety: give up if the base ends up this far from where the run started
-    # (the arm could reach the box before the cup looks right).
-    # 0 = no limit.
-    max_travel_m: 0.0
+  # Safety: give up if the base ends up this far from where the run started
+  # (the arm could reach the box before the cup looks right).
+  # 0 = no limit.
+  max_travel_m: 0.0
 
-    # A detection older than this is "not in view"; lost for lost_s -> search.
-    # detection_timeout_s stays on: without it the base would keep driving on
-    # the last position seen after the camera loses the cup.
-    # lost_s 0 = never give up, stand still until the cup is seen again.
-    detection_timeout_s: 0.5
-    lost_s: 0.0
+  # When detections drop out (glare, angle, blur) - no searching once seen:
+  # detection_timeout_s  older than this = lost: keep aligning on the last
+  #                      detection until a new one arrives
+  # lost_s               stop and fail after lost this long. 0 = never -
+  #                      it would keep driving on the old position for ever.
+  #                      Before the target was ever seen (search_time_s 0)
+  #                      it is how long to wait for it.
+  detection_timeout_s: 0.5
+  lost_s: 3.0
 
-    # Nothing in view: turn at search_speed (rad/s) for up to search_time_s
-    # until a target shows, then align. Not found by then -> stop, "not found".
-    # 10 s at 0.3 rad/s is about half a turn.
-    # 0 = do not turn: wait lost_s for it instead (lost_s 0 = for ever).
-    search_speed: 0.3
-    search_time_s: 10.0
-    # Which way to search: +1 = left (counter-clockwise), -1 = right.
-    search_direction: 1
+  # Not seen yet this run: turn at search_speed (rad/s) for up to
+  # search_time_s until a target shows, then align. Not found by then ->
+  # stop, "not found". Once seen, a run never searches again.
+  # 10 s at 0.3 rad/s is about half a turn.
+  # 0 = do not turn: wait lost_s for it instead (lost_s 0 = for ever).
+  search_speed: 0.3
+  search_time_s: 10.0
+  # Which way to search: +1 = left (counter-clockwise), -1 = right.
+  search_direction: 1
 
-    # Give up, stop and release control after this long. 0 = no limit.
-    timeout_s: 0.0
+  # Give up, stop and release control after this long. 0 = no limit.
+  timeout_s: 0.0

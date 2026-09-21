@@ -10,10 +10,11 @@ P-controller instead of a learned policy.
               idle | searching | aligning | aligned | failed: <why>
 
 A run: acquire control as owner_name ("align"), then
-  SEARCHING  nothing in view: turn at search_speed for up to search_time_s,
-             always in search_direction (+1 left, -1 right), until a target
-             shows. search_time_s 0 = do not turn: wait lost_s for it, or
-             with lost_s 0 wait for ever
+  SEARCHING  only until the target is first seen: turn at search_speed for
+             up to search_time_s, always in search_direction (+1 left, -1
+             right). search_time_s 0 = do not turn: wait lost_s for it, or
+             with lost_s 0 wait for ever. Once seen, a run never searches
+             again - see LOST below.
   ALIGNING   cup in view: one P-controller per axis, each clamped to
              [min_*, max_*] and zero inside its tolerance
                cup x (left/right)  -> angular_z  x_correction: rotate
@@ -22,26 +23,18 @@ A run: acquire control as owner_name ("align"), then
              strafe can also hold the heading the cup was first seen at, with
              angular_z (k_heading > 0), so all three axes move
   ALIGNED    every axis within tolerance for settle_frames detections in a
-             row - the "done" the mission waits for
-then stop the base and release control. aligned / failed stays on ~/status
-until the next run.
+             row - the "done" the mission waits for; predictions never count
 
-One point in the image gives two errors, the base has three axes: x is fixed
-either by turning or by sliding sideways, never both. rotate is what the demos
-did; strafe keeps the heading Nav2 arrived with.
-
-The numbers come from the base_correct demos (omniman_base_correct_v6, cup
-found by cup_detector.py): with the cup left of x=280 the operator turned left
-(+angular_z), right of 360 turned right, and in between stopped 95% of the
-time. After correcting, the cup sat at x 299-343 and y 201-260 (middle half of
-the episodes), so aim 320, 245.
-
-Signs, with the arm at home and the camera looking forward: cup left of aim ->
-turn left (+angular_z) or slide left (+linear_y); cup higher than aim (further
-away) -> forward (+linear_x).
+LOST - detections drop out (glare, an angle the colour range misses, motion
+blur). Turning away to search and coming back made the base swing back and
+forth, so once the target has been seen a run never searches again: it keeps
+aligning on the last detection, and each new detection replaces it. Only new
+detections count toward settle_frames. If nothing new arrives for lost_s the
+run stops and fails (0 = never - it would keep driving on the old position).
 
 A run also ends - base stopped, control given back if still held - when
   - the cup does not show within search_time_s of turning
+  - the target stays lost for lost_s
   - the base has moved max_travel_m from where the run started
   - timeout_s passes
   - control is taken away (a forced acquire)
@@ -53,6 +46,10 @@ color_detector.py (started by control_launch.py) that is the first of its
 `targets` in view - the cup's yellow lid, the black mark, anything given a
 colour range. Plain ROS - no torch.
 
+Settings: config/visual_align.yaml, section visual_align - read from the
+file directly (no ROS parameters). Saved edits apply within a second; topics
+and rate_hz only at start.
+
 Run (with control_arbiter):
   ros2 launch omniman_vla control_launch.py
   ros2 service call /visual_align/run std_srvs/srv/Trigger
@@ -60,19 +57,20 @@ Run (with control_arbiter):
 """
 
 import math
+import os
 import threading
 import time
 
 import rclpy
+import yaml
+from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from omniman_interfaces.msg import ControlOwner
 from omniman_interfaces.srv import AcquireControl, ReleaseControl
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
-from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import String
@@ -88,6 +86,16 @@ FIRST_DETECTION_S = 2.0
 
 BUSY = ('searching', 'aligning')
 
+# Settings visual_align needs in its section of the config file.
+REQUIRED = [
+    'owner_name', 'detections_topic', 'cmd_vel_topic', 'odom_topic', 'rate_hz',
+    'x_correction', 'aim_x', 'tolerance_x', 'aim_y', 'tolerance_y', 'settle_frames',
+    'min_score', 'k_angular', 'max_angular', 'min_angular', 'k_lateral', 'max_lateral',
+    'k_forward', 'max_forward', 'min_linear', 'k_heading', 'tolerance_heading_deg',
+    'max_travel_m', 'detection_timeout_s', 'lost_s', 'search_speed', 'search_time_s',
+    'search_direction', 'timeout_s',
+]
+
 
 def yaw_of(q):
     return math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
@@ -97,32 +105,53 @@ def wrap(a):
     return math.atan2(math.sin(a), math.cos(a))
 
 
-def declare_from_yaml(node, names):
-    """Declare parameters with no default: every value must come from the
-    params file. Any number type is accepted (300 or 300.0). Raises, naming
-    the missing ones, if the file does not set them all."""
-    for name in names:
-        node.declare_parameter(name, descriptor=ParameterDescriptor(dynamic_typing=True))
-    missing = [n for n in names if node.get_parameter(n).type_ == Parameter.Type.NOT_SET]
-    if missing:
-        raise RuntimeError(
-            f'{node.get_name()}: not set in the params file: {", ".join(missing)} '
-            '- run it with --params-file config/visual_align.yaml')
+CONFIG_FILE = os.path.join(get_package_share_directory('omniman_vla'), 'config',
+                           'visual_align.yaml')
+
+
+class Config:
+    """This node's section of config/visual_align.yaml - read straight from
+    the file, not through ROS parameters. Re-read when the file changes
+    (checked at most once a second), so saved edits apply without a restart;
+    an edit that breaks the file is logged and the previous values are kept."""
+
+    def __init__(self, section, missing, logger):
+        # missing(values) -> names of the settings the section lacks.
+        self.section, self.missing, self.logger = section, missing, logger
+        self.checked = 0.0
+        self.load()
+
+    def load(self):
+        mtime = os.stat(CONFIG_FILE).st_mtime
+        with open(CONFIG_FILE) as f:
+            values = (yaml.safe_load(f) or {}).get(self.section) or {}
+        missing = self.missing(values)
+        if missing:
+            raise RuntimeError(f'{CONFIG_FILE} [{self.section}] is missing: '
+                               f'{", ".join(missing)}')
+        self.values, self.mtime = values, mtime
+
+    def __getitem__(self, key):
+        now = time.monotonic()
+        if now - self.checked > 1.0:
+            self.checked = now
+            try:
+                if os.stat(CONFIG_FILE).st_mtime != self.mtime:
+                    self.load()
+                    self.logger.info(f'reloaded {CONFIG_FILE}')
+            except (OSError, yaml.YAMLError, RuntimeError, AttributeError) as e:
+                self.logger.error(f'bad edit, keeping previous values: {e}')
+                self.mtime = os.stat(CONFIG_FILE).st_mtime
+        return self.values[key]
 
 
 class VisualAlign(Node):
 
     def __init__(self):
         super().__init__('visual_align')
-        # All values come from config/visual_align.yaml - none are set here.
-        declare_from_yaml(self, [
-            'owner_name', 'detections_topic', 'cmd_vel_topic', 'odom_topic', 'rate_hz',
-            'x_correction', 'aim_x', 'tolerance_x', 'aim_y', 'tolerance_y', 'settle_frames',
-            'min_score', 'k_angular', 'max_angular', 'min_angular', 'k_lateral',
-            'max_lateral', 'k_forward', 'max_forward', 'min_linear', 'k_heading',
-            'tolerance_heading_deg', 'max_travel_m', 'detection_timeout_s', 'lost_s',
-            'search_speed', 'search_time_s', 'search_direction', 'timeout_s',
-        ])
+        # Every value comes from config/visual_align.yaml [visual_align].
+        self.cfg = Config('visual_align', lambda v: [k for k in REQUIRED if k not in v],
+                          self.get_logger())
 
         # Same threading as policy_runner.py: service handlers wait on other
         # services, so reentrant + multithreaded, and the lock is never held
@@ -140,7 +169,7 @@ class VisualAlign(Node):
                              durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.status_pub = self.create_publisher(String, '~/status', latched)
         self.cmd_pub = self.create_publisher(
-            Twist, self.get_parameter('cmd_vel_topic').value, 10)
+            Twist, self.p('cmd_vel_topic'), 10)
 
         self.owner = ''
         self.holding = False
@@ -148,13 +177,14 @@ class VisualAlign(Node):
         self.det_sub = None
         self.started_at = 0.0
 
-        # Latest detection: cup x, when it arrived, and whether the controller
-        # has used it yet (settle_frames counts detections, not ticks).
+        # Latest detection, image px: when it arrived, and whether the
+        # controller has used it yet (settle_frames counts detections).
         self.cup_x = None
         self.cup_y = None
         self.cup_seen_at = 0.0
         self.cup_new = False
         self.settled = 0
+        self.lost_noted = False
 
         self.have_odom = False
         self.yaw = 0.0
@@ -168,11 +198,11 @@ class VisualAlign(Node):
         self.create_subscription(
             ControlOwner, '/control/owner', self.on_owner, latched, callback_group=group)
         self.create_subscription(
-            Odometry, self.get_parameter('odom_topic').value, self.on_odom, 10,
+            Odometry, self.p('odom_topic'), self.on_odom, 10,
             callback_group=group)
         self.create_service(Trigger, '~/run', self.on_run, callback_group=group)
         self.create_service(Trigger, '~/stop', self.on_stop, callback_group=group)
-        self.create_timer(1.0 / float(self.get_parameter('rate_hz').value), self.tick,
+        self.create_timer(1.0 / float(self.p('rate_hz')), self.tick,
                           callback_group=group)
 
         self.set_state('idle')
@@ -181,7 +211,7 @@ class VisualAlign(Node):
     # ---- helpers ------------------------------------------------------------
 
     def p(self, name):
-        return self.get_parameter(name).value
+        return self.cfg[name]
 
     def owner_name(self):
         return self.p('owner_name')
@@ -274,6 +304,7 @@ class VisualAlign(Node):
             self.cup_x = None
             self.cup_new = False
             self.settled = 0
+            self.lost_noted = False
             self.start_pos = self.pos
             self.hold_set = False
             self.det_sub = self.create_subscription(
@@ -353,8 +384,12 @@ class VisualAlign(Node):
                     result, cmd = self.search_command(now)
 
             if self.state == 'aligning':
+                age = now - self.cup_seen_at
                 if fresh:
-                    cmd = self.align_command()
+                    if self.lost_noted:
+                        self.get_logger().info(f'   target back after {age:.1f}s')
+                        self.lost_noted = False
+                    cmd = self.align_command(self.cup_x, self.cup_y)
                     if cmd == (0.0, 0.0, 0.0):
                         if new:
                             self.settled += 1
@@ -365,9 +400,15 @@ class VisualAlign(Node):
                                 f'base moved {travelled:.2f} m')
                     else:
                         self.settled = 0
-                elif now - self.cup_seen_at > self.p('lost_s'):
-                    self.get_logger().warn('   target lost - searching again')
-                    self.start_search()
+                else:
+                    # Keep aligning on the last detection until a new one.
+                    self.settled = 0
+                    if not self.lost_noted:
+                        self.get_logger().warn('   target lost - using last detection')
+                        self.lost_noted = True
+                    cmd = self.align_command(self.cup_x, self.cup_y)
+                    if 0.0 < self.p('lost_s') < age:
+                        result = f'failed: target lost for {age:.0f}s'
 
         if result is not None:
             self.end_run(result)
@@ -392,12 +433,12 @@ class VisualAlign(Node):
             return None, (0.0, 0.0, side * abs(self.p('search_speed')))
         return f'failed: target not found after turning {turn_s:.0f}s', (0.0, 0.0, 0.0)
 
-    def align_command(self):
-        """(linear_x, linear_y, angular_z) for the latest cup position."""
-        ex = self.p('aim_x') - self.cup_x    # + : cup left of aim
-        ey = self.p('aim_y') - self.cup_y    # + : cup above aim, i.e. too far
+    def align_command(self, x, y):
+        """(linear_x, linear_y, angular_z) for the target at image (x, y)."""
+        ex = self.p('aim_x') - x             # + : cup left of aim
         vx = vy = wz = 0.0
         if self.p('k_forward') > 0.0:
+            ey = self.p('aim_y') - y         # + : cup above aim, i.e. too far
             vx = self.axis(ey, self.p('tolerance_y'), self.p('k_forward'),
                            self.p('min_linear'), self.p('max_forward'))
         if self.p('x_correction') == 'strafe':

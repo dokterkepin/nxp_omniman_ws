@@ -19,51 +19,81 @@ Old frames are dropped rather than queued: only the newest image is detected.
 Needs torch + ultralytics + clip, so run it in the lerobot_jazzy env, on the
 GPU PC:
   conda activate lerobot_jazzy && source install/setup.bash
-  ros2 run omniman_vla cup_detector.py --ros-args \\
-      --params-file src/omniman_vla/config/visual_align.yaml
+  ros2 run omniman_vla cup_detector.py
+
+Settings: config/visual_align.yaml, section cup_detector (model and classes
+only at start).
 
 Check what it sees:
   ros2 run rqt_image_view rqt_image_view /cup_detector/debug/compressed
 """
 
 import os
+import time
 
 import cv2
 import numpy as np
 import rclpy
-from rcl_interfaces.msg import ParameterDescriptor
+import yaml
+from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
-from rclpy.parameter import Parameter
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import CompressedImage
 from ultralytics import YOLO
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
 
+CONFIG_FILE = os.path.join(get_package_share_directory('omniman_vla'), 'config',
+                           'visual_align.yaml')
 
-def declare_from_yaml(node, names):
-    """Declare parameters with no default: every value must come from the
-    params file. Any number type is accepted (300 or 300.0). Raises, naming
-    the missing ones, if the file does not set them all."""
-    for name in names:
-        node.declare_parameter(name, descriptor=ParameterDescriptor(dynamic_typing=True))
-    missing = [n for n in names if node.get_parameter(n).type_ == Parameter.Type.NOT_SET]
-    if missing:
-        raise RuntimeError(
-            f'{node.get_name()}: not set in the params file: {", ".join(missing)} '
-            '- run it with --params-file config/visual_align.yaml')
+
+class Config:
+    """This node's section of config/visual_align.yaml - read straight from
+    the file, not through ROS parameters. Re-read when the file changes
+    (checked at most once a second), so saved edits apply without a restart;
+    an edit that breaks the file is logged and the previous values are kept."""
+
+    def __init__(self, section, missing, logger):
+        # missing(values) -> names of the settings the section lacks.
+        self.section, self.missing, self.logger = section, missing, logger
+        self.checked = 0.0
+        self.load()
+
+    def load(self):
+        mtime = os.stat(CONFIG_FILE).st_mtime
+        with open(CONFIG_FILE) as f:
+            values = (yaml.safe_load(f) or {}).get(self.section) or {}
+        missing = self.missing(values)
+        if missing:
+            raise RuntimeError(f'{CONFIG_FILE} [{self.section}] is missing: '
+                               f'{", ".join(missing)}')
+        self.values, self.mtime = values, mtime
+
+    def __getitem__(self, key):
+        now = time.monotonic()
+        if now - self.checked > 1.0:
+            self.checked = now
+            try:
+                if os.stat(CONFIG_FILE).st_mtime != self.mtime:
+                    self.load()
+                    self.logger.info(f'reloaded {CONFIG_FILE}')
+            except (OSError, yaml.YAMLError, RuntimeError, AttributeError) as e:
+                self.logger.error(f'bad edit, keeping previous values: {e}')
+                self.mtime = os.stat(CONFIG_FILE).st_mtime
+        return self.values[key]
 
 
 class CupDetector(Node):
 
     def __init__(self):
         super().__init__('cup_detector')
-        # All values come from config/visual_align.yaml - none are set here.
-        declare_from_yaml(self, ['model', 'classes', 'image_topic', 'min_score', 'device'])
-
-        path = os.path.expanduser(self.get_parameter('model').value)
-        classes = list(self.get_parameter('classes').value)
-        self.min_score = float(self.get_parameter('min_score').value)
-        self.device = self.get_parameter('device').value
+        # Every value comes from config/visual_align.yaml [cup_detector].
+        self.cfg = Config('cup_detector',
+                          lambda v: [k for k in ('model', 'classes', 'image_topic',
+                                                 'min_score', 'device') if k not in v],
+                          self.get_logger())
+        path = os.path.expanduser(self.cfg['model'])
+        classes = list(self.cfg['classes'])
+        self.device = self.cfg['device']
 
         self.model = YOLO(path)
         if classes:
@@ -75,7 +105,7 @@ class CupDetector(Node):
         self.debug_pub = self.create_publisher(CompressedImage, '~/debug/compressed', 1)
         # Depth 1, best effort: a slow frame drops the ones behind it.
         self.create_subscription(
-            CompressedImage, self.get_parameter('image_topic').value,
+            CompressedImage, self.cfg['image_topic'],
             self.on_image, qos_profile_sensor_data)
 
         self.get_logger().info(f'ready - {os.path.basename(path)} looking for {classes}')
@@ -89,7 +119,8 @@ class CupDetector(Node):
         frame = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
         if frame is None:
             return
-        result = self.model(frame, conf=self.min_score, device=self.device, verbose=False)[0]
+        result = self.model(frame, conf=float(self.cfg['min_score']), device=self.device,
+                            verbose=False)[0]
 
         boxes = sorted(
             zip(result.boxes.xyxy.tolist(), result.boxes.conf.tolist(),

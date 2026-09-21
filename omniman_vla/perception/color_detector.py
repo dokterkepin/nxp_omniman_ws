@@ -24,59 +24,104 @@ aluminium rails out.
 Inference only runs while something subscribes to ~/detections or the debug
 image. Plain OpenCV, no GPU: runs on the robot PC (control_launch.py).
 
+Settings: config/visual_align.yaml, section color_detector - read from the
+file directly (no ROS parameters). Saved edits (targets, colour ranges)
+apply within a second; image_topic only at start.
+
 Tune with the debug image:
   ros2 run rqt_image_view rqt_image_view /color_detector/debug/compressed
 """
 
+import os
+import time
+
 import cv2
 import numpy as np
 import rclpy
-from rcl_interfaces.msg import ParameterDescriptor
+import yaml
+from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
-from rclpy.parameter import Parameter
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import CompressedImage
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
 
-# Settings every target needs, as <target>.<setting> in the params file.
+# Settings every target needs, under its name in the config file.
 TARGET_SETTINGS = ['hsv_low', 'hsv_high', 'min_area', 'min_fill', 'max_aspect']
+
+
+def missing_settings(values):
+    """Names missing from the color_detector section: image_topic, targets,
+    and each listed target's five settings."""
+    missing = [k for k in ('image_topic', 'targets') if k not in values]
+    for t in values.get('targets') or []:
+        block = values.get(t)
+        if not isinstance(block, dict):
+            missing.append(t)
+        else:
+            missing += [f'{t}.{k}' for k in TARGET_SETTINGS if k not in block]
+    return missing
+
 
 # Debug colours (BGR), cycled per target.
 DEBUG_COLORS = [(0, 0, 255), (0, 200, 0), (255, 0, 0), (0, 165, 255), (255, 0, 255)]
 
+CONFIG_FILE = os.path.join(get_package_share_directory('omniman_vla'), 'config',
+                           'visual_align.yaml')
 
-def declare_from_yaml(node, names):
-    """Declare parameters with no default: every value must come from the
-    params file. Any number type is accepted (300 or 300.0). Raises, naming
-    the missing ones, if the file does not set them all."""
-    for name in names:
-        node.declare_parameter(name, descriptor=ParameterDescriptor(dynamic_typing=True))
-    missing = [n for n in names if node.get_parameter(n).type_ == Parameter.Type.NOT_SET]
-    if missing:
-        raise RuntimeError(
-            f'{node.get_name()}: not set in the params file: {", ".join(missing)} '
-            '- run it with --params-file config/visual_align.yaml')
+
+class Config:
+    """This node's section of config/visual_align.yaml - read straight from
+    the file, not through ROS parameters. Re-read when the file changes
+    (checked at most once a second), so saved edits apply without a restart;
+    an edit that breaks the file is logged and the previous values are kept."""
+
+    def __init__(self, section, missing, logger):
+        # missing(values) -> names of the settings the section lacks.
+        self.section, self.missing, self.logger = section, missing, logger
+        self.checked = 0.0
+        self.load()
+
+    def load(self):
+        mtime = os.stat(CONFIG_FILE).st_mtime
+        with open(CONFIG_FILE) as f:
+            values = (yaml.safe_load(f) or {}).get(self.section) or {}
+        missing = self.missing(values)
+        if missing:
+            raise RuntimeError(f'{CONFIG_FILE} [{self.section}] is missing: '
+                               f'{", ".join(missing)}')
+        self.values, self.mtime = values, mtime
+
+    def __getitem__(self, key):
+        now = time.monotonic()
+        if now - self.checked > 1.0:
+            self.checked = now
+            try:
+                if os.stat(CONFIG_FILE).st_mtime != self.mtime:
+                    self.load()
+                    self.logger.info(f'reloaded {CONFIG_FILE}')
+            except (OSError, yaml.YAMLError, RuntimeError, AttributeError) as e:
+                self.logger.error(f'bad edit, keeping previous values: {e}')
+                self.mtime = os.stat(CONFIG_FILE).st_mtime
+        return self.values[key]
 
 
 class ColorDetector(Node):
 
     def __init__(self):
         super().__init__('color_detector')
-        # All values come from config/visual_align.yaml - none are set here.
-        declare_from_yaml(self, ['image_topic', 'targets'])
-        self.targets = list(self.get_parameter('targets').value)
-        declare_from_yaml(self, [f'{t}.{s}' for t in self.targets for s in TARGET_SETTINGS])
+        # Every value comes from config/visual_align.yaml [color_detector].
+        self.cfg = Config('color_detector', missing_settings, self.get_logger())
 
         self.det_pub = self.create_publisher(Detection2DArray, '~/detections', 10)
         self.debug_pub = self.create_publisher(CompressedImage, '~/debug/compressed', 1)
         self.create_subscription(
-            CompressedImage, self.get_parameter('image_topic').value,
+            CompressedImage, self.cfg['image_topic'],
             self.on_image, qos_profile_sensor_data)
         self.kernel = np.ones((5, 5), np.uint8)
-        self.get_logger().info(f'ready - targets in priority order: {self.targets}')
+        self.get_logger().info(f'ready - targets in priority order: {self.cfg["targets"]}')
 
     def p(self, target, setting):
-        return self.get_parameter(f'{target}.{setting}').value
+        return self.cfg[target][setting]
 
     def mask(self, hsv, target):
         """Pixels inside the target's HSV range. hsv_low H > hsv_high H wraps
@@ -130,7 +175,8 @@ class ColorDetector(Node):
         out = Detection2DArray()
         out.header = msg.header
         found = []
-        for target in self.targets:
+        targets = list(self.cfg['targets'])
+        for target in targets:
             c = self.find(hsv, target)
             if c is None:
                 continue
@@ -151,7 +197,7 @@ class ColorDetector(Node):
 
         if want_debug:
             for i, (target, c) in enumerate(found):
-                color = DEBUG_COLORS[self.targets.index(target) % len(DEBUG_COLORS)]
+                color = DEBUG_COLORS[targets.index(target) % len(DEBUG_COLORS)]
                 x, y, w, h = cv2.boundingRect(c)
                 cv2.drawContours(frame, [c], -1, color, 2)
                 cv2.circle(frame, (x + w // 2, y + h // 2), 5, color, -1)
