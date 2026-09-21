@@ -27,6 +27,7 @@ install(PROGRAMS
   communication/visual_align.py
   # perception: SAM 3 target detector (GPU PC, lerobot_jazzy env)
   perception/sam_detector.py
+  perception/efficient_sam_detector.py
   # commander: missions
   commander/pick_place_mission.py
   commander/pick_place_shuttle.py

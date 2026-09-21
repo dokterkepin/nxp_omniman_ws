@@ -5,7 +5,7 @@ only brings up hardware: controllers, camera, lidar, joystick.
 
     control_arbiter  /control/owner, /control/acquire, /control/release
     policy_runner    /policy_runner/run, /policy_runner/stop, /policy_runner/status
-    sam_detector     /sam_detector/detections, /sam_detector/debug/compressed
+    detector         /<detector>/detections, /<detector>/debug/compressed
     visual_align     /visual_align/run, /visual_align/stop, /visual_align/status
 
 Anything that takes part in the lock - pick_place_mission.py, the web UI's
@@ -13,14 +13,20 @@ Policy and Align switches - needs this running; without it they report
 "control_arbiter not answering" and nothing moves. The joystick is not part of
 the lock and always works.
 
-sam_detector and visual_align read config/visual_align.yaml on THIS PC and
+The detector and visual_align read config/visual_align.yaml on THIS PC and
 pick up saved edits within a second - no restart, nothing to change on the
 robot. Run only one copy of this launch on the network.
 
-sam_detector needs the GPU and torch: launch from the lerobot_jazzy env.
+DETECTOR - one of two, switched by hand below (comment one in, the other out):
+  sam_detector            SAM 3            launch from the lerobot_jazzy env
+  efficient_sam_detector  EfficientSAM3    launch from the effsam3 env
+Each publishes under its own name (/sam_detector/... or
+/efficient_sam_detector/...): when switching, also set visual_align's
+detections_topic in config/visual_align.yaml, and point the debug viewer at
+the matching debug/compressed.
 
-Run:
-  conda activate lerobot_jazzy && source install/setup.bash
+Run (with the env of the detector that is switched in):
+  conda activate effsam3 && source install/setup.bash    # or lerobot_jazzy
   ros2 launch omniman_vla control_launch.py
 """
 
@@ -49,16 +55,24 @@ def generate_launch_description():
         parameters=[runner_params],
     )
 
-    # Finds the align targets with SAM 3 (text prompts), on the GPU. Idle
-    # until visual_align (or the debug image) subscribes.
-    sam_detector = Node(
+    # SAM 3 - launch from the lerobot_jazzy env.
+    # detector = Node(
+    #     package='omniman_vla',
+    #     executable='sam_detector.py',
+    #     name='sam_detector',
+    #     output='screen',
+    # )
+
+    # EfficientSAM3 - lighter; launch from the effsam3 env. Publishes on
+    # /efficient_sam_detector/... - set visual_align's detections_topic to match.
+    detector = Node(
         package='omniman_vla',
-        executable='sam_detector.py',
-        name='sam_detector',
+        executable='efficient_sam_detector.py',
+        name='efficient_sam_detector',
         output='screen',
     )
 
-    # Aligns to the first thing sam_detector finds; idle until ~/run.
+    # Aligns to the first thing the detector finds; idle until ~/run.
     visual_align = Node(
         package='omniman_vla',
         executable='visual_align.py',
@@ -66,4 +80,4 @@ def generate_launch_description():
         output='screen',
     )
 
-    return LaunchDescription([control_arbiter, policy_runner, sam_detector, visual_align])
+    return LaunchDescription([control_arbiter, policy_runner, detector, visual_align])

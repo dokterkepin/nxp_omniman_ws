@@ -23,9 +23,34 @@ sam_detector:
   # Input size, multiple of 14. 644: ~100 ms a frame; 1008 (native): ~3x slower.
   imgsz: 644
 
+# EfficientSAM3 (efficient_sam_detector.py, GPU PC, effsam3 env) - a lighter,
+# distilled SAM 3 to try in place of sam_detector: switch the node in
+# control_launch.py, and set visual_align's detections_topic below to
+# /efficient_sam_detector/detections (back to /sam_detector/detections for
+# SAM 3). Weights: huggingface.co/Simon7108528/EfficientSAM3
+# (efficientsam3_ft/). Tested: cup ok, black mark weak - see the node.
+efficient_sam_detector:
+  image_topic: /image_raw/compressed
+  # RV-M (RepViT) was the best for the cup. Others: efficientsam3_efficientvit.pt
+  # (backbone_type efficientvit, model_name b1), efficientsam3_tinyvit.pt
+  # (tinyvit, 11m).
+  model: ~/models/efficientsam3/efficientsam3_ft/efficientsam3_repvit.pt
+  backbone_type: repvit
+  model_name: m1.1
+  # The released checkpoints need exactly this text encoder - with anything
+  # else the text weights do not load and nothing is detected.
+  text_encoder: MobileCLIP-S0
+  text_context_length: 16
+  # Input size the model was trained at.
+  resolution: 1008
+  # Tested: "yellow cup lid" (cup, 20/20). For the mark "black rectangle" was
+  # the best wording, but weak - lower conf to ~0.35 for it.
+  prompts: ["yellow cup lid"]
+  conf: 0.5
+
 visual_align:
   owner_name: align
-  detections_topic: /sam_detector/detections
+  detections_topic: /efficient_sam_detector/detections
   cmd_vel_topic: /cmd_vel
   odom_topic: /mecanum_drive_controller/odometry
   rate_hz: 20.0
