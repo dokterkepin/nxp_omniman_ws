@@ -23,11 +23,11 @@ A run: acquire control as owner_name ("align"), then
              strafe can also hold the heading the cup was first seen at, with
              angular_z (k_heading > 0), so all three axes move
   ALIGNED    every axis within tolerance for settle_frames detections in a
-             row - the "done" the mission waits for; predictions never count
+             row - the "done" the mission waits for
 
-LOST - detections drop out (glare, an angle the colour range misses, motion
-blur). Turning away to search and coming back made the base swing back and
-forth, so once the target has been seen a run never searches again: it keeps
+LOST - detections drop out (glare, an unusual angle, motion blur). Turning
+away to search and coming back made the base swing back and forth, so once
+the target has been seen a run never searches again: it keeps
 aligning on the last detection, and each new detection replaces it. Only new
 detections count toward settle_frames. If nothing new arrives for lost_s the
 run stops and fails (0 = never - it would keep driving on the old position).
@@ -42,9 +42,9 @@ A run also ends - base stopped, control given back if still held - when
 max_travel_m, timeout_s and lost_s at 0 switch that limit off.
 
 Aligns to the FIRST detection on detections_topic, whatever it is: with
-color_detector.py (started by control_launch.py) that is the first of its
-`targets` in view - the cup's yellow lid, the black mark, anything given a
-colour range. Plain ROS - no torch.
+sam_detector.py (started by control_launch.py) that is the first of its
+`prompts` in view - "yellow cup lid", "black square", any short noun phrase.
+This node itself is plain ROS - no torch.
 
 Settings: config/visual_align.yaml, section visual_align - read from the
 file directly (no ROS parameters). Saved edits apply within a second; topics

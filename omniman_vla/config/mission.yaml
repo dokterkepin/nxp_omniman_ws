@@ -42,7 +42,7 @@ policies:
 settings:
   fps: 30
   # pick_place_mission.py: after arriving at pick_area, move the base until the
-  # cup is in place in the wrist camera (visual_align.py + cup_detector.py)
+  # cup is in place in the wrist camera (visual_align.py + sam_detector.py)
   # before starting the pick policy. false = start the pick right away.
   align_before_pick: true
   # After each nav leg the mission waits for wheel odometry to show the base

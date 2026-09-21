@@ -1,58 +1,31 @@
-# Settings for color_detector.py, visual_align.py and cup_detector.py - the
-# base correction step between Nav2 and the policy.
+# Settings for sam_detector.py and visual_align.py - the base correction step
+# between Nav2 and the policy: SAM 3 finds the target, visual_align moves the
+# base until it sits where the policy expects it.
 #
 # The nodes read this file directly (not ROS parameters, no --ros-args), each
 # its own section below. Save an edit and it applies within a second - no
-# restart; only topics and rate_hz are read once at start. Note: a node reads
-# the copy of this file on the PC it runs on.
+# restart; only topics, model, half, imgsz and rate_hz are read once at start.
+# Note: a node reads the copy of this file on the PC it runs on.
 
-color_detector:
+# SAM 3 (sam_detector.py, GPU PC, lerobot_jazzy env). Weights: sam3.pt from
+# huggingface.co/facebook/sam3 (gated - request access first).
+sam_detector:
   image_topic: /image_raw/compressed
-  # Priority order: the first target in this list that is in view is the one
-  # visual_align aligns to. When placing, the held cup (yellow) is in view -
-  # put black first, or leave yellow out, e.g. targets: ["black"].
-  # Each target below needs all five settings.
-  targets: ["yellow"]
-
-  # HSV in OpenCV units: H 0-180, S 0-255, V 0-255. hsv_low H above
-  # hsv_high H wraps around 180 (red).
-  # min_area    px, smaller blobs are ignored
-  # min_fill    blob / its rotated box, 0 = off (solid square ~0.9)
-  # max_aspect  long / short side of that box, 0 = off
-  #
-  # The cup's yellow lid. Overexposed on this camera: hue 27-30 and very
-  # bright set it apart from the cardboard (hue 19-22, V ~172), saturation
-  # does not. 173/173 aligned frames found, no false hits.
-  yellow:
-    hsv_low: [25, 70, 210]
-    hsv_high: [34, 255, 255]
-    min_area: 600
-    min_fill: 0.0
-    max_aspect: 0.0
-  # The black mark / container: V ~34 on cardboard of V ~170. The shape check
-  # keeps out the black aluminium rails (long and thin).
-  black:
-    hsv_low: [0, 0, 0]
-    hsv_high: [180, 255, 110]
-    min_area: 2000
-    min_fill: 0.6
-    max_aspect: 2.5
-
-# YOLO-World detector - not used by default (visual_align reads
-# color_detector). Kept to switch back: set detections_topic below to
-# /cup_detector/detections and run cup_detector.py on the GPU PC.
-
-cup_detector:
-  # YOLO-World: finds objects from text prompts, no training.
-  model: ~/models/yolov8s-worldv2.pt
-  classes: ["paper cup", "cup with yellow lid", "black square", "black rectangle", "brown box", "brown rectangle", "brown square", "brown box"]
-  image_topic: /image_raw/compressed
-  min_score: 0.3
-  device: cuda:0
+  model: ~/models/sam3.pt
+  # Short noun phrases, priority order: the first one in view is aligned to.
+  # Tested: "yellow cup lid" (cup), "black square" (the mark). NOT "black
+  # mark" - it matches dirt specks all over the box.
+  prompts: ["black square"]
+  # Minimum score (0-1) for a mask to count.
+  conf: 0.5
+  # fp16 on the GPU: about half the memory and faster.
+  half: true
+  # Input size, multiple of 14. 644: ~100 ms a frame; 1008 (native): ~3x slower.
+  imgsz: 644
 
 visual_align:
   owner_name: align
-  detections_topic: /color_detector/detections
+  detections_topic: /sam_detector/detections
   cmd_vel_topic: /cmd_vel
   odom_topic: /mecanum_drive_controller/odometry
   rate_hz: 20.0

@@ -27,7 +27,7 @@ Prereqs:
   - nav2_launch.py, robot localized
   - physical_ai_server_bringup.launch.py
   - control_launch.py on the GPU PC (control_arbiter, policy_runner,
-    color_detector, visual_align)
+    sam_detector, visual_align) - from the lerobot_jazzy env
 
 Run:
   ros2 run omniman_vla pick_place_mission.py

@@ -25,9 +25,8 @@ install(PROGRAMS
   communication/control_arbiter.py
   communication/policy_runner.py
   communication/visual_align.py
-  # perception: detectors (color_detector: CPU, robot PC; cup_detector: GPU PC)
-  perception/cup_detector.py
-  perception/color_detector.py
+  # perception: SAM 3 target detector (GPU PC, lerobot_jazzy env)
+  perception/sam_detector.py
   # commander: missions
   commander/pick_place_mission.py
   commander/pick_place_shuttle.py

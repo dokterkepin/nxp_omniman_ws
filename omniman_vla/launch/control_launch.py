@@ -5,7 +5,7 @@ only brings up hardware: controllers, camera, lidar, joystick.
 
     control_arbiter  /control/owner, /control/acquire, /control/release
     policy_runner    /policy_runner/run, /policy_runner/stop, /policy_runner/status
-    color_detector   /color_detector/detections, /color_detector/debug/compressed
+    sam_detector     /sam_detector/detections, /sam_detector/debug/compressed
     visual_align     /visual_align/run, /visual_align/stop, /visual_align/status
 
 Anything that takes part in the lock - pick_place_mission.py, the web UI's
@@ -13,11 +13,14 @@ Policy and Align switches - needs this running; without it they report
 "control_arbiter not answering" and nothing moves. The joystick is not part of
 the lock and always works.
 
-color_detector and visual_align read config/visual_align.yaml on THIS PC and
+sam_detector and visual_align read config/visual_align.yaml on THIS PC and
 pick up saved edits within a second - no restart, nothing to change on the
 robot. Run only one copy of this launch on the network.
 
+sam_detector needs the GPU and torch: launch from the lerobot_jazzy env.
+
 Run:
+  conda activate lerobot_jazzy && source install/setup.bash
   ros2 launch omniman_vla control_launch.py
 """
 
@@ -46,16 +49,16 @@ def generate_launch_description():
         parameters=[runner_params],
     )
 
-    # Finds the align targets by colour; plain OpenCV, no GPU. Idle until
-    # visual_align (or the debug image) subscribes.
-    color_detector = Node(
+    # Finds the align targets with SAM 3 (text prompts), on the GPU. Idle
+    # until visual_align (or the debug image) subscribes.
+    sam_detector = Node(
         package='omniman_vla',
-        executable='color_detector.py',
-        name='color_detector',
+        executable='sam_detector.py',
+        name='sam_detector',
         output='screen',
     )
 
-    # Aligns to the first thing color_detector finds; idle until ~/run.
+    # Aligns to the first thing sam_detector finds; idle until ~/run.
     visual_align = Node(
         package='omniman_vla',
         executable='visual_align.py',
@@ -63,4 +66,4 @@ def generate_launch_description():
         output='screen',
     )
 
-    return LaunchDescription([control_arbiter, policy_runner, color_detector, visual_align])
+    return LaunchDescription([control_arbiter, policy_runner, sam_detector, visual_align])

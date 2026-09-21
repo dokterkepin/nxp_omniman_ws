@@ -162,7 +162,7 @@ def generate_launch_description():
         output="screen",
     )
 
-    # The control lock, policy_runner, color_detector and visual_align are NOT
+    # The control lock, policy_runner, sam_detector and visual_align are NOT
     # started here: run control_launch.py on the GPU PC.
 
     teleop_inference_launch = IncludeLaunchDescription(  # noqa: F841
