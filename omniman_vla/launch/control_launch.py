@@ -7,6 +7,7 @@ only brings up hardware: controllers, camera, lidar, joystick.
     policy_runner    /policy_runner/run, /policy_runner/stop, /policy_runner/status
     detector         /<detector>/detections, /<detector>/debug/compressed
     visual_align     /visual_align/run, /visual_align/stop, /visual_align/status
+    grasp_monitor    /gripper/holding, /grasp_monitor/state
 
 Anything that takes part in the lock - pick_place_mission.py, the web UI's
 Policy and Align switches - needs this running; without it they report
@@ -80,4 +81,15 @@ def generate_launch_description():
         output='screen',
     )
 
-    return LaunchDescription([control_arbiter, policy_runner, detector, visual_align])
+    # Is the gripper holding something? From the gripper joint's position and
+    # effort (settings in config/mission.yaml); pick_place_bt.py retries a
+    # pick that closed on nothing.
+    grasp_monitor = Node(
+        package='omniman_vla',
+        executable='grasp_monitor.py',
+        name='grasp_monitor',
+        output='screen',
+    )
+
+    return LaunchDescription(
+        [control_arbiter, policy_runner, detector, visual_align, grasp_monitor])

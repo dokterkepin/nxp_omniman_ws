@@ -39,6 +39,7 @@
   <exec_depend>omniman_interfaces</exec_depend>
   <exec_depend>omniman_navigation</exec_depend>
   <exec_depend>nav2_simple_commander</exec_depend>
+  <exec_depend>py_trees</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>std_srvs</exec_depend>

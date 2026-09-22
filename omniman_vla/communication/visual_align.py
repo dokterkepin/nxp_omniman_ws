@@ -8,6 +8,8 @@ P-controller instead of a learned policy.
     ~/stop    std_srvs/srv/Trigger   stop, release control
     ~/status  std_msgs/msg/String    latched
               idle | searching | aligning | aligned | failed: <why>
+    ~/target  std_msgs/msg/String    latched, in: which detection to align to -
+              its class_id (e.g. "black square"); empty = the first detection
 
 A run: acquire control as owner_name ("align"), then
   SEARCHING  only until the target is first seen: turn at search_speed for
@@ -197,6 +199,11 @@ class VisualAlign(Node):
 
         self.create_subscription(
             ControlOwner, '/control/owner', self.on_owner, latched, callback_group=group)
+        # Set by a mission before ~/run (the place step aligns to the mark while
+        # the held cup is also in view). Empty: the first detection, whatever.
+        self.target = ''
+        self.create_subscription(
+            String, '~/target', self.on_target, latched, callback_group=group)
         self.create_subscription(
             Odometry, self.p('odom_topic'), self.on_odom, 10,
             callback_group=group)
@@ -338,9 +345,14 @@ class VisualAlign(Node):
         self.pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
         self.have_odom = True
 
+    def on_target(self, msg):
+        self.target = msg.data
+        self.get_logger().info(f'target: {self.target or "first detection"}')
+
     def on_detections(self, msg):
         best = next((d for d in msg.detections
-                     if d.results and d.results[0].hypothesis.score >= self.p('min_score')),
+                     if d.results and d.results[0].hypothesis.score >= self.p('min_score')
+                     and (not self.target or d.results[0].hypothesis.class_id == self.target)),
                     None)
         if best is None:
             return

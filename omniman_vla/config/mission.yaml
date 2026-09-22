@@ -8,6 +8,9 @@
 #           place      (pick_place policy, same checkpoint)
 #   -> home (nav2)
 #
+# pick_place_bt.py runs it as a behaviour tree with a grasp check and retry
+# (settings at the end of `settings`, and `grasp_monitor` below).
+#
 # pick_place_mission.py runs the same mission with visual_align.py as the
 # correct step before the pick (none before the place), and ignores the
 # base_correction entry below. It hands the robot over through the
@@ -50,3 +53,32 @@ settings:
   # long it must stay stopped; settle_timeout_s gives up if it never does.
   still_time_s: 0.5
   settle_timeout_s: 5.0
+
+  # ---- pick_place_bt.py only ----
+  # A pick whose gripper closes on nothing (grasp_monitor) is retried - align
+  # again, pick again - up to this many attempts in all, then the mission stops.
+  max_pick_attempts: 3
+  # What visual_align aligns to before the pick / the place: prompts of the
+  # detector (sam_detector's prompts must contain both, e.g.
+  # ["yellow cup lid", "black square"]).
+  pick_target: "yellow cup lid"
+  place_target: "black square"
+  # Align to place_target before the place policy. false = place right away.
+  align_before_place: true
+
+# Is the gripper holding something? (grasp_monitor.py - read by the node from
+# this file directly; saved edits apply within a second.)
+#   holding = position > closed_empty_position  and  |effort| > holding_min_effort
+# Observed: open 0.019, fully closed -0.013; closed on the cup the fingers
+# never go below -0.002 and the effort reads -20 .. -200; closed on nothing
+# the effort is near 0.
+grasp_monitor:
+  joint_states_topic: /joint_states
+  joint: gripper_prismatic_joint
+  # Below this the fingers closed past where the cup would stop them: empty.
+  closed_empty_position: -0.002
+  # |effort| above this: the servo is pushing against something.
+  holding_min_effort: 10
+  # Both must hold this long before the state changes (no flicker while the
+  # fingers are still moving).
+  stable_s: 0.3
