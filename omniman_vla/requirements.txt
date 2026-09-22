@@ -1,0 +1,49 @@
+# Python packages for the GPU side of omniman_vla - the detectors
+# (sam_detector: SAM 3, efficient_sam_detector: EfficientSAM3) and everything
+# else control_launch.py starts. One conda env holds both detectors.
+#
+# Install into a fresh conda env, in a terminal WITHOUT ROS sourced:
+#   conda create -n omniman_vla python=3.12 -y
+#   conda activate omniman_vla
+#   pip install -r requirements.txt
+#   (+ EfficientSAM3's code, see below)
+# Full steps, model weights and the apt packages: docs/omniman_vla.md, "Setup".
+#
+# Versions are the ones tested together (RTX 4060 Ti, driver with CUDA 13).
+
+# --- PyTorch (the PyPI wheels are built for CUDA 13.0) ---
+torch==2.14.0
+torchvision==0.29.0
+
+# --- SAM 3 through Ultralytics (sam_detector.py) ---
+ultralytics==8.4.155
+ultralytics-thop==2.1.6
+polars==1.44.2
+# Ultralytics' CLIP fork: turns SAM 3's text prompts into features.
+clip @ git+https://github.com/ultralytics/CLIP.git@a13192f8cb767260d7dfd98c843b0716593169e7
+
+# --- EfficientSAM3 (efficient_sam_detector.py) ---
+# The model code itself (the `sam3` package) is NOT in this file: its
+# packaging lists only 2 of its sub-packages, so a normal pip install leaves
+# out sam3.sam and the model fails to build. It must be an editable install
+# from a clone - see docs/omniman_vla.md, "Setup":
+#   git clone https://github.com/SimonZeng7108/efficientsam3 ~/tools/efficientsam3
+#   git -C ~/tools/efficientsam3 checkout bd0936c788fed8d51fa799437f05abd97b401b06
+#   pip install -e ~/tools/efficientsam3/sam3
+# Its dependencies:
+timm==1.0.29
+ftfy==6.1.1
+einops==0.8.2
+pycocotools==2.0.11
+omegaconf==2.3.1
+iopath==0.1.10
+psutil==7.2.2
+
+# --- Shared ---
+numpy==2.5.3
+# Exactly one OpenCV package: opencv-python and opencv-python-headless both
+# install cv2 and overwrite each other. Never add the headless one next to it.
+opencv-python==5.0.0.93
+pillow==12.3.0
+PyYAML==6.0.3
+huggingface_hub==1.32.0

@@ -19,15 +19,17 @@ pick up saved edits within a second - no restart, nothing to change on the
 robot. Run only one copy of this launch on the network.
 
 DETECTOR - one of two, switched by hand below (comment one in, the other out):
-  sam_detector            SAM 3            launch from the lerobot_jazzy env
-  efficient_sam_detector  EfficientSAM3    launch from the effsam3 env
+  sam_detector            SAM 3
+  efficient_sam_detector  EfficientSAM3
+Both need the omniman_vla conda env (omniman_vla/requirements.txt,
+docs/omniman_vla.md "Setup").
 Each publishes under its own name (/sam_detector/... or
 /efficient_sam_detector/...): when switching, also set visual_align's
 detections_topic in config/visual_align.yaml, and point the debug viewer at
 the matching debug/compressed.
 
-Run (with the env of the detector that is switched in):
-  conda activate effsam3 && source install/setup.bash    # or lerobot_jazzy
+Run:
+  conda activate omniman_vla && source install/setup.bash
   ros2 launch omniman_vla control_launch.py
 """
 
@@ -56,7 +58,7 @@ def generate_launch_description():
         parameters=[runner_params],
     )
 
-    # SAM 3 - launch from the lerobot_jazzy env.
+    # SAM 3.
     # detector = Node(
     #     package='omniman_vla',
     #     executable='sam_detector.py',
@@ -64,7 +66,7 @@ def generate_launch_description():
     #     output='screen',
     # )
 
-    # EfficientSAM3 - lighter; launch from the effsam3 env. Publishes on
+    # EfficientSAM3 - lighter. Publishes on
     # /efficient_sam_detector/... - set visual_align's detections_topic to match.
     detector = Node(
         package='omniman_vla',

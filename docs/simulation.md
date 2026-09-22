@@ -24,3 +24,24 @@ errors like "no map received" or TF extrapolation warnings.
 
 When `use_sim:=true`, the URDF xacro switches from real hardware plugins to `TopicBasedSystem`,
 and the SLAM launch skips launching the physical RPLidar node.
+
+# Why the sim mirrors the real robot
+
+If Isaac Sim is open while the **real** hardware launch is running, moving the
+real arm moves the sim arm 1:1. This is not a sync of two clocks, it is just a topic subscription:
+
+```
+real motors → ros2_control (wall clock) → joint_state_broadcaster → /joint_states
+                                                                        │ DDS (same ROS_DOMAIN_ID)
+Isaac Sim OmniGraph: ROS2 Subscribe Joint State ────────────────────────┘
+                     → Articulation Controller (position targets) → sim physics
+```
+
+- `/joint_states` carries joint **names and positions**. The OmniGraph subscriber reads the
+  latest message and sets those positions as drive targets on the matching joints.
+- It **ignores the message timestamp**. It only applies "the newest value I have" on each sim
+  tick. So the real robot stamps with wall time, the sim runs on its own sim clock, and nothing
+  compares them, which means no mismatch error.
+- The sim lags the real arm by about one physics step plus network delay (a few ms), so it looks
+  1:1. It is a *follower*, not a synchronized twin: if physics blocks a joint (collision, weak
+  drive gains), the sim pose will differ and nothing corrects it back.

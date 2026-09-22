@@ -194,6 +194,14 @@ def generate_launch_description():
         arguments=["-d", rviz_config],
     )
 
+    web_ui_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("omniman_navigation"), "launch", "web_ui_launch.py"]
+            )
+        ),
+    )
+
     return LaunchDescription([
         map_file,
         nav2_params_file,
@@ -208,4 +216,5 @@ def generate_launch_description():
         lifecycle_manager,
         twist_relay,
         rviz_node,
+        web_ui_launch,
     ])

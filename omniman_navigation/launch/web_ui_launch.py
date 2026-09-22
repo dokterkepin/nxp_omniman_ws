@@ -11,7 +11,8 @@ Both servers run on the machine that runs Nav2, so open
 http://<this-pc-ip>:8081 on the iPad. Plain http on purpose: Safari refuses a
 ws:// connection from an https page, which is what blocks app.foxglove.dev.
 
-Run alongside nav2_launch.py:
+Started by nav2_launch.py - don't also run it by hand, the ports would clash.
+On its own (e.g. with Nav2 launched some other way):
   ros2 launch omniman_navigation web_ui_launch.py
   ros2 launch omniman_navigation web_ui_launch.py web_port:=8888
 """

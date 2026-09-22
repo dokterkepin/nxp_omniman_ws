@@ -56,6 +56,8 @@ This starts the full Nav2 stack:
   in place to face the path first, then hands over to MPPI
 - **filter_mask_server** + **costmap_filter_info_server** — keepout zones
 - **behavior_server** — spin / backup / wait recoveries
+- **Web UI** — `web_ui_launch.py`, included: rosbridge on port **9091** and the
+  touch page on **8081** (see [Web UI](#web-ui) below)
 
 Odometry is wheel-only, straight from `mecanum_drive_controller`
 (`odom -> base_footprint`). There is no rf2o and no EKF.
@@ -69,6 +71,18 @@ In RViz:
 > plain `Twist`. A relay node (`twist_to_twist_stamped.py`) bridges this gap when user would like to teleoperate with joystick (use_joy:=true).
 
 ![Nav2 Navigation](images/nav2.png)
+
+### Web UI
+
+Started together with Nav2 - no separate launch. On a phone or iPad on the same
+network, open:
+
+```
+http://<ip-of-the-pc-running-nav2>:8081
+```
+
+It shows the map, lidar and costmaps, and lets you set the initial pose, send
+goals, and save and drive to named places.
 
 ### Drawing a keepout mask in GIMP
 

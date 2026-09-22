@@ -6,6 +6,10 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+
+# The Python library missions import: omniman_vla.mission
+ament_python_install_package(${PROJECT_NAME})
 
 install(DIRECTORY
   urdf

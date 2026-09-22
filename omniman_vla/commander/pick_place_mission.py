@@ -27,7 +27,7 @@ Prereqs:
   - nav2_launch.py, robot localized
   - physical_ai_server_bringup.launch.py
   - control_launch.py on the GPU PC (control_arbiter, policy_runner,
-    sam_detector, visual_align) - from the lerobot_jazzy env
+    detector, visual_align, grasp_monitor) - from the omniman_vla env
 
 Run:
   ros2 run omniman_vla pick_place_mission.py
@@ -50,10 +50,6 @@ from omniman_interfaces.srv import AcquireControl, ReleaseControl, RunPolicy
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
-
-# "Still" means every odometry twist component under these for still_time_s.
-STILL_LINEAR = 0.01     # m/s
-STILL_ANGULAR = 0.02    # rad/s
 
 NAV = 'nav'
 
@@ -99,8 +95,12 @@ class BaseStill:
     already stale. This waits for the actual stop instead.
     """
 
-    def __init__(self, node):
+    def __init__(self, node, settings):
+        # "Still" = every odometry speed under still_linear / still_angular
+        # (mission.yaml settings) for still_time_s.
         self.node = node
+        self.linear = float(settings['still_linear'])
+        self.angular = float(settings['still_angular'])
         self.still_since = None
         self.last_odom = None
         node.create_subscription(
@@ -110,9 +110,9 @@ class BaseStill:
         t = msg.twist.twist
         now = time.monotonic()
         self.last_odom = now
-        moving = (abs(t.linear.x) >= STILL_LINEAR
-                  or abs(t.linear.y) >= STILL_LINEAR
-                  or abs(t.angular.z) >= STILL_ANGULAR)
+        moving = (abs(t.linear.x) >= self.linear
+                  or abs(t.linear.y) >= self.linear
+                  or abs(t.angular.z) >= self.angular)
         if moving:
             self.still_since = None
         elif self.still_since is None:
@@ -275,7 +275,7 @@ class Mission:
         self.poses = cfg['poses']
         self.policy_cfg = cfg['policies']['manipulate']
         self.settings = cfg['settings']
-        self.still = BaseStill(nav)
+        self.still = BaseStill(nav, self.settings)
         self.control = Control(nav, NAV)
         self.policy = Policy(nav)
         self.align = Align(nav)

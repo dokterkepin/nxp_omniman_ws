@@ -53,14 +53,29 @@ settings:
   # long it must stay stopped; settle_timeout_s gives up if it never does.
   still_time_s: 0.5
   settle_timeout_s: 5.0
+  # "Still" = every odometry speed under these (odometry is never exactly 0).
+  # Raise them a little if a stopped base still reads "did not settle".
+  still_linear: 0.01       # m/s
+  still_angular: 0.02      # rad/s
+
+  # ---- behaviour-tree missions (omniman_vla.mission) ----
+  # How long a step waits for a service (visual_align, policy_runner, the
+  # lock) to appear before failing with "not answering".
+  service_wait_s: 10.0
+  # How often the tree is ticked, seconds.
+  tick_s: 0.1
 
   # ---- pick_place_bt.py only ----
   # A pick whose gripper closes on nothing (grasp_monitor) is retried - align
   # again, pick again - up to this many attempts in all, then the mission stops.
   max_pick_attempts: 3
-  # What visual_align aligns to before the pick / the place: prompts of the
-  # detector (sam_detector's prompts must contain both, e.g.
-  # ["yellow cup lid", "black square"]).
+  # The same for the place: still holding the cup after the place policy ->
+  # align to place_target again and place again, up to this many attempts.
+  max_place_attempts: 3
+  # What visual_align aligns to before the pick / the place. Must be written
+  # exactly as one of the active detector's prompts in visual_align.yaml -
+  # detections are named after the prompt, and visual_align only accepts the
+  # current target. pick_place_bt.py checks this at start and stops if not.
   pick_target: "yellow cup lid"
   place_target: "black square"
   # Align to place_target before the place policy. false = place right away.
@@ -78,7 +93,7 @@ grasp_monitor:
   # Below this the fingers closed past where the cup would stop them: empty.
   closed_empty_position: -0.002
   # |effort| above this: the servo is pushing against something.
-  holding_min_effort: 10
+  holding_min_effort: 1.5
   # Both must hold this long before the state changes (no flicker while the
   # fingers are still moving).
   stable_s: 0.3

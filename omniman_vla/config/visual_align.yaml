@@ -15,7 +15,7 @@ sam_detector:
   # Short noun phrases, priority order: the first one in view is aligned to.
   # Tested: "yellow cup lid" (cup), "black square" (the mark). NOT "black
   # mark" - it matches dirt specks all over the box.
-  prompts: ["yellow cup lid", "black rectangle"]
+  prompts: ["yellow cup lid", "black square"]
   # Minimum score (0-1) for a mask to count.
   conf: 0.5
   # fp16 on the GPU: about half the memory and faster.
@@ -45,7 +45,7 @@ efficient_sam_detector:
   resolution: 1008
   # Tested: "yellow cup lid" (cup, 20/20). For the mark "black rectangle" was
   # the best wording, but weak - lower conf to ~0.35 for it.
-  prompts: ["yellow cup lid", "black rectangle"]
+  prompts: ["yellow cup lid", "black square"]
   conf: 0.5
 
 visual_align:
@@ -102,18 +102,18 @@ visual_align:
   #                      detection until a new one arrives
   # lost_s               stop and fail after lost this long. 0 = never -
   #                      it would keep driving on the old position for ever.
-  #                      Before the target was ever seen (search_time_s 0)
+  #                      Before the target was ever seen (search_turns 0)
   #                      it is how long to wait for it.
   detection_timeout_s: 0.5
   lost_s: 3.0
 
-  # Not seen yet this run: turn at search_speed (rad/s) for up to
-  # search_time_s until a target shows, then align. Not found by then ->
-  # stop, "not found". Once seen, a run never searches again.
-  # 10 s at 0.3 rad/s is about half a turn.
-  # 0 = do not turn: wait lost_s for it instead (lost_s 0 = for ever).
+  # Not seen yet this run: turn without stopping at search_speed (rad/s)
+  # until a target shows, then align. After search_turns full turns (from
+  # odometry) -> stop, "not found". Once seen, a run never searches again.
+  # 1.0 = one full circle, 0.5 = half; 0 = do not turn: wait lost_s instead
+  # (lost_s 0 = for ever). One turn at 0.3 rad/s takes about 21 s.
   search_speed: 0.3
-  search_time_s: 10.0
+  search_turns: 1.0
   # Which way to search: +1 = left (counter-clockwise), -1 = right.
   search_direction: 1
 

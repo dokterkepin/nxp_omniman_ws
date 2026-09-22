@@ -21,7 +21,7 @@ matched dirt specks all over the box. ~100 ms a frame for one prompt, ~115 ms
 for two, 3.4 GB of GPU memory; imgsz 1008 (SAM 3's native size) is ~3x slower
 for the same scores here.
 
-Needs the GPU and the lerobot_jazzy env (torch + ultralytics), and the SAM 3
+Needs the GPU and the omniman_vla conda env (omniman_vla/requirements.txt), and the SAM 3
 weights: sam3.pt from https://huggingface.co/facebook/sam3 (gated - request
 access, then `hf download facebook/sam3 sam3.pt --local-dir ~/models`).
 
@@ -33,7 +33,7 @@ Settings: config/visual_align.yaml, section sam_detector - read from the file
 directly (no ROS parameters). Saved edits to prompts and conf apply within a
 second; model, half, imgsz and image_topic only at start.
 
-Started by control_launch.py (GPU PC, lerobot_jazzy env). On its own:
+Started by control_launch.py (GPU PC, omniman_vla env). On its own:
   ros2 run omniman_vla sam_detector.py
   ros2 run rqt_image_view rqt_image_view /sam_detector/debug/compressed
 """

@@ -14,6 +14,7 @@
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
 
   <!-- twist_to_twist_stamped.py relay -->
   <exec_depend>omniman_ros2_control</exec_depend>

@@ -4,7 +4,8 @@ Is the gripper holding something? Read from the gripper joint alone.
 
     in   /joint_states                  sensor_msgs/JointState
     out  /gripper/holding               std_msgs/Bool     latched, on change
-         ~/state                        std_msgs/String   latched, on change
+         ~/state                        std_msgs/String   latched, on change:
+              holding | empty - closed on nothing | empty - open  (+ readings)
 
 The policy closes the gripper whether or not the cup is there, so "closed"
 says nothing. How far it closes, and how hard it pushes, do:
@@ -102,8 +103,8 @@ class GraspMonitor(Node):
         self.holding_pub = self.create_publisher(Bool, '/gripper/holding', latched)
         self.state_pub = self.create_publisher(String, '~/state', latched)
 
-        self.holding = None      # published state; None until first decided
-        self.pending = None      # raw reading waiting out stable_s
+        self.state = None        # published state; None until first decided
+        self.pending = None      # reading waiting out stable_s
         self.pending_since = 0.0
         self.warned = False
 
@@ -122,23 +123,27 @@ class GraspMonitor(Node):
                     f'no effort for {joint} in {self.cfg["joint_states_topic"]} - '
                     'cannot tell holding from open; reporting not holding')
                 self.warned = True
-            self.decide(False, msg.position[i], float('nan'))
+            self.decide('empty - no effort reading', msg.position[i], float('nan'))
             return
         pos, eff = msg.position[i], msg.effort[i]
-        raw = (pos > self.cfg['closed_empty_position']
-               and abs(eff) > self.cfg['holding_min_effort'])
-        self.decide(raw, pos, eff)
+        if pos > self.cfg['closed_empty_position'] and abs(eff) > self.cfg['holding_min_effort']:
+            state = 'holding'
+        elif pos <= self.cfg['closed_empty_position']:
+            state = 'empty - closed on nothing'
+        else:
+            state = 'empty - open'
+        self.decide(state, pos, eff)
 
-    def decide(self, raw, pos, eff):
-        """Publish a new state once the raw reading has held for stable_s."""
+    def decide(self, state, pos, eff):
+        """Publish a new state once the reading has held for stable_s."""
         now = time.monotonic()
-        if raw != self.pending:
-            self.pending, self.pending_since = raw, now
-        if raw == self.holding or now - self.pending_since < self.cfg['stable_s']:
+        if state != self.pending:
+            self.pending, self.pending_since = state, now
+        if state == self.state or now - self.pending_since < self.cfg['stable_s']:
             return
-        self.holding = raw
-        self.holding_pub.publish(Bool(data=raw))
-        text = f'{"holding" if raw else "empty"} (position {pos:+.4f}, effort {eff:+.0f})'
+        self.state = state
+        self.holding_pub.publish(Bool(data=state == 'holding'))
+        text = f'{state} (position {pos:+.4f}, effort {eff:+.0f})'
         self.state_pub.publish(String(data=text))
         self.get_logger().info(text)
 

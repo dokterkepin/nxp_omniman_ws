@@ -12,11 +12,12 @@ P-controller instead of a learned policy.
               its class_id (e.g. "black square"); empty = the first detection
 
 A run: acquire control as owner_name ("align"), then
-  SEARCHING  only until the target is first seen: turn at search_speed for
-             up to search_time_s, always in search_direction (+1 left, -1
-             right). search_time_s 0 = do not turn: wait lost_s for it, or
-             with lost_s 0 wait for ever. Once seen, a run never searches
-             again - see LOST below.
+  SEARCHING  only until the target is first seen: turn at once and without
+             stopping at search_speed in search_direction (+1 left, -1 right)
+             until search_turns full turns are covered (odometry), then
+             fail. search_turns 0 = do not turn: wait lost_s for it, or with
+             lost_s 0 wait for ever. Once seen, a run never searches again -
+             see LOST below.
   ALIGNING   cup in view: one P-controller per axis, each clamped to
              [min_*, max_*] and zero inside its tolerance
                cup x (left/right)  -> angular_z  x_correction: rotate
@@ -35,7 +36,7 @@ detections count toward settle_frames. If nothing new arrives for lost_s the
 run stops and fails (0 = never - it would keep driving on the old position).
 
 A run also ends - base stopped, control given back if still held - when
-  - the cup does not show within search_time_s of turning
+  - the target does not show within search_turns turns
   - the target stays lost for lost_s
   - the base has moved max_travel_m from where the run started
   - timeout_s passes
@@ -81,11 +82,6 @@ from vision_msgs.msg import Detection2DArray
 
 CALL_TIMEOUT_S = 15.0
 
-# Extra wait for the first detection of a run: the detector only starts once
-# it discovers this node's subscription, which is made when the run starts.
-# Turning before then could turn a cup that is in view out of it.
-FIRST_DETECTION_S = 2.0
-
 BUSY = ('searching', 'aligning')
 
 # Settings visual_align needs in its section of the config file.
@@ -94,7 +90,7 @@ REQUIRED = [
     'x_correction', 'aim_x', 'tolerance_x', 'aim_y', 'tolerance_y', 'settle_frames',
     'min_score', 'k_angular', 'max_angular', 'min_angular', 'k_lateral', 'max_lateral',
     'k_forward', 'max_forward', 'min_linear', 'k_heading', 'tolerance_heading_deg',
-    'max_travel_m', 'detection_timeout_s', 'lost_s', 'search_speed', 'search_time_s',
+    'max_travel_m', 'detection_timeout_s', 'lost_s', 'search_speed', 'search_turns',
     'search_direction', 'timeout_s',
 ]
 
@@ -196,6 +192,9 @@ class VisualAlign(Node):
         self.hold_yaw = 0.0
         self.hold_set = False
         self.search_since = 0.0
+        # Search progress: how far the base has turned, from odometry yaw.
+        self.search_turned = 0.0
+        self.search_prev_yaw = 0.0
 
         self.create_subscription(
             ControlOwner, '/control/owner', self.on_owner, latched, callback_group=group)
@@ -254,6 +253,8 @@ class VisualAlign(Node):
 
     def start_search(self):
         self.search_since = time.monotonic()
+        self.search_turned = 0.0
+        self.search_prev_yaw = self.yaw
         self.set_state('searching')
 
     def end_run(self, result, release=True):
@@ -428,22 +429,24 @@ class VisualAlign(Node):
             self.drive(*cmd)
 
     def search_command(self, now):
-        """(result, cmd) while the cup is not in view."""
+        """(result, cmd) while the target has not been seen: turn without
+        stopping until search_turns full turns are covered."""
         waited = now - self.search_since
-        first = FIRST_DETECTION_S if self.cup_x is None else 0.0
-        turn_s = self.p('search_time_s')
-        if turn_s <= 0.0:
-            # No turning: give the cup lost_s to show up, or wait for ever.
+        turns = float(self.p('search_turns'))
+        if turns <= 0.0:
+            # No turning: give the target lost_s to show up, or wait for ever.
             lost_s = self.p('lost_s')
-            if 0.0 < lost_s < waited - first:
+            if 0.0 < lost_s < waited:
                 return 'failed: target not in view', (0.0, 0.0, 0.0)
             return None, (0.0, 0.0, 0.0)
-        if waited < first:
-            return None, (0.0, 0.0, 0.0)
-        if waited - first < turn_s:
+        # Angle covered so far, from odometry (unwrapped, either direction).
+        self.search_turned += abs(wrap(self.yaw - self.search_prev_yaw))
+        self.search_prev_yaw = self.yaw
+        if self.search_turned < turns * 2.0 * math.pi:
             side = 1.0 if self.p('search_direction') >= 0 else -1.0
             return None, (0.0, 0.0, side * abs(self.p('search_speed')))
-        return f'failed: target not found after turning {turn_s:.0f}s', (0.0, 0.0, 0.0)
+        return (f'failed: target not found after turning '
+                f'{math.degrees(self.search_turned):.0f} deg', (0.0, 0.0, 0.0))
 
     def align_command(self, x, y):
         """(linear_x, linear_y, angular_z) for the target at image (x, y)."""

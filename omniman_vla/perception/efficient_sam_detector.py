@@ -21,8 +21,9 @@ frames that have no mark scoring up to ~0.5 - expect misses and false hits.
 Other wordings ("paper cup", "cup", "black sticker") mostly fail.
 
 EfficientSAM3 is not in Ultralytics: it runs from its own code in the
-`effsam3` conda env (github.com/SimonZeng7108/efficientsam3, installed with
-`pip install -e ~/tools/efficientsam3/sam3`), weights from
+omniman_vla conda env (github.com/SimonZeng7108/efficientsam3, installed with
+`pip install -e ~/tools/efficientsam3/sam3` - see docs/omniman_vla.md
+"Setup"), weights from
 huggingface.co/Simon7108528/EfficientSAM3 (efficientsam3_ft/*.pt). The
 released checkpoints use the MobileCLIP-S0 text encoder, context 16 - with
 S1 the text weights do not load and nothing is ever detected.
@@ -31,9 +32,9 @@ Settings: config/visual_align.yaml, section efficient_sam_detector - read from
 the file directly (no ROS parameters). Saved edits to prompts and conf apply
 within a second; the model settings and image_topic only at start.
 
-Started by control_launch.py in place of sam_detector (launch from the effsam3
-env). On its own:
-  conda activate effsam3 && source install/setup.bash
+Started by control_launch.py in place of sam_detector (omniman_vla env). On
+its own:
+  conda activate omniman_vla && source install/setup.bash
   ros2 run omniman_vla efficient_sam_detector.py
 """
 
