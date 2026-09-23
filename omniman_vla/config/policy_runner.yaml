@@ -27,3 +27,8 @@ policy_runner:
     finished_dwell_s: 10.0
     # Give up, and give control back, if inference has not begun by then.
     warmup_timeout_s: 60.0
+    # Stop a run that can never finish: the arm never leaves home (the policy
+    # does nothing), or never comes back (it keeps reaching for something that
+    # is not there). FINISH, release, report idle - a mission then sees the
+    # run end and can retry. 0 = no limit (wait for ever).
+    run_timeout_s: 120.0

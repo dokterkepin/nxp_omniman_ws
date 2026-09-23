@@ -34,9 +34,7 @@ install(PROGRAMS
   perception/sam_detector.py
   perception/efficient_sam_detector.py
   # commander: missions
-  commander/pick_place_mission.py
   commander/pick_place_bt.py
-  commander/pick_place_shuttle.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

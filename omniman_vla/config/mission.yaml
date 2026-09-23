@@ -1,50 +1,26 @@
-# Mission definition for pick_place_shuttle.py
+# Mission settings for the missions built on omniman_vla.mission
+# (pick_place_bt.py is the worked example):
 #
 #   home -> pick_area  (nav2)
-#           correct    (base_correction policy - fixes nav2's residual error)
-#           pick       (pick_place policy)
+#           align      (visual_align: base correction on what the detector sees)
+#           pick       (policy, until policy_runner sees the arm finished)
 #   ->     place_area  (nav2)
-#           correct    (base_correction policy)
-#           place      (pick_place policy, same checkpoint)
+#           align, place
 #   -> home (nav2)
-#
-# pick_place_bt.py runs it as a behaviour tree with a grasp check and retry
-# (settings at the end of `settings`, and `grasp_monitor` below).
-#
-# pick_place_mission.py runs the same mission with visual_align.py as the
-# correct step before the pick (none before the place), and ignores the
-# base_correction entry below. It hands the robot over through the
-# control lock and lets policy_runner.py decide when the arm is finished; the
-# arm settings for that are in policy_runner.yaml, not here.
 #
 # The places (home, pick_area, place_area) are NOT in this file: they live in
 # poses.yaml next to it, so the web UI can save them where the robot really is
-# without rewriting the comments here.
-# Policies are ACT checkpoints; both are 10-dim (7 arm/gripper + 3 base), so
-# they can drive the base as well as the arm. That is what makes the base
-# correction step possible - nav2 gets close (it leaves up to ~12 cm / ~5.7 deg
-# of error), and the policy closes the loop visually, which is not bounded by
-# AMCL's ~5 deg yaw uncertainty.
+# without rewriting the comments here. The arm settings that decide when a
+# policy run is finished are in policy_runner.yaml, not here.
 
 policies:
-  # Only pick_place_shuttle.py uses this one. Several versions are trained
-  # (omniman_base_correct_v2 .. v5); point this at the one you want.
-  base_correction:
-    path: /home/dokterkepin/output/omniman_base_correct_v5/checkpoints/last/pretrained_model
-    instruction: "correct the base position"
-    duration_s: 10.0
   manipulate:
     path: /home/dokterkepin/output/omniman_pick_and_place/checkpoints/last/pretrained_model
     instruction_pick: "pick the object"
     instruction_place: "place the object"
-    # Fixed run times, pick_place_shuttle.py only. With pick_place_mission.py
-    # policy_runner.py runs the policy until the arm is done.
-    pick_duration_s: 500.0
-    place_duration_s: 10.0
 
 settings:
-  fps: 30
-  # pick_place_mission.py: after arriving at pick_area, move the base until the
+  # After arriving at pick_area, move the base until the
   # cup is in place in the wrist camera (visual_align.py + sam_detector.py)
   # before starting the pick policy. false = start the pick right away.
   align_before_pick: true
@@ -64,14 +40,11 @@ settings:
   service_wait_s: 10.0
   # How often the tree is ticked, seconds.
   tick_s: 0.1
+  # How often the running step logs one line about what it is waiting for
+  # (the tree itself is printed whenever a step's status changes).
+  log_every_s: 2.0
 
   # ---- pick_place_bt.py only ----
-  # A pick whose gripper closes on nothing (grasp_monitor) is retried - align
-  # again, pick again - up to this many attempts in all, then the mission stops.
-  max_pick_attempts: 3
-  # The same for the place: still holding the cup after the place policy ->
-  # align to place_target again and place again, up to this many attempts.
-  max_place_attempts: 3
   # What visual_align aligns to before the pick / the place. Must be written
   # exactly as one of the active detector's prompts in visual_align.yaml -
   # detections are named after the prompt, and visual_align only accepts the
@@ -91,9 +64,9 @@ grasp_monitor:
   joint_states_topic: /joint_states
   joint: gripper_prismatic_joint
   # Below this the fingers closed past where the cup would stop them: empty.
-  closed_empty_position: -0.002
+  closed_empty_position: -0.0025
   # |effort| above this: the servo is pushing against something.
-  holding_min_effort: 1.5
+  holding_min_effort: 2
   # Both must hold this long before the state changes (no flicker while the
   # fingers are still moving).
   stable_s: 0.3

@@ -5,6 +5,8 @@ Runs a physical_ai_server policy under the control lock (control_arbiter).
     ~/run     omniman_interfaces/srv/RunPolicy   acquire control, START_INFERENCE
     ~/stop    std_srvs/srv/Trigger               FINISH, release control
     ~/status  std_msgs/msg/String   latched      idle | starting | working
+    ~/arm     std_msgs/msg/String   latched      how far the arm is from home,
+              and for how long - the signal FINISHED below is made of
 
 A run: acquire control as owner_name ("policy") - refused while someone else
 holds it, unless the caller forces - then START_INFERENCE. The call returns
@@ -20,6 +22,8 @@ FINISHED
     control, which is the "I'm done" whoever is waiting listens for.
 
 A run also ends - and control is given back if still held - when
+  - run_timeout_s passes (0 = no limit): the arm never left home, or never
+    came back, so FINISHED above can never happen and the run would hang
   - control is taken away (a forced acquire): FINISH at once
   - inference stops from outside, e.g. in the physical_ai_manager UI
   - inference never begins within warmup_timeout_s
@@ -81,6 +85,7 @@ class PolicyRunner(Node):
         self.declare_parameter('home_exit_tolerance', 0.30)
         self.declare_parameter('finished_dwell_s', 5.0)
         self.declare_parameter('warmup_timeout_s', 60.0)
+        self.declare_parameter('run_timeout_s', 0.0)
 
         # Service handlers call other services and wait for the answer, which
         # needs other threads spinning - hence reentrant + multithreaded.
@@ -101,6 +106,10 @@ class PolicyRunner(Node):
         latched = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
                              durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.status_pub = self.create_publisher(String, '~/status', latched)
+        # What the finished-check sees: how far the worst arm joint is from
+        # home, whether that counts as home, and whether the arm has left it.
+        self.arm_pub = self.create_publisher(String, '~/arm', latched)
+        self.arm_said = 0.0
 
         # Server phase, whoever started it.
         self.phase = None
@@ -298,6 +307,15 @@ class PolicyRunner(Node):
             exit_tol = self.get_parameter('home_exit_tolerance').value
             worst = max(abs(positions[j] - h) for j, h in zip(ARM_JOINTS, home))
             now = time.monotonic()
+            if now - self.arm_said > 0.5:
+                self.arm_said = now
+                where = 'at home' if self.at_home else 'away from home'
+                since = f', {now - self.home_since:.1f}s' if self.at_home else ''
+                self.arm_pub.publish(String(data=(
+                    f'{where}{since}: worst joint {worst:.3f} rad (home under '
+                    f'{enter_tol}, leaves home over {exit_tol}); left home once: '
+                    f'{"yes" if self.left_home else "no"}; finished after '
+                    f'{self.get_parameter("finished_dwell_s").value}s at home')))
 
             if self.at_home and worst > exit_tol:
                 kind = 'reset' if self.left_home else 'task started'
@@ -320,9 +338,14 @@ class PolicyRunner(Node):
 
     def tick(self):
         now = time.monotonic()
+        run_timeout = self.get_parameter('run_timeout_s').value
         if (self.state == 'starting'
                 and now - self.started_at > self.get_parameter('warmup_timeout_s').value):
             self.end_run('inference never started')
+        elif (self.state == 'working' and run_timeout > 0.0
+                and now - self.started_at > run_timeout):
+            where = 'never left home' if not self.left_home else 'never came back home'
+            self.end_run(f'run timed out after {run_timeout:.0f}s - the arm {where}')
         elif self.state == 'working' and not self.inferencing():
             # Stopped from outside: nothing left to FINISH.
             self.end_run('inference stopped from outside', finish=False)

@@ -9,7 +9,7 @@ only brings up hardware: controllers, camera, lidar, joystick.
     visual_align     /visual_align/run, /visual_align/stop, /visual_align/status
     grasp_monitor    /gripper/holding, /grasp_monitor/state
 
-Anything that takes part in the lock - pick_place_mission.py, the web UI's
+Anything that takes part in the lock - the missions, the web UI's
 Policy and Align switches - needs this running; without it they report
 "control_arbiter not answering" and nothing moves. The joystick is not part of
 the lock and always works.
@@ -39,6 +39,12 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
+# Nodes log warnings and errors only: what they are doing is on their topics,
+# and the mission (pick_place_bt.py) prints it where it belongs, next to the
+# step that is waiting for it. Drop this from a node to hear it again.
+QUIET = ['--ros-args', '--log-level', 'warn']
+
+
 def generate_launch_description():
     runner_params = PathJoinSubstitution(
         [FindPackageShare('omniman_vla'), 'config', 'policy_runner.yaml'])
@@ -48,6 +54,7 @@ def generate_launch_description():
         executable='control_arbiter.py',
         name='control_arbiter',
         output='screen',
+        arguments=QUIET,
     )
 
     policy_runner = Node(
@@ -56,6 +63,7 @@ def generate_launch_description():
         name='policy_runner',
         output='screen',
         parameters=[runner_params],
+        arguments=QUIET,
     )
 
     # SAM 3.
@@ -64,6 +72,7 @@ def generate_launch_description():
     #     executable='sam_detector.py',
     #     name='sam_detector',
     #     output='screen',
+    #     arguments=QUIET,
     # )
 
     # EfficientSAM3 - lighter. Publishes on
@@ -73,6 +82,7 @@ def generate_launch_description():
         executable='efficient_sam_detector.py',
         name='efficient_sam_detector',
         output='screen',
+        arguments=QUIET,
     )
 
     # Aligns to the first thing the detector finds; idle until ~/run.
@@ -81,6 +91,7 @@ def generate_launch_description():
         executable='visual_align.py',
         name='visual_align',
         output='screen',
+        arguments=QUIET,
     )
 
     # Is the gripper holding something? From the gripper joint's position and
@@ -91,6 +102,7 @@ def generate_launch_description():
         executable='grasp_monitor.py',
         name='grasp_monitor',
         output='screen',
+        arguments=QUIET,
     )
 
     return LaunchDescription(
