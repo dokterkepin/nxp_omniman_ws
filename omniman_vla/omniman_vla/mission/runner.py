@@ -15,7 +15,6 @@ from std_srvs.srv import Trigger
 
 from .robot import NAV, Robot, load_poses, make_pose
 from .step import Step
-from .steps import Align
 
 # Internal: messages handled per tick at most. Odometry alone arrives faster
 # than the tick rate; reading one message per tick lets them pile up and the
@@ -26,31 +25,6 @@ SPIN_PER_TICK = 50
 # mission.yaml `settings:` keys this package needs.
 SETTINGS = ['tick_s', 'log_every_s', 'service_wait_s', 'still_time_s', 'still_linear',
             'still_angular', 'settle_timeout_s']
-
-
-def check_align_targets(root):
-    """Every Align in the tree must name exactly a prompt of the detector
-    visual_align listens to: detections carry the prompt as their name, and
-    visual_align accepts only the current target, so a target spelled
-    differently ("black square" vs "black rectangle") is never found and the
-    run fails after a full search turn. Returns what is wrong, or ''."""
-    targets = sorted({b.target for b in root.iterate() if isinstance(b, Align)})
-    if not targets:
-        return ''
-    path = f"{get_package_share_directory('omniman_vla')}/config/visual_align.yaml"
-    with open(path) as f:
-        va = yaml.safe_load(f) or {}
-    topic = va.get('visual_align', {}).get('detections_topic', '')
-    detector = topic.strip('/').split('/')[0]        # /efficient_sam_detector/detections
-    prompts = list(va.get(detector, {}).get('prompts') or [])
-    if not prompts:
-        return (f'cannot check the align targets: no prompts for "{detector}" (from '
-                f'detections_topic {topic}) in {path}')
-    bad = [t for t in targets if t not in prompts]
-    if bad:
-        return (f'align target(s) {bad} not among {detector}\'s prompts {prompts} - '
-                'fix the mission or the prompts in visual_align.yaml')
-    return ''
 
 
 def call_sync(nav, client, request, timeout_s=5.0):
@@ -96,13 +70,6 @@ def run_mission(build, node_name, initial_pose='home'):
 
     robot = Robot(nav, cfg)
     root = build(robot)
-    problem = check_align_targets(root)
-    if problem:
-        log.error(problem)
-        nav.destroy_node()
-        rclpy.try_shutdown()
-        return False
-
     if initial_pose is not None:
         # BasicNavigator's default initial pose is a zero-norm quaternion, and
         # waitUntilNav2Active() publishes it until AMCL answers - so a real one

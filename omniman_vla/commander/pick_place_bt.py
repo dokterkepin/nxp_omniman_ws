@@ -25,9 +25,9 @@ pick-with-retry pattern (BehaviorTree.CPP's RetryUntilSuccessful; py_trees'
 Retry, Selector and EternalGuard) with QT-Opt's style of grasp check (gripper
 not fully closed).
 
-Settings from config/mission.yaml (`settings:`, `policies: manipulate`),
-places from poses.yaml. pick_target / place_target must be prompts of the
-running detector - checked at start.
+What to align to and what to tell the policy are written below, in each
+task (Align's target is the detector's prompt - any text works). Timing
+settings and the policy path from config/mission.yaml, places from poses.yaml.
 
 Prereqs: nav2_launch.py (robot localized), physical_ai_server,
 control_launch.py; py_trees (sudo apt install ros-jazzy-py-trees).
@@ -41,9 +41,12 @@ from omniman_vla.mission import (Align, Holding, Navigate, PolicyStep, mission, 
                                  start_again, task)
 
 
+CUP = 'yellow cup lid'           # what to pick - the detector looks for this
+MARK = 'black square'            # where to place it
+
+
 def build(robot):
-    s = robot.cfg['settings']
-    m = robot.cfg['policies']['manipulate']
+    policy = robot.cfg['policies']['manipulate']['path']
 
     # Each task: its steps, how many tries, and what to run if it still
     # fails. If the on_failure steps succeed the mission carries on; end them
@@ -55,16 +58,16 @@ def build(robot):
                       on_failure=[Navigate(robot, 'home'), start_again()])
 
     pick = task('pick',
-                steps=[Align(robot, s['pick_target'], timeout_s=60),
-                       PolicyStep(robot, 'pick', m['instruction_pick'],
-                                  policy_path=m['path'], timeout_s=90),
+                steps=[Align(robot, CUP, timeout_s=60),
+                       PolicyStep(robot, 'pick', 'pick the object',
+                                  policy_path=policy, timeout_s=90),
                        Holding(robot, 'grasp succeeded', holding=True)],
                 attempts=1,
                 # Back to the pick area and straight into the policy - no base
                 # correction this time. If this grasp works too, carry on.
                 on_failure=[Navigate(robot, 'pick_area'),
-                            PolicyStep(robot, 'pick', m['instruction_pick'],
-                                       policy_path=m['path'], timeout_s=90),
+                            PolicyStep(robot, 'pick', 'pick the object',
+                                       policy_path=policy, timeout_s=90),
                             Holding(robot, 'grasp succeeded', holding=True)])
 
     carry = task('carry',
@@ -73,9 +76,9 @@ def build(robot):
                      condition=robot.is_holding)])
 
     place = task('place',
-                 steps=[Align(robot, s['place_target'], timeout_s=60),
-                        PolicyStep(robot, 'place', m['instruction_place'],
-                                   policy_path=m['path'], timeout_s=90),
+                 steps=[Align(robot, MARK, timeout_s=60),
+                        PolicyStep(robot, 'place', 'place the object',
+                                   policy_path=policy, timeout_s=90),
                         Holding(robot, 'cup released', holding=False)],
                  attempts=3,
                  on_failure=[Navigate(robot, 'home'), start_again()])

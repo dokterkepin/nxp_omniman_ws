@@ -12,10 +12,9 @@
 sam_detector:
   image_topic: /image_raw/compressed
   model: ~/models/sam3.pt
-  # Short noun phrases, priority order: the first one in view is aligned to.
+  # What to look for is set by the mission's Align(robot, '<prompt>').
   # Tested: "yellow cup lid" (cup), "black square" (the mark). NOT "black
   # mark" - it matches dirt specks all over the box.
-  prompts: ["yellow cup lid", "black square"]
   # Minimum score (0-1) for a mask to count.
   conf: 0.5
   # fp16 on the GPU: about half the memory and faster.
@@ -43,9 +42,9 @@ efficient_sam_detector:
   text_context_length: 16
   # Input size the model was trained at.
   resolution: 1008
+  # What to look for is set by the mission's Align(robot, '<prompt>').
   # Tested: "yellow cup lid" (cup, 20/20). For the mark "black rectangle" was
   # the best wording, but weak - lower conf to ~0.35 for it.
-  prompts: ["yellow cup lid", "black square"]
   conf: 0.5
 
 visual_align:

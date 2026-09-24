@@ -6,10 +6,13 @@ Finds align targets with SAM 3 (Segment Anything 3), prompted with text.
     out  ~/detections                     vision_msgs/Detection2DArray
          ~/debug/compressed               sensor_msgs/CompressedImage   masks drawn
 
-One detection per prompt that is found (its highest-scoring mask), class_id =
-the prompt, in the order of `prompts` - the first prompt in the list that is in
-view comes first, and visual_align aligns to the first detection. The
-position is the mask's centroid, not its box centre, so a partly hidden or
+    in   /visual_align/target             std_msgs/String   latched: the prompt
+
+The prompt is the target the mission's Align sets (/visual_align/target),
+so any text written in a mission just works; until one is set, nothing is
+detected. One detection when it is found (its highest-scoring mask),
+class_id = the prompt. The position is the mask's centroid, not its box
+centre, so a partly hidden or
 oddly shaped object still gives its middle.
 
 SAM 3 finds everything matching a short noun phrase and outlines it exactly -
@@ -30,7 +33,7 @@ image, and only on the newest frame - slower than the camera, older frames
 are dropped.
 
 Settings: config/visual_align.yaml, section sam_detector - read from the file
-directly (no ROS parameters). Saved edits to prompts and conf apply within a
+directly (no ROS parameters). Saved edits to conf apply within a
 second; model, half, imgsz and image_topic only at start.
 
 Started by control_launch.py (GPU PC, omniman_vla env). On its own:
@@ -47,12 +50,13 @@ import rclpy
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import CompressedImage
+from std_msgs.msg import String
 from ultralytics.models.sam import SAM3SemanticPredictor
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
 
-SETTINGS = ['image_topic', 'model', 'prompts', 'conf', 'half', 'imgsz']
+SETTINGS = ['image_topic', 'model', 'conf', 'half', 'imgsz']
 
 # Debug colours (BGR), cycled per prompt.
 DEBUG_COLORS = [(0, 0, 255), (0, 200, 0), (255, 0, 0), (0, 165, 255), (255, 0, 255)]
@@ -115,15 +119,26 @@ class SamDetector(Node):
         # The first call builds the model and the CUDA kernels; do it now,
         # not on the first real frame.
         t = time.monotonic()
-        self.detect(np.zeros((480, 640, 3), np.uint8), list(self.cfg['prompts']))
+        # Any word - warms up the text path too.
+        self.detect(np.zeros((480, 640, 3), np.uint8), ['object'])
         self.get_logger().info(f'model ready in {time.monotonic() - t:.1f}s')
 
         self.det_pub = self.create_publisher(Detection2DArray, '~/detections', 10)
         self.debug_pub = self.create_publisher(CompressedImage, '~/debug/compressed', 1)
         self.create_subscription(
             CompressedImage, self.cfg['image_topic'], self.on_image, qos_profile_sensor_data)
+        # The mission's Align sets what to look for (/visual_align/target,
+        # latched); nothing is detected until it is set.
+        self.target = ''
+        latched = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
+                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(String, '/visual_align/target', self.on_target, latched)
         self.ms = []
-        self.get_logger().info(f'ready - prompts in priority order: {self.cfg["prompts"]}')
+        self.get_logger().info('ready - waiting for a target on /visual_align/target')
+
+    def on_target(self, msg):
+        self.target = msg.data.strip()
+        self.get_logger().info(f'looking for: "{self.target}"')
 
     def detect(self, frame, prompts):
         """For each prompt, its best mask as (prompt, score, mask) - in prompt
@@ -147,14 +162,14 @@ class SamDetector(Node):
     def on_image(self, msg):
         want_det = self.det_pub.get_subscription_count() > 0
         want_debug = self.debug_pub.get_subscription_count() > 0
-        if not (want_det or want_debug):
+        if not self.target or not (want_det or want_debug):
             return
         frame = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
         if frame is None:
             return
 
         t = time.monotonic()
-        prompts = list(self.cfg['prompts'])
+        prompts = [self.target]
         found = self.detect(frame, prompts)
         ms = (time.monotonic() - t) * 1000.0
         self.ms.append(ms)

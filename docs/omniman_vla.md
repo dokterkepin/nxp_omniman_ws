@@ -9,7 +9,7 @@ This page has four parts:
 0. **[Setup](#0-setup)** - what to install, once per PC.
 1. **[The big picture](#1-the-big-picture)** - what runs where, and how to start it.
 2. **[The building blocks](#2-the-building-blocks)** - one section per node, with
-   its **contract**: what you send it, what it answers, and the rules for using
+   its **behaviour**: what you send it, what it answers, and the rules for using
    it.
 3. **[Tutorial: write a mission](#3-tutorial-write-a-mission)** - how
    `pick_place_bt.py` is built, step by step, so you can build your own.
@@ -175,7 +175,7 @@ and each of them takes and gives back the lock on its own.
 ## 2. The building blocks
 
 Each block below has the same layout: **what it is for**, its **interface**
-(topics and services), its **contract** (the rules you must follow when you use
+(topics and services), its **behaviour** (the rules you must follow when you use
 it), and how to **try it by hand**.
 
 ### 2.1 control_arbiter - the lock
@@ -197,7 +197,7 @@ is called a **resource arbiter** or **mutex**.
 *Latched* means a program that starts later still gets the current value at
 once.
 
-**Contract**
+**behaviour**
 
 1. **Ask politely.** `acquire` with `force: false`. If refused, someone else
    has it - wait about 0.5 s and ask again.
@@ -238,6 +238,7 @@ policies.
 | `/policy_runner/run` | `omniman_interfaces/srv/RunPolicy` | take the lock, start the policy. `policy_path` / `instruction` empty = defaults from `policy_runner.yaml`; `force` goes to the lock |
 | `/policy_runner/stop` | `std_srvs/srv/Trigger` | stop the policy, release the lock |
 | `/policy_runner/status` | `std_msgs/msg/String` (latched) | `idle`, `starting`, `working`, `ending` |
+| `/policy_runner/arm` | `std_msgs/msg/String` (latched) | while working: at home / away from home, the worst joint's distance from home, and how long it has been home |
 
 **How "finished" is decided.** Every episode starts and ends with the arm at
 its home pose, and passes through home briefly as a reset between attempts. So:
@@ -259,10 +260,14 @@ arm finished - home for 10.0s - ending run
 ```
 
 A run also ends when control is taken away, inference is stopped from
-outside, inference has not started within `warmup_timeout_s` (60 s), or
-`/policy_runner/stop` is called.
+outside, inference has not started within `warmup_timeout_s` (60 s), the run
+has lasted `run_timeout_s` (0 = no limit), or `/policy_runner/stop` is called.
 
-**Contract**
+If a run takes much longer than the arm's motion, `ros2 topic echo
+/policy_runner/arm`: an "at home" time that keeps restarting from 0 means the
+arm keeps twitching past `home_exit_tolerance`, so the dwell never completes.
+
+**behaviour**
 
 1. **`run` returns when the policy has *started*, not finished.** Watch
    `/policy_runner/status`: finished = back to `idle` **after having been busy**.
@@ -273,7 +278,8 @@ outside, inference has not started within `warmup_timeout_s` (60 s), or
 3. **Stop it on your exit** (`/policy_runner/stop`) - it is a no-op when idle.
 4. **Know its blind spot:** if the arm never leaves home, or never comes back
    and settles (for example it keeps reaching for a target you moved), the run
-   never finishes. Your mission needs its own time limit or a stop button.
+   never finishes by itself. `run_timeout_s` ends it; in a mission, give
+   `PolicyStep` a `timeout_s`.
 
 **By hand**
 
@@ -285,40 +291,53 @@ ros2 service call /policy_runner/stop std_srvs/srv/Trigger
 
 ### 2.3 The detector - find targets by text (SAM 3)
 
-**What for.** Finds objects in the wrist camera from short text prompts
-("yellow cup lid", "black square") and reports where they are in the image.
+**What for.** Finds one object in the wrist camera from a short text prompt
+("yellow cup lid", "black square") and reports where it is in the image.
 There are two interchangeable versions, switched by hand in
 `control_launch.py`:
 
 | Node | Model | Notes |
 |---|---|---|
-| `sam_detector` | SAM 3 (Ultralytics) | best quality; ~35 ms at `imgsz: 336`, 3.4 GB GPU |
+| `sam_detector` | SAM 3 (Ultralytics) | best quality; ~100 ms at `imgsz: 644`, 3.4 GB GPU |
 | `efficient_sam_detector` | EfficientSAM3 (distilled) | ~65 ms, ~1.1 GB; cup fine, flat black mark weak |
 
 Both run in the `omniman_vla` env.
+
+**Where the prompt comes from.** There is no prompt list in the config. The
+detector looks for whatever text is on `/visual_align/target`, which the
+mission's `Align(robot, '<text>')` sets. Any text written in a mission just
+works; nothing has to be kept in sync with a YAML file.
 
 **Interface**
 
 | Name | Type | Purpose |
 |---|---|---|
-| `/<detector>/detections` | `vision_msgs/msg/Detection2DArray` | one detection per prompt found: `class_id` = **the prompt text**, `score`, centre = the mask's centre in pixels (640x480) |
-| `/<detector>/debug/compressed` | `sensor_msgs/msg/CompressedImage` | the camera image with masks, scores and `<- align` drawn |
+| `/visual_align/target` | `std_msgs/msg/String` (latched, **input**) | the prompt: what to look for |
+| `/<detector>/detections` | `vision_msgs/msg/Detection2DArray` | the best mask for the prompt, if found: `class_id` = **the prompt text**, `score`, centre = the mask's centre in pixels (640x480) |
+| `/<detector>/debug/compressed` | `sensor_msgs/msg/CompressedImage` | the camera image with the mask, score and `<- align` drawn |
 
-**Contract**
+**behaviour**
 
-1. **The name of a detection is the prompt, word for word.** Anything that
-   looks for "black square" only finds it if a prompt is exactly "black square".
-2. **Detections come in prompt order**, best mask per prompt.
-3. **It only works while someone listens** - it runs nothing without a
-   subscriber, so it costs no GPU when idle. Seeing the debug image keeps it
-   running.
-4. **Prompts that work:** short noun phrases describing what the camera sees.
+1. **Nothing is detected until a target is set.** Before the first `Align`,
+   detections and the debug image stay empty.
+2. **The target is latched.** After an `Align` ends the detector keeps the
+   last target (for the debug view and the web UI's Align switch) until a new
+   one is set or it restarts.
+3. **It only runs while someone listens.** visual_align subscribes only during
+   a run, so SAM uses the GPU only during `Align` steps. An open debug image
+   keeps it running.
+4. **It warms up at start.** It runs the model once on a black image, so the
+   slow first load (weights to the GPU, CUDA kernels) happens during the
+   launch. `model ready in Xs` in the log means it is really ready.
+5. **Prompts that work:** short noun phrases describing what the camera sees.
    Tested: "yellow cup lid", "black square". Avoid "black mark" (matched dirt
-   specks). Test new prompts on the debug image before using them.
+   specks). Test a new prompt on the debug image before using it (set it by
+   hand, below).
 
 **By hand**
 
 ```bash
+ros2 topic pub --once /visual_align/target std_msgs/msg/String "{data: 'yellow cup lid'}"
 ros2 run rqt_image_view rqt_image_view /sam_detector/debug/compressed
 ros2 topic echo /sam_detector/detections --field detections
 ```
@@ -352,11 +371,10 @@ aligned     target inside tolerance_x / tolerance_y for settle_frames
             detections in a row -> stop, release the lock
 ```
 
-**Contract**
+**behaviour**
 
-1. **Set `/visual_align/target` before `run`** when more than one prompted
-   object can be in view (at the place, the held cup is in view too). The name
-   must be **exactly** a detector prompt.
+1. **Set `/visual_align/target` before `run`.** It is also the detector's
+   prompt (2.3), so any text works. Empty = the first detection.
 2. **Watch `/visual_align/status` like policy_runner's:** the result is latched
    (`aligned` / `failed: ...` stays), so only a result after `searching` /
    `aligning` belongs to your run.
@@ -394,7 +412,7 @@ because the policy drives the gripper through `arm_controller`.
 | `/gripper/holding` | `std_msgs/msg/Bool` (latched) | true = holding |
 | `/grasp_monitor/state` | `std_msgs/msg/String` (latched) | `holding` / `empty - closed on nothing` / `empty - open`, with the position and effort |
 
-**Contract**
+**behaviour**
 
 1. **Read it after the gripper has settled** (it waits `stable_s`, 0.3 s,
    before changing). After a policy run has finished, it has.
@@ -446,15 +464,19 @@ returns one of:
 | `SUCCESS` | done, it worked |
 | `FAILURE` | done, it did not |
 
-The building bricks we use:
+The building bricks underneath:
 
 | Brick | Does |
 |---|---|
 | `Sequence(memory=True)` | runs its children in order; stops at the first `FAILURE`; `SUCCESS` when all succeed. `memory=True` = a finished child is not re-run on the next tick |
+| `Selector(memory=True)` | tries its children in order until one succeeds - "do this, or else that" |
 | `Retry(n)` | re-runs its child after a `FAILURE`, up to `n` failures in total |
 | `EternalGuard(condition)` | re-checks `condition()` **every tick** while its child runs; the moment it is false, the child is stopped and the guard fails |
 | a **step** (your class) | starts something, follows it, reports the result |
 | a **condition** (your class) | checks something once: `SUCCESS` or `FAILURE` |
+
+You rarely use these directly: the library's `task()` and `mission()` (Step 3)
+are built from them.
 
 A step is a class with three methods py_trees calls for you:
 
@@ -467,38 +489,32 @@ terminate(new_status) once, when it ends or is stopped   -> clean up / cancel
 **Golden rule: never block.** `update()` must return at once. Start a service
 call in one tick, check `future.done()` in the next ones.
 
-### Step 1 - write the mission down as a tree
+### Step 1 - write the mission down as tasks
 
-Before code, draw it. For pick and place:
+Before code, write it down as **tasks**. For each task answer three
+questions: *which steps? how many tries? what if it still fails?*
 
 ```
-pick and place                       Sequence
- ├─ nav to pick_area                 Navigate
- ├─ pick attempts                    Retry(max_pick_attempts)
- │    └─ attempt                     Sequence
- │         ├─ align to pick_target   Align
- │         ├─ pick policy            PolicyStep
- │         └─ grasp succeeded        Holding(True)
- ├─ while holding                    EternalGuard(holding)
- │    └─ nav to place_area           Navigate
- ├─ place attempts                   Retry(max_place_attempts)
- │    └─ attempt                     Sequence
- │         ├─ align to place_target  Align
- │         ├─ place policy           PolicyStep
- │         └─ cup released           Holding(False)
- └─ nav to home                      Navigate
+pick and place                  mission: a failed task starts it again (restarts 2)
+ ├─ go to pick area             nav to pick_area              | on failure: nav home, start again
+ ├─ pick (1 try)                align cup, pick policy,
+ │                              grasp succeeded               | on failure: nav pick_area,
+ │                                                            |   pick policy, grasp succeeded
+ ├─ carry                       nav to place_area while holding
+ ├─ place (3 tries)             align mark, place policy,
+ │                              cup released                  | on failure: nav home, start again
+ └─ go home                     nav to home
 ```
 
-Read it aloud: *drive there; try up to 3 times to align, pick and confirm the
-grasp; drive to the place but abort if the cup drops; try up to 3 times to
-align, place and confirm the release; drive home.* Each question "what if X
-fails?" gets its answer from the structure: a `Retry` around it, a guard, or
-letting the whole mission fail.
+Read it aloud: *drive to the pick area; align, pick and confirm the grasp - if
+that fails, drive back and pick once more without aligning; carry the cup,
+and if it drops start over; try up to 3 times to align, place and confirm the
+release - if that fails, go home and start over; drive home.*
 
 ### Step 2 - build it from the library
 
 You do not write the steps yourself. They are in the library
-**`omniman_vla.mission`**; a mission only draws its tree and calls
+**`omniman_vla.mission`**; a mission only lists its tasks and calls
 `run_mission`. Here is a complete mission for another task - fetch a bottle
 and bring it to a person:
 
@@ -506,25 +522,27 @@ and bring it to a person:
 #!/usr/bin/env python3
 """Fetch a bottle from the shelf and bring it to the person."""
 import py_trees
-from omniman_vla.mission import Align, Holding, Navigate, PolicyStep, run_mission
+from omniman_vla.mission import (Align, Holding, Navigate, PolicyStep, mission, run_mission,
+                                 start_again, task)
 
 BOTTLE_POLICY = '~/output/omniman_fetch_bottle/checkpoints/last/pretrained_model'
 
 
 def build(robot):
-    pick = py_trees.decorators.Retry('pick attempts', py_trees.composites.Sequence(
-        'attempt', memory=True, children=[
-            Align(robot, 'green bottle'),                           # a detector prompt
-            PolicyStep(robot, 'pick', 'pick the bottle', policy_path=BOTTLE_POLICY),
-            Holding(robot, 'grasp succeeded', holding=True),
-        ]), num_failures=3)
+    go = task('go to shelf', steps=[Navigate(robot, 'shelf')])     # a place in poses.yaml
 
-    return py_trees.composites.Sequence('fetch bottle', memory=True, children=[
-        Navigate(robot, 'shelf'),                                   # a place in poses.yaml
-        pick,
-        py_trees.decorators.EternalGuard(                           # abort if it drops
-            'while holding', Navigate(robot, 'person'), condition=lambda: robot.holding),
-    ])
+    pick = task('pick',
+                steps=[Align(robot, 'green bottle', timeout_s=60),  # any text: the prompt
+                       PolicyStep(robot, 'pick', 'pick the bottle',
+                                  policy_path=BOTTLE_POLICY, timeout_s=90),
+                       Holding(robot, 'grasp succeeded', holding=True)],
+                attempts=3,
+                on_failure=[Navigate(robot, 'home'), start_again()])
+
+    bring = task('bring', steps=[py_trees.decorators.EternalGuard(  # start over if it drops
+        'while holding', Navigate(robot, 'person'), condition=robot.is_holding)])
+
+    return mission('fetch bottle', [go, pick, bring], restarts=2)
 
 
 if __name__ == '__main__':
@@ -536,23 +554,64 @@ read it next to this page.
 
 ### Step 3 - what the library gives you
 
-**The steps**
+**Tasks and the mission** - how the steps are put together:
+
+| | Does |
+|---|---|
+| `task(name, steps, attempts=1, on_failure=None)` | runs `steps` in order; if one fails they start again from the first, up to `attempts` tries. If every try fails, the `on_failure` steps run |
+| `start_again()` | a step that always fails - put it last in `on_failure` to start the mission over |
+| `mission(name, tasks, restarts=2)` | runs the tasks in order; a failed task starts it again from the first task, up to `restarts` times, then the mission fails |
+| `attempts(name, steps, times)`, `on_failure(steps, then)` | the two halves of `task()`, for building your own shapes |
+
+**What happens after `on_failure`** - you decide, by what you put in it:
+
+- the `on_failure` steps **succeed** -> the task counts as done, the mission
+  **carries on** with the next task;
+- one of them **fails**, or it ends with `start_again()` -> the mission
+  **starts again** from its first task.
+
+`on_failure` can be any steps: drive anywhere, run any policy, align to
+anything, several in a row. Write **new** step objects there (py_trees allows
+each object only once in a tree):
+
+```python
+on_failure=[Navigate(robot, 'home')]                              # go home, carry on
+on_failure=[Navigate(robot, 'home'), start_again()]               # go home, start over
+on_failure=[Navigate(robot, 'pick_area'),                         # pick again without
+            PolicyStep(robot, 'pick', 'pick the object'),         # aligning first
+            Holding(robot, 'grasp succeeded', holding=True)]
+```
+
+**The steps** - every step is independent: a step runs only itself, nothing
+before it. Whether to align before a policy is decided only by whether you put
+an `Align` in the list.
 
 | Step | Does | Arguments |
 |---|---|---|
 | `Navigate(robot, place)` | drive with Nav2 to a place from `poses.yaml`, wait until the base is still. Holds owner `nav` only while driving | `place`: name in `poses.yaml` |
-| `Align(robot, target)` | `visual_align` to a target, wait until the base is still | `target`: **exactly** a detector prompt |
-| `PolicyStep(robot, label, instruction, policy_path='')` | run an arm policy through `policy_runner` until the arm is finished | `label`: name in the tree; `instruction`: the policy's task text; `policy_path`: checkpoint, empty = `policy_runner.yaml`'s default |
+| `Align(robot, target)` | set the detector's prompt, `visual_align` to it, wait until the base is still | `target`: any text, e.g. `'yellow cup lid'` |
+| `PolicyStep(robot, label, instruction, policy_path='')` | run an arm policy through `policy_runner` until the arm is finished | `label`: name in the log; `instruction`: the policy's task text; `policy_path`: checkpoint, empty = `policy_runner.yaml`'s default |
 | `Holding(robot, name, holding=True)` | condition on `grasp_monitor` | `holding=True`: SUCCESS if holding (a pick worked); `False`: SUCCESS if not (a place let go) |
 
-Each one already follows its building block's contract from part 2: waits
+**Timings, per step** - optional arguments; left out, the setting of the same
+name in `mission.yaml` is used:
+
+| Argument | Steps | Meaning |
+|---|---|---|
+| `timeout_s` | `Align`, `PolicyStep` | stop it and fail after this long (None = no limit) |
+| `settle_timeout_s` | `Navigate`, `Align` | how long to wait for the base to stop |
+| `service_wait_s` | all | how long to wait for its service to exist |
+
+A step that fails stops what it started (Nav2 goal, visual_align, policy), so
+a retry starts clean.
+
+Each step already follows its building block's behaviour from part 2: waits
 until the service exists, reads the latched status correctly, cancels what it
-started if the tree interrupts it, and writes its reason next to itself in the
-printed tree:
+started if the tree interrupts it, and logs its result with the reason:
 
 ```
---> align to "yellow cup lid" [✓] -- aligned in 7.4s, base turned +45 deg, moved 0.16 m
---> grasp succeeded [✕] -- empty - closed on nothing (position -0.0120, effort -1)
+align to "yellow cup lid": aligned in 7.4s, base turned +45 deg, moved 0.16 m
+grasp succeeded: empty - closed on nothing (position -0.0120, effort -1)
 ```
 
 **`run_mission(build, node_name, initial_pose='home')`** does everything
@@ -560,37 +619,47 @@ around the tree:
 
 - ROS init with a Ctrl+C that still lets it clean up
 - reads `mission.yaml` (the `mission_file` parameter) and `poses.yaml` beside it
-- **checks every `Align` target** against the running detector's prompts, and
-  stops at once if one is not a prompt - finds them in your tree by itself
-- gives AMCL the start pose (`initial_pose`: a place in `poses.yaml`, or `None`)
-  and waits for Nav2
-- ticks the tree, prints it whenever a status changes
+- gives AMCL the start pose (`initial_pose`: a place in `poses.yaml`, or `None`
+  to keep the current localization) and waits for Nav2
+- ticks the tree and logs each step's result; while a step runs, one line
+  every `log_every_s` about what it is waiting for (the tree itself is not
+  printed)
 - on **any** exit - done, failed, Ctrl+C - stops Nav2, `visual_align` and the
   policy, and releases `nav`
 
-**`robot`** - the object `build(robot)` receives. What you may use in your tree:
+**`robot`** - the object `build(robot)` receives. For conditions (like the
+`EternalGuard` above) and your own log lines:
 
 | | |
 |---|---|
 | `robot.cfg` | the whole `mission.yaml`, plus `robot.cfg['poses']` |
-| `robot.holding` | latest `/gripper/holding` (e.g. for an `EternalGuard`) |
-| `robot.pose` | `(x, y, yaw)` from odometry |
+| `robot.is_holding()` | `grasp_monitor`: something in the gripper |
+| `robot.gripper_state()` | its reading, `holding (position ..., effort ...)` |
+| `robot.arm_state()` | `policy_runner`: how far the arm is from home |
+| `robot.align_status()` | `visual_align`: `searching` / `aligning` / `aligned` / `failed: ...` |
+| `robot.policy_status()` | `policy_runner`: `idle` / `starting` / `working` |
+| `robot.task_phase()` | physical_ai_server: `INFERENCING`, `READY`, ... |
+| `robot.control_owner()` | the lock: `nav`, `align`, `policy` or `""` |
+| `robot.base_pose()`, `robot.base_twist()`, `robot.base_still()` | odometry: `(x, y, yaw)`, `(vx, vy, wz)`, stopped or not |
 
 ### Step 4 - settings
 
-Everything tunable is in `config/mission.yaml`, `settings:` - read once when
-the mission starts:
+The shared timing settings are in `config/mission.yaml`, `settings:` - read
+once when the mission starts:
 
 | Setting | Used for |
 |---|---|
-| `still_time_s`, `still_linear`, `still_angular` | when the base counts as stopped (after driving and aligning) |
+| `still_time_s`, `still_linear`, `still_angular` | when the base counts as stopped (after driving and aligning): every odometry speed below `still_linear` (m/s) / `still_angular` (rad/s) for `still_time_s` |
 | `settle_timeout_s` | how long to wait for that before failing |
 | `service_wait_s` | how long a step waits for a service before "not answering" |
 | `tick_s` | how often the tree is ticked |
+| `log_every_s` | how often a running step logs what it is waiting for |
 
-Your own mission's values (attempts, targets, instructions) can go in the same
-file - `robot.cfg['settings']['max_pick_attempts']` is how `pick_place_bt.py`
-reads its own. Use a different file with `--ros-args -p mission_file:=...`.
+Everything that belongs to one mission - targets, instructions, attempts,
+restarts, per-step timeouts - is written **in the mission file** itself
+(Step 2), not in `mission.yaml`. `policies: manipulate: path` is the default
+policy checkpoint (`robot.cfg['policies']['manipulate']['path']`). Use a
+different settings file with `--ros-args -p mission_file:=...`.
 
 ### Step 5 - install and run
 
@@ -650,13 +719,14 @@ The rules every step keeps:
 3. **Latched results:** if the thing you follow reports its result on a
    latched topic, only trust a result after you have seen it busy.
 4. **Cancel in `terminate()`** when `self.interrupted(new_status)`.
-5. **Give reasons** with `fail(...)` / `succeed(...)` - they appear in the tree.
+5. **Give reasons** with `fail(...)` / `succeed(...)` - they appear in the log.
 6. **If it moves the robot, it must take the lock** (part 2.1) - or better,
    make it a node with a run/stop/status interface like `visual_align`, and a
    step that calls it.
 
 If the step is useful for more than one mission, add it to
-`omniman_vla/omniman_vla/mission.py` so the next person can import it.
+`omniman_vla/omniman_vla/mission/steps.py` and export it in `__init__.py`, so
+the next person can import it.
 
 ### Step 7 - test without the robot
 
@@ -679,11 +749,11 @@ the object drops - and check the tree ends the way you expect. That is how
 
 ### Checklist for a new mission
 
-- [ ] Drew the tree first; every failure has an answer (retry, guard, or abort).
+- [ ] Wrote the tasks first; every task answers "how many tries?" and "what if
+      it still fails?" (`on_failure`, or let the mission start again).
 - [ ] Built it from `omniman_vla.mission`; new steps subclass `Step` and keep
       its rules.
-- [ ] Align targets are written exactly like detector prompts (checked at
-      start anyway).
+- [ ] Tried each new `Align` target on the detector's debug image.
 - [ ] Places exist in `poses.yaml` on the PC that runs the mission.
 - [ ] Tested against fakes in domain 99 before the robot.
 
@@ -693,10 +763,10 @@ the object drops - and check the tree ends the way you expect. That is how
 
 | File | Read by | What is in it |
 |---|---|---|
-| `mission.yaml` | missions, grasp_monitor | policy path and instructions; `settings:` (`still_time_s`, `settle_timeout_s`, `align_before_pick/place`, `max_pick/place_attempts`, `pick/place_target`); `grasp_monitor:` thresholds |
+| `mission.yaml` | missions, grasp_monitor | default policy path; `settings:` (timing shared by all missions: `still_*`, `settle_timeout_s`, `service_wait_s`, `tick_s`, `log_every_s`); `grasp_monitor:` thresholds |
 | `poses.yaml` | missions, web UI | named places in the map frame, yaw in **degrees**. Written by the web UI's "Save here" - comments are not kept |
-| `visual_align.yaml` | detectors, visual_align | detector sections (`prompts`, model, `conf`, ...) and `visual_align:` (aim point, tolerances, gains, search, `detections_topic`) |
-| `policy_runner.yaml` | policy_runner | default policy, `home_pose`, tolerances, `finished_dwell_s`, `warmup_timeout_s` |
+| `visual_align.yaml` | detectors, visual_align | detector sections (model, `conf`, ... - no prompts, those come from the mission) and `visual_align:` (aim point, tolerances, gains, search, `detections_topic`) |
+| `policy_runner.yaml` | policy_runner | default policy, `home_pose`, tolerances, `finished_dwell_s`, `warmup_timeout_s`, `run_timeout_s` |
 | `controllers_vla.yaml` | robot bringup | ros2_control controllers |
 
 `visual_align.yaml` and the `grasp_monitor:` section are read by the nodes
@@ -707,12 +777,11 @@ restart, no `ros2 param set`. Topic names are read only at start.
 
 | What | Setting | Change it when |
 |---|---|---|
-| "arm finished" | `finished_dwell_s` (10 s) | a reset is mistaken for a finish: make it longer than the longest `(reset)` pause in the log |
+| "arm finished" | `finished_dwell_s` (10 s) | a reset is mistaken for a finish: make it longer than the longest `(reset)` pause in the log. A run that never finishes although the arm looks home: raise `home_exit_tolerance` |
 | | `home_pose`, `home_tolerance` | the arm rests a bit off home and is never counted as home |
 | alignment | `aim_x`, `aim_y` | the policy's grasp starts from a different view; move the robot where it should stop and read the target's pixel from the detections |
 | | `tolerance_x/y` (30 px) | it hunts back and forth near the target: widen; stops too early: tighten |
+| | `settle_frames` (5) | how many detections in a row inside the tolerance before `aligned` - a time, not a size |
 | | `k_angular`, `k_forward`, `min_*`, `max_*` | too slow / overshoots; `min_*` below the speed that moves the base at all does nothing |
 | | `search_turns`, `search_direction` | how far and which way to look when the target is not in view |
 | grasp check | `closed_empty_position`, `holding_min_effort` | real readings from `/grasp_monitor/state` sit on the wrong side of a threshold |
-
- the gripper | `holding_min_effort` above the real effort - check `/grasp_monitor/state` and lower it |

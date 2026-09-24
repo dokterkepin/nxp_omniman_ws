@@ -24,7 +24,7 @@ commander/pick_place_bt.py is the full example.
 Steps (steps.py)
     Navigate(robot, place)                  drive with Nav2 to a place in poses.yaml
     Align(robot, target)                    base correction with visual_align;
-                                            target = a prompt of the running detector
+                                            target = any text, the detector's prompt
     PolicyStep(robot, label, instruction)   run the arm policy until the arm is home
     Holding(robot, name, holding=True)      is the gripper holding something (or not)
     task(name, steps, attempts, on_failure) one state: its steps, how many tries,
@@ -62,8 +62,7 @@ What the robot knows (robot.py) - for conditions and your own log lines
   e.g. py_trees.decorators.EternalGuard('while holding', step, condition=robot.is_holding)
 
 run_mission(build, node_name) (runner.py)
-    ROS setup, mission.yaml and poses.yaml, a check that every Align target
-    is a detector prompt, the initial pose, waiting for Nav2, the tick loop
+    ROS setup, mission.yaml and poses.yaml, the initial pose, waiting for Nav2, the tick loop
     and the log - and on any exit, Ctrl+C included, it stops Nav2,
     visual_align and the policy and releases the control lock.
 

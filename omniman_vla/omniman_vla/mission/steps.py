@@ -106,8 +106,9 @@ class Navigate(Step):
 
 
 class Align(Step):
-    """visual_align to `target` - exactly a prompt of the running detector -
-    then wait for the base to be still. Stopped if interrupted."""
+    """visual_align to `target` - any text, e.g. 'yellow cup lid': the
+    detector looks for exactly this - then wait for the base to be still.
+    Stopped if interrupted."""
 
     def __init__(self, robot, target, timeout_s=None, settle_timeout_s=None,
                  service_wait_s=None):

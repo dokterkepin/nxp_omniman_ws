@@ -16,14 +16,8 @@
 policies:
   manipulate:
     path: /home/dokterkepin/output/omniman_pick_and_place/checkpoints/last/pretrained_model
-    instruction_pick: "pick the object"
-    instruction_place: "place the object"
 
 settings:
-  # After arriving at pick_area, move the base until the
-  # cup is in place in the wrist camera (visual_align.py + sam_detector.py)
-  # before starting the pick policy. false = start the pick right away.
-  align_before_pick: true
   # After each nav leg the mission waits for wheel odometry to show the base
   # has actually stopped, instead of sleeping a fixed time. still_time_s is how
   # long it must stay stopped; settle_timeout_s gives up if it never does.
@@ -40,19 +34,8 @@ settings:
   service_wait_s: 10.0
   # How often the tree is ticked, seconds.
   tick_s: 0.1
-  # How often the running step logs one line about what it is waiting for
-  # (the tree itself is printed whenever a step's status changes).
+  # How often the running step logs one line about what it is waiting for.
   log_every_s: 2.0
-
-  # ---- pick_place_bt.py only ----
-  # What visual_align aligns to before the pick / the place. Must be written
-  # exactly as one of the active detector's prompts in visual_align.yaml -
-  # detections are named after the prompt, and visual_align only accepts the
-  # current target. pick_place_bt.py checks this at start and stops if not.
-  pick_target: "yellow cup lid"
-  place_target: "black square"
-  # Align to place_target before the place policy. false = place right away.
-  align_before_place: true
 
 # Is the gripper holding something? (grasp_monitor.py - read by the node from
 # this file directly; saved edits apply within a second.)
