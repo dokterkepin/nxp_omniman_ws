@@ -250,10 +250,12 @@ class PolicyStep(Step):
         waited = time.monotonic() - self.since
         if self.phase == 'call':
             return f'/policy_runner/run: calling ("{self.instruction}")'
-        return (f'/policy_runner/status: {r.policy_status() or "nothing yet"} | '
-                f'{r.task_phase()} | {waited:.0f}s\n'
-                f'      arm (/policy_runner/arm): {r.arm_state()}\n'
-                f'      gripper (/grasp_monitor/state): {r.gripper_state()}')
+        # Only the two things that decide the step: is the arm home, is
+        # the gripper holding. The full readings: robot.arm_state(),
+        # robot.gripper_state().
+        arm = r.arm_state().split(':')[0].split(',')[0]
+        gripper = r.gripper_state().split(' (')[0]
+        return f'arm {arm} | gripper {gripper} | {waited:.0f}s'
 
     def terminate(self, new_status):
         if self.interrupted(new_status) and self.phase == 'watch':
@@ -280,6 +282,78 @@ class Holding(py_trees.behaviour.Behaviour):
             return Status.SUCCESS
         self.robot.nav.get_logger().warn(f'{self.name}: no - {self.feedback_message}')
         return Status.FAILURE
+
+
+def task(name, steps, attempts=1, on_failure=None):
+    """One state of a mission: its steps, how many tries, and what to run if
+    it still fails.
+
+        task('pick',
+             steps=[Align(robot, 'cup'), PolicyStep(robot, 'pick', 'pick it'),
+                    Holding(robot, 'grasp succeeded', holding=True)],
+             attempts=3,
+             on_failure=[Navigate(robot, 'home')])
+
+    The steps run in order; if one fails they start again from the first,
+    up to `attempts` tries in all. If every try fails, the `on_failure` steps
+    run - any steps: drive somewhere, run a policy, several of them:
+      - they succeed    the task counts as done, the mission carries on
+      - one fails       the task fails, the mission starts again
+    End on_failure with start_again() to always start the mission again
+    after it, e.g. on_failure=[Navigate(robot, 'home'), start_again()]."""
+    tries = py_trees.decorators.Retry(
+        f'{name} ({attempts} tries)',
+        py_trees.composites.Sequence(name, memory=True, children=list(steps)),
+        num_failures=int(attempts))
+    if not on_failure:
+        return tries
+    return py_trees.composites.Selector(
+        f'{name}, or on failure', memory=True, children=[
+            tries,
+            py_trees.composites.Sequence(f'{name} failed', memory=True,
+                                         children=list(on_failure)),
+        ])
+
+
+def start_again(reason='start the mission again'):
+    """A step that always fails: put it last in on_failure to make the
+    mission start again from its first task after the recovery."""
+    return py_trees.behaviours.Failure(reason)
+
+
+def mission(name, tasks, restarts=2):
+    """The tasks in order. If one fails (after its own on_failure steps), the
+    mission starts again from the first task - up to `restarts` times, then
+    it fails."""
+    return py_trees.decorators.Retry(
+        f'{name} (restarts: {restarts})',
+        py_trees.composites.Sequence(name, memory=True, children=list(tasks)),
+        num_failures=int(restarts) + 1)
+
+
+def _as_one(steps, name):
+    """A list of steps as one memory Sequence; a single step as itself."""
+    if isinstance(steps, (list, tuple)):
+        return py_trees.composites.Sequence(name, memory=True, children=list(steps))
+    return steps
+
+
+def on_failure(steps, then, name=None):
+    """Run `steps`; if one of them fails, run `then` - whatever the mission
+    wants to happen next after that failure (py_trees' Selector).
+
+        on_failure(Align(robot, 'cup'), then=Navigate(robot, 'home'))
+        on_failure(Align(robot, 'cup'),
+                   then=[Navigate(robot, 'pick_area'), Align(robot, 'cup')])
+
+    `steps` and `then` are each one step or a list of steps. Succeeds if
+    `steps` did, or else if `then` did; fails only if both failed. Put a new
+    step object in `then` - py_trees allows each object only once in a tree.
+    Wrap it in attempts() to repeat the whole thing."""
+    first = _as_one(steps, 'try')
+    return py_trees.composites.Selector(
+        name or f'{first.name}, on failure', memory=True,
+        children=[first, _as_one(then, 'on failure')])
 
 
 def attempts(name, children, times):

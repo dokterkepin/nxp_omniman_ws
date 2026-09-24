@@ -211,3 +211,107 @@ pkill -9   -f ros2_control_node                    # SIGKILL - NO cleanup
 
 Signal the launch, not individual nodes - it propagates to every node it started.
 Killing a process does NOT means stop the hardware, beaware of this and check if there is a service call too kill the hardware instead of using this
+
+---
+
+## Reading Old Node Logs
+
+Every ROS 2 node writes what it logs to a file in `~/.ros/log/` - one file per
+run. So a mission you ran this afternoon is still there, even after the
+terminal is closed. (A normal terminal does NOT keep its output, and
+`journalctl` only has systemd services - neither helps here.)
+
+The file names are hard to read: `python3_263023_1790144702152.log` =
+`<executable>_<pid>_<start time in ms since 1970>.log`, and every Python node
+is called `python3`. So: first find the file, then open it.
+
+### 1. Add `roslogs` to `~/.bashrc` (once)
+
+```bash
+roslogs() {   # roslogs [node] [how many]   e.g. roslogs pick_place_bt 20
+  for f in $(ls -tr ~/.ros/log/*.log | tail -n ${2:-30}); do
+    node=$(grep -om1 '\] \[[a-z_0-9]*\]' "$f" | tr -d '[] ')
+    [ -n "$1" ] && [ "$node" != "$1" ] && continue
+    ms=$(basename "$f" .log | grep -o '[0-9]*$')
+    start=$(date -d @${ms:0:10} '+%a %m-%d %H:%M:%S')
+    end=$(date -r "$f" '+%H:%M:%S')
+    printf '%s -> %s  %-20s %s\n' "$start" "$end" "${node:-?}" "$(basename $f)"
+  done
+}
+```
+
+Then `source ~/.bashrc`.
+
+### 2. Find the run
+
+```bash
+roslogs                                  # newest 30 log files, any node
+roslogs pick_place_bt                    # only the mission, among the newest 30
+roslogs pick_place_bt 3000               # look further back
+roslogs pick_place_bt 3000 | grep " 09-23 1[2-5]:"    # one afternoon
+```
+
+```
+Wed 09-23 14:25:02 -> 14:31:10  pick_place_bt        python3_263023_1790144702152.log
+```
+
+start date and time -> last line written, node, file name.
+
+**Run not listed?** It only looks at the newest N files, and every node
+writes one - raise the number (`3000`).
+
+### 3. Show the log
+
+```bash
+less ~/.ros/log/python3_263023_1790144702152.log
+```
+
+| key | does |
+|---|---|
+| `G` / `g` | end (how it ended) / start |
+| `/ERROR` then `n` | search, next match |
+| `q` | quit |
+
+Quick looks without opening it:
+
+```bash
+tail -30 ~/.ros/log/<file>.log                  # how it ended
+grep -E "ERROR|WARN" ~/.ros/log/<file>.log      # only the problems
+```
+
+### 4. Nicer viewer: lnav (optional)
+
+```bash
+sudo apt install lnav
+lnav ~/.ros/log/<file>.log                                  # one run
+lnav $(grep -l "\[pick_place_bt\]" ~/.ros/log/*.log)        # every mission run
+```
+
+Colours, `e` / `E` = next / previous error, `q` = quit.
+
+**Do not run `lnav ~/.ros/log/*.log`** - there are thousands of files and
+lnav stops with "Too many open files", showing almost nothing. Always pick
+the files first (as above).
+
+Filter inside lnav: press `:` and type `filter-in <text>`, Enter. Remove it:
+`TAB`, `D`, `TAB`.
+
+### 5. Keep it tidy
+
+```bash
+find ~/.ros/log -name "*.log" -mtime +7 -delete     # delete logs older than a week
+```
+
+Or give every day its own folder - add to `~/.bashrc`:
+
+```bash
+export ROS_LOG_DIR=~/.ros/log/$(date +%Y-%m-%d)
+```
+
+### 6. Save output of anything else
+
+For a command that is not a ROS node, save what it prints yourself:
+
+```bash
+some_command 2>&1 | tee ~/run_$(date +%m%d_%H%M).log
+```

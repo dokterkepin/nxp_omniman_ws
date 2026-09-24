@@ -27,7 +27,16 @@ Steps (steps.py)
                                             target = a prompt of the running detector
     PolicyStep(robot, label, instruction)   run the arm policy until the arm is home
     Holding(robot, name, holding=True)      is the gripper holding something (or not)
+    task(name, steps, attempts, on_failure) one state: its steps, how many tries,
+                                            and what to run if it still fails -
+                                            if those succeed the mission carries on
+    start_again()                           last in on_failure: start the mission
+                                            again from its first task
+    mission(name, [tasks], restarts)        the tasks in order; a failed task
+                                            starts the mission again from the first
     attempts(name, [steps], times)          run those steps again if one fails
+    on_failure(steps, then=[steps])         if steps fail, run `then` instead -
+                                            what happens next is up to the mission
 
   Timings, per step - left out, the setting of that name in mission.yaml is used:
     timeout_s          Align, PolicyStep   stop it and fail after this long
@@ -74,7 +83,8 @@ Needs py_trees: sudo apt install ros-jazzy-py-trees
 from .robot import Robot
 from .runner import run_mission
 from .step import Step
-from .steps import Align, Holding, Navigate, PolicyStep, attempts
+from .steps import (Align, Holding, Navigate, PolicyStep, attempts, mission, on_failure,
+                    start_again, task)
 
 __all__ = ['Align', 'Holding', 'Navigate', 'PolicyStep', 'Robot', 'Step', 'attempts',
-           'run_mission']
+           'mission', 'on_failure', 'run_mission', 'start_again', 'task']

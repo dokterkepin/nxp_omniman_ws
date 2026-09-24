@@ -112,7 +112,6 @@ def run_mission(build, node_name, initial_pose='home'):
     nav.waitUntilNav2Active()
 
     tree = py_trees.trees.BehaviourTree(root)
-    log.info('\n' + py_trees.display.unicode_tree(root))
     tick_s = float(cfg['settings']['tick_s'])
     log_every_s = float(cfg['settings']['log_every_s'])
     shown, last_line = None, 0.0
@@ -120,13 +119,11 @@ def run_mission(build, node_name, initial_pose='home'):
         while True:
             start = time.monotonic()
             tree.tick()
-            # The tree only when a step's status changes; in between, one line
-            # about what the running step is waiting for, and where that comes
-            # from - the reasons in the tree change every tick and would
-            # otherwise reprint it constantly.
+            # No tree in the log: each step logs its own result, and while it
+            # runs, one line every log_every_s about what it is waiting for.
+            # A step changing status restarts that interval.
             statuses = tuple(n.status for n in root.iterate())
             if statuses != shown:
-                log.info('\n' + py_trees.display.unicode_tree(root, show_status=True))
                 shown, last_line = statuses, time.monotonic()
             else:
                 running = root.tip()
