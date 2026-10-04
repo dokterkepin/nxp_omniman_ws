@@ -36,7 +36,7 @@ python3 -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device
 
 load the conda environment:
 ```bash
-export PYTHONPATH=/home/dokterkepin/anaconda3/envs/lerobot_train/lib/python3.10/site-packages:/home/dokterkepin/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot/src:$PYTHONPATH
+export PYTHONPATH=/home/dokterkepin/miniconda3/envs/lerobot_jazzy/lib/python3.12/site-packages:/home/dokterkepin/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot/src:$PYTHONPATH
 ```
 
 ---

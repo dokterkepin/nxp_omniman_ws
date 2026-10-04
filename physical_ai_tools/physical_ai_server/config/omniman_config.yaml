@@ -8,23 +8,7 @@
 # ONE config for recording. physical_ai_server CANNOT record state and action
 # with different dimensions -- _create_dataset() builds BOTH from the same
 # total_joint_order (the concatenation of joint_order)
-#
-# WHY follower_mobile:/odom IS ABSENT
-# Measured base velocity reaches the commanded value in ~1 frame (33 ms), so
-# observation and action are ~99% the same signal. The network then learns
-# "echo the observation", which is right 99.7% of the frames where the robot is
-# stopped -- and at inference that is a fixed point it can never leave, so the
-# wheels never turn. Base velocity belongs in the ACTION only, as in Mobile
-# ALOHA (arXiv 2401.02117). Note ROBOTIS's ffw_sg2 config and LeKiwi both put it
-# in the observation, but neither ships evidence of learning base motion --
-# ROBOTIS's own published datasets are all stationary ffw_bg2.
-#
-# WHY THE ARM STAYS IN, even for a base-only policy
-# joint_order doubles as the name filter for /joint_states, and the wrist camera
-# is mounted on palm_link so it MOVES with the arm. Without the joint angles the
-# image cannot be interpreted (is the table far, or is the arm just tucked in?).
-# A base-only joint_order would also match nothing in /joint_states and yield a
-# silently EMPTY observation.state.
+
 physical_ai_server:
   ros__parameters:
     omniman:
@@ -35,23 +19,12 @@ physical_ai_server:
       camera_topic_list:
         - cam:/image_raw/compressed
 
-      # follower_mobile IS required here even though we don't want base velocity
-      # in the TRAINING data: physical_ai_server ties observation.state and
-      # action to the SAME length (both = len(total_joint_order), see
-      # data_manager._create_dataset / physical_ai_server.py's
-      # check_lerobot_dataset(camera_data, self.total_joint_order)). There is
-      # no way to declare an asymmetric shape at record time -- omitting this
-      # topic crashes on frame 1 with
-      #   ValueError: observation.state of shape (7,) does not match (10,)
       joint_topic_list:
         - follower:/joint_states
-        - follower_mobile:/mecanum_drive_controller/odometry
         - leader:/leader/joint_trajectory
-        - leader_mobile:/cmd_vel
 
       joint_list:
         - leader
-        - leader_mobile
 
       # Order matters: total_joint_order is these lists concatenated, and it
       # defines both the action layout and the /joint_states name filter.
@@ -64,11 +37,3 @@ physical_ai_server:
           - wrist_pitch_joint
           - palm_yaw_joint
           - gripper_prismatic_joint
-        # /cmd_vel is a Twist (BODY-frame velocity), not per-wheel commands.
-        # twist2tensor_array ignores these names and always emits exactly
-        # [linear.x, linear.y, angular.z] -- but the LENGTH sets the declared
-        # feature shape and the inference slice width, so it must be 3.
-        leader_mobile:
-          - linear_x
-          - linear_y
-          - angular_z

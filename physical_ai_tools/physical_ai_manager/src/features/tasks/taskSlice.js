@@ -29,7 +29,7 @@ const initialState = {
     // arm sub-vector will be near-constant in the recording; .py
     // (omniman_vla/scripts) cuts it down to state[0:7]/action[7:10] afterward
     // for training a clean base-only policy. Arm manipulation is unaffected 
-    taskName: 'pick_and_place',
+    taskName: 'pick_and_place_v3',
     taskType: '',
     taskInstruction: ['pick the object'],
     policyPath: '',
@@ -37,10 +37,10 @@ const initialState = {
     userId: 'dokterkepin',
     fps: 30,
     tags: [],
-    warmupTime: 5,
+    warmupTime: 1,
     episodeTime: 20,
-    resetTime: 5,
-    numEpisodes: 1,
+    resetTime: 7,
+    numEpisodes: 5,
     token: '',
     pushToHub: false,
     privateMode: false,
