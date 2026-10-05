@@ -62,7 +62,7 @@ def build(robot):
                        PolicyStep(robot, 'pick', 'pick the object',
                                   policy_path=policy, timeout_s=90),
                        Holding(robot, 'grasp succeeded', holding=True)],
-                attempts=1,
+                attempts=2,
                 # Back to the pick area and straight into the policy - no base
                 # correction this time. If this grasp works too, carry on.
                 on_failure=[Navigate(robot, 'pick_area'),
@@ -80,7 +80,7 @@ def build(robot):
                         PolicyStep(robot, 'place', 'place the object',
                                    policy_path=policy, timeout_s=90),
                         Holding(robot, 'cup released', holding=False)],
-                 attempts=3,
+                 attempts=2,
                  on_failure=[Navigate(robot, 'home'), start_again()])
 
     go_home = task('go home', steps=[Navigate(robot, 'home')])
