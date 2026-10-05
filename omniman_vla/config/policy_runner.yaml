@@ -13,17 +13,19 @@ policy_runner:
     # The arm's home pose (shoulder_yaw, upper_shoulder_pitch, arm_yaw,
     # forearm_pitch, wrist_pitch, palm_yaw), measured at rest. No gripper.
     home_pose: [-0.083, 0.585, -0.000, -1.506, 1.391, -0.042]
-    # Every arm joint within this of home_pose counts as "at home". The policy
-    # does not return to exactly the same pose: after a place it came to rest
-    # 0.118 rad off (upper_shoulder_pitch) and was never seen as home at 0.08.
-    # 0.20 covers that with margin, while task poses are much further out.
+    # Every arm joint within this of home_pose counts as "at home"; beyond it,
+    # the arm is away. The policy does not return to exactly the same pose:
+    # after a place it came to rest 0.118 rad off (upper_shoulder_pitch) and was
+    # never seen as home at 0.08. 0.20 covers that with margin, while task poses
+    # are much further out. Keep the resting pose well inside it (read "worst
+    # joint" in `ros2 topic echo /policy_runner/arm`) - an arm resting near the
+    # limit flips in and out of home and never finishes. Raise it if that happens.
     home_tolerance: 0.20
-    # Once home, the arm only counts as gone when some joint is beyond this.
-    # The gap to home_tolerance stops a joint resting near the edge from flapping.
-    home_exit_tolerance: 0.30
-    # Finished = back home for this long, after having left it once. Must be
-    # longer than the pause of a reset between grasp attempts, which also passes
-    # through home. Read the "left home after Xs (reset)" log lines to tune it.
+    # Finished = at home for this long in a row (it does not have to have moved:
+    # a policy stops moving once the object is picked). Must be longer than any
+    # pause at home that is not the end - a reset between grasp attempts, which
+    # also passes through home, or a slow start. Read the "left home after Xs"
+    # log lines to tune it.
     # Only a default: a mission sets it per step (PolicyStep dwell_s=...);
     # this applies to callers that do not, like the web UI's Policy switch.
     finished_dwell_s: 8.0

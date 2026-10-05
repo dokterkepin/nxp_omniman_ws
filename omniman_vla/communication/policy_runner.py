@@ -14,16 +14,20 @@ once the policy has started; follow /control/owner or ~/status to see it end.
 
 FINISHED
     The arm returns to its home pose briefly, as a reset between attempts, and
-    for good once the task is done. So finished = back home, after having left
-    it once, for finished_dwell_s. Arriving home means every arm joint within
-    home_tolerance; leaving means some joint beyond home_exit_tolerance, so a
-    joint resting near the edge cannot flap. Positions only - at rest the
-    reported joint velocities are pure noise. On finish: FINISH, then release
+    for good once the task is done. So finished = at home for finished_dwell_s
+    in a row - whether or not it moved first: a policy that stops moving once
+    the object is picked leaves the arm home, and that is done. The dwell must
+    be longer than any pause at home that is not the end (a reset between
+    attempts, a slow start). Arriving home means every arm joint within
+    home_tolerance; leaving means some joint beyond it. Keep the arm's resting
+    pose well inside home_tolerance, or it flips in and out of home and the
+    dwell never completes. Positions only - at rest the reported joint
+    velocities are pure noise. On finish: FINISH, then release
     control, which is the "I'm done" whoever is waiting listens for.
 
 A run also ends - and control is given back if still held - when
-  - run_timeout_s passes (0 = no limit): the arm never left home, or never
-    came back, so FINISHED above can never happen and the run would hang
+  - run_timeout_s passes (0 = no limit): the arm never settles at home (it keeps
+    moving), so FINISHED above can never happen and the run would hang
   - control is taken away (a forced acquire): FINISH at once
   - inference stops from outside, e.g. in the physical_ai_manager UI
   - inference never begins within warmup_timeout_s
@@ -82,7 +86,6 @@ class PolicyRunner(Node):
         self.declare_parameter('fps', 30)
         self.declare_parameter('home_pose', [0.0] * len(ARM_JOINTS))
         self.declare_parameter('home_tolerance', 0.20)
-        self.declare_parameter('home_exit_tolerance', 0.30)
         self.declare_parameter('finished_dwell_s', 5.0)
         self.declare_parameter('warmup_timeout_s', 60.0)
         self.declare_parameter('run_timeout_s', 0.0)
@@ -303,8 +306,7 @@ class PolicyRunner(Node):
             if any(j not in positions for j in ARM_JOINTS):
                 return
             home = self.get_parameter('home_pose').value
-            enter_tol = self.get_parameter('home_tolerance').value
-            exit_tol = self.get_parameter('home_exit_tolerance').value
+            tol = self.get_parameter('home_tolerance').value
             worst = max(abs(positions[j] - h) for j, h in zip(ARM_JOINTS, home))
             now = time.monotonic()
             if now - self.arm_said > 0.5:
@@ -313,22 +315,21 @@ class PolicyRunner(Node):
                 since = f', {now - self.home_since:.1f}s' if self.at_home else ''
                 self.arm_pub.publish(String(data=(
                     f'{where}{since}: worst joint {worst:.3f} rad (home under '
-                    f'{enter_tol}, leaves home over {exit_tol}); left home once: '
-                    f'{"yes" if self.left_home else "no"}; finished after '
+                    f'{tol}); finished after '
                     f'{self.get_parameter("finished_dwell_s").value}s at home')))
 
-            if self.at_home and worst > exit_tol:
+            if self.at_home and worst > tol:
                 kind = 'reset' if self.left_home else 'task started'
                 self.get_logger().info(
                     f'   left home after {now - self.home_since:.1f}s ({kind})')
                 self.at_home = False
                 self.left_home = True
-            elif not self.at_home and worst <= enter_tol:
+            elif not self.at_home and worst <= tol:
                 self.at_home = True
                 self.home_since = now
                 if self.left_home:
                     self.get_logger().info('   back home')
-            elif (self.at_home and self.left_home
+            elif (self.at_home
                   and now - self.home_since >= self.get_parameter('finished_dwell_s').value):
                 finished_after = now - self.home_since
         finally:
@@ -344,8 +345,8 @@ class PolicyRunner(Node):
             self.end_run('inference never started')
         elif (self.state == 'working' and run_timeout > 0.0
                 and now - self.started_at > run_timeout):
-            where = 'never left home' if not self.left_home else 'never came back home'
-            self.end_run(f'run timed out after {run_timeout:.0f}s - the arm {where}')
+            self.end_run(f'run timed out after {run_timeout:.0f}s - the arm never stayed '
+                         f'home for {self.get_parameter("finished_dwell_s").value}s')
         elif self.state == 'working' and not self.inferencing():
             # Stopped from outside: nothing left to FINISH.
             self.end_run('inference stopped from outside', finish=False)
