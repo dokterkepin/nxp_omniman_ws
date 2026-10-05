@@ -21,7 +21,8 @@ exclude: |
     physical_ai_tools/|
     rf2o_laser_odometry/|
     rplidar_ros/|
-    moveit_config/
+    moveit_config/|
+    topic_based_ros2_control/
   )
 
 repos:
