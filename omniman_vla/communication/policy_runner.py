@@ -90,6 +90,7 @@ class PolicyRunner(Node):
         self.declare_parameter('instruction', '')
         self.declare_parameter('backend', 'lerobot')
         self.declare_parameter('inference_hz', 15)
+        self.declare_parameter('action_request_mode', 'async')
         self.declare_parameter('control_hz', 100)
         self.declare_parameter('home_pose', [0.0] * len(ARM_JOINTS))
         self.declare_parameter('home_tolerance', 0.20)
@@ -252,6 +253,7 @@ class PolicyRunner(Node):
         start.task_info.service_type = self.get_parameter('backend').value
         start.task_info.inference_mode = 'robot'       # publish to the robot, not a preview
         start.task_info.inference_hz = int(self.get_parameter('inference_hz').value)
+        start.task_info.action_request_mode = self.get_parameter('action_request_mode').value
         start.task_info.control_hz = int(self.get_parameter('control_hz').value)
         start.task_info.record_inference_mode = False
         res = self.call(self.command_client, start)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Cyclo's services as plain processes - what s6 does inside Cyclo's container,
-for running Cyclo natively (orchestrator's cyclo_bringup.launch.py).
+for running Cyclo natively (orchestrator's omniman_cyclo_bringup.launch.py).
 
     orchestrator   ros2 launch orchestrator orchestrator_bringup.launch.py
                    (orchestrator, rosbridge, rosbag recorder, web_video_server)
@@ -21,7 +21,7 @@ processes too, in the cyclo_lerobot conda env (CYCLO_LEROBOT_ENV):
                                                          the robot (LeRobot 0.6)
               main-runtime     python -m main_runtime     /lerobot/inference_command,
                                                          publishes the actions
-              trainer          lerobot_trainer.py         /lerobot/train
+              trainer          policy/lerobot/lerobot_trainer.py  /lerobot/train
 
 They talk to ROS over Zenoh (zenoh_ros2_sdk, no ROS install), so ROS's
 Python and library paths are kept out of their environment.
@@ -35,8 +35,11 @@ import sys
 import threading
 import time
 
-# Cyclo's runtime files, outside git: nxp_omniman_ws/cyclo (set by cyclo_bringup.launch.py).
-CYCLO_HOME = Path(os.environ.get('CYCLO_HOME', Path(__file__).resolve().parents[3] / 'cyclo'))
+import yaml
+
+# Cyclo's runtime files, outside git: nxp_omniman_ws/cyclo
+# (set by omniman_cyclo_bringup.launch.py).
+CYCLO_HOME = Path(os.environ.get('CYCLO_HOME', Path(__file__).resolve().parents[4] / 'cyclo'))
 RUN_DIR = CYCLO_HOME / 'run'
 LOG_DIR = CYCLO_HOME / 'log' / 'services'
 BT_ROBOT_TYPE_FILE = RUN_DIR / 'bt_node_robot_type'
@@ -47,18 +50,22 @@ COMMANDS = {
     'bt_node': ['ros2', 'launch', 'orchestrator', 'bt_node.launch.py'],
 }
 
-CYCLO_DIR = Path(os.environ.get('CYCLO_DIR', Path(__file__).resolve().parents[1]))
+CYCLO_DIR = Path(os.environ.get('CYCLO_DIR', Path(__file__).resolve().parents[2]))
 LEROBOT_ENV = Path(os.environ.get('CYCLO_LEROBOT_ENV',
                                   Path.home() / 'miniconda3' / 'envs' / 'cyclo_lerobot'))
 
+_TRAINER = CYCLO_DIR / 'cyclo_brain' / 'policy' / 'lerobot' / 'lerobot_trainer.py'
+POLICY_DIR = Path(__file__).resolve().parents[1] / 'policy'
+BACKEND_CONFIG = POLICY_DIR / 'lerobot_backend.yaml'
+ENGINES = ('lerobot_engine', 'omniman_act')
+
 # Backend processes, in start order: main-runtime waits for engine-process.
-_HERE = Path(__file__).resolve().parent
-_MAIN = str(_HERE / 'backend_main.py')      # shows the runtime's INFO messages
+_MAIN = str(POLICY_DIR / 'backend_main.py')      # shows the runtime's INFO messages
 BACKENDS = {
     'lerobot': {
         'engine-process': [_MAIN, '-m', 'engine_process'],
         'main-runtime': [_MAIN, '-m', 'main_runtime'],
-        'trainer': [_MAIN, str(_HERE / 'lerobot_trainer.py')],
+        'trainer': [_MAIN, str(_TRAINER)],
     },
 }
 # What Cyclo's UI and tree engine check for "backend up" (container services).
@@ -143,6 +150,15 @@ def backend_installed(backend):
         (site / pkg).is_dir() for pkg in ('lerobot', 'torch', 'zenoh', 'zenoh_ros2_sdk'))
 
 
+def backend_engine():
+    """The engine chosen in lerobot_backend.yaml (read at every backend start)."""
+    with open(BACKEND_CONFIG) as f:
+        engine = (yaml.safe_load(f) or {}).get('engine', 'lerobot_engine')
+    if engine not in ENGINES:
+        raise ValueError(f'{BACKEND_CONFIG}: engine "{engine}" - one of {", ".join(ENGINES)}')
+    return engine
+
+
 def _backend_env(backend):
     """Like the container's: Cyclo's runtime, SDKs and engine on PYTHONPATH,
     nothing of ROS (these processes speak Zenoh themselves)."""
@@ -150,13 +166,14 @@ def _backend_env(backend):
     drop = ('PYTHONPATH', 'LD_LIBRARY_PATH', 'AMENT_PREFIX_PATH', 'COLCON_PREFIX_PATH',
             'CMAKE_PREFIX_PATH', 'PYTHONHOME', 'VIRTUAL_ENV')
     env = {k: v for k, v in os.environ.items() if k not in drop}
+    engine = backend_engine()
     paths = [brain / 'policy' / backend, brain / 'policy' / 'common' / 'runtime',
              brain / 'sdk' / 'robot_client', brain / 'sdk' / 'action_chunk_processing']
     env.update({
         'PYTHONPATH': os.pathsep.join(str(p) for p in paths),
         'PATH': f'{LEROBOT_ENV / "bin"}{os.pathsep}{env.get("PATH", "")}',
         'POLICY_BACKEND': backend,
-        'POLICY_ENGINE_MODULE': f'{backend}_engine',
+        'POLICY_ENGINE_MODULE': engine,
         'ROBOT_CLIENT_SDK_PATH': str(brain / 'sdk' / 'robot_client'),
         'ACTION_CHUNK_PROCESSING_SDK_PATH': str(brain / 'sdk' / 'action_chunk_processing'),
         'ZENOH_SDK_PATH': '',            # pip-installed in the env
@@ -166,6 +183,8 @@ def _backend_env(backend):
             'ORCHESTRATOR_CONFIG_PATH', str(CYCLO_DIR / 'shared' / 'shared' / 'robot_configs')),
         'PYTHONUNBUFFERED': '1',
     })
+    if engine == 'omniman_act':
+        env['POSTPROCESS_ACTIONS'] = 'false'      # one action per step, no 100 Hz interpolation
     return env
 
 
@@ -176,7 +195,11 @@ def backend_up(backend):
     if not backend_installed(backend):
         return False, (f'{backend}: no conda env at {LEROBOT_ENV} - run '
                        'cyclo_intelligence/native/install.sh')
-    env = _backend_env(backend)
+    try:
+        env = _backend_env(backend)
+    except (OSError, ValueError) as e:
+        return False, f'{backend}: {e}'
+    print(f'[services] {backend} engine: {env["POLICY_ENGINE_MODULE"]}', flush=True)
     started = []
     for proc_name, args in BACKENDS[backend].items():
         name = f'{backend}/{proc_name}'

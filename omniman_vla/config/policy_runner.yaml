@@ -16,6 +16,11 @@ policy_runner:
     # a wrong value plays the policy too slow or too fast (15 with a 30 fps
     # dataset ran every motion at half speed). omniman_pick_and_place: 30.
     inference_hz: 30
+    # How the runtime asks the policy for actions: async = in the background
+    # whenever its queue runs low (Cyclo's default); sync = only when the queue
+    # is empty, one request per step. omniman_act (native/policy/lerobot_backend.yaml)
+    # needs sync.
+    action_request_mode: async
     # How often actions are sent to the arm (Cyclo interpolates the chunk).
     control_hz: 100
 

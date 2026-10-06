@@ -26,7 +26,7 @@ start with the supervisor - bt_node for CYCLO_ROBOT_TYPE - as
 physical_ai_server_bringup.launch.py started everything at once; the UI's
 buttons still stop and start them.
 
-Run by orchestrator's cyclo_bringup.launch.py, with PYTHONPATH containing
+Run by orchestrator's omniman_cyclo_bringup.launch.py, with PYTHONPATH containing
 src/cyclo_intelligence/docker.
 """
 

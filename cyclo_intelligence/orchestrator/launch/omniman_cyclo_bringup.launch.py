@@ -3,8 +3,8 @@
 Cyclo Intelligence (src/cyclo_intelligence) with omniman's layer, natively -
 the counterpart of physical_ai_server_bringup.launch.py:
 
-    ros2 launch orchestrator cyclo_bringup.launch.py
-    ros2 launch orchestrator cyclo_bringup.launch.py robot_type:=omniman_mobile
+    ros2 launch orchestrator omniman_cyclo_bringup.launch.py
+    ros2 launch orchestrator omniman_cyclo_bringup.launch.py robot_type:=omniman_mobile
 
 Starts Cyclo's supervisor (its UI backend) and web UI on http://<this pc>:7080,
 and with them the orchestrator (+ rosbridge, rosbag recorder, web_video_server),
@@ -83,13 +83,13 @@ def setup(context):
         actions.append(LogInfo(msg=f'[cyclo] /workspace is not {workspace} - recording and '
                                    f'models need it: sudo ln -sfn {workspace} /workspace'))
     actions += [
-        ExecuteProcess(cmd=['python3', str(native / 'supervisor_native.py')],
+        ExecuteProcess(cmd=['python3', str(native / 'service' / 'supervisor_native.py')],
                        name='cyclo_supervisor', output='screen', sigterm_timeout='20'),
-        ExecuteProcess(cmd=['python3', str(native / 'web.py')],
+        ExecuteProcess(cmd=['python3', str(native / 'service' / 'web.py')],
                        name='cyclo_web', output='screen'),
         # The arm's 7 joints alone, in the trained order, for the policy and the
         # recorder (robot_configs: state.arm.topic) - /joint_states has the wheels too.
-        ExecuteProcess(cmd=['python3', str(native / 'arm_state_relay.py')],
+        ExecuteProcess(cmd=['python3', str(native / 'robot' / 'arm_state_relay.py')],
                        name='cyclo_arm_state', output='screen'),
     ]
     if 'orchestrator' in env['CYCLO_AUTOSTART']:

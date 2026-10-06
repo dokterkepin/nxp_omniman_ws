@@ -14,7 +14,7 @@ in Cyclo's container, on the same port (7080) and paths:
 rosbridge (7090) and web_video_server (7085) are reached by the browser
 directly, as in the container.
 
-Run by orchestrator's cyclo_bringup.launch.py.
+Run by orchestrator's omniman_cyclo_bringup.launch.py.
 """
 
 import asyncio
@@ -31,7 +31,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 import uvicorn
 import websockets
 
-CYCLO = Path(os.environ.get('CYCLO_DIR', Path(__file__).resolve().parents[1]))
+CYCLO = Path(os.environ.get('CYCLO_DIR', Path(__file__).resolve().parents[2]))
 UI_BUILD = CYCLO / 'orchestrator' / 'ui' / 'build'
 URDF_DIR = CYCLO / 'shared' / 'shared' / 'robot_configs'
 WORKSPACE = Path(os.environ.get('CYCLO_WORKSPACE', '/workspace'))  # set by the launch file

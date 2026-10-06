@@ -15,7 +15,7 @@ the shoulder and wrist angles belong ("state dim mismatch: got 11, policy
 expects 7 - truncating to 7") and ran badly. The robot configs read the arm's
 state from /omniman/arm_state instead, for inference and for recording.
 
-Started by cyclo_bringup.launch.py.
+Started by omniman_cyclo_bringup.launch.py.
 """
 
 from pathlib import Path

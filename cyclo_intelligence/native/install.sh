@@ -7,7 +7,7 @@
 #   venv/        Cyclo's Python packages (CPU torch: only its dataset converter
 #                uses it); numpy<2 as in Cyclo's image. Its ROS nodes run on
 #                the system Python and see these through PYTHONPATH, set by
-#                cyclo_bringup.launch.py for Cyclo's processes only.
+#                omniman_cyclo_bringup.launch.py for Cyclo's processes only.
 #   workspace/   Cyclo's data: recordings, datasets, models, BT trees
 # the web UI: npm build in src/cyclo_intelligence/orchestrator/ui (git-ignored),
 # and the conda env cyclo_lerobot for Cyclo's LeRobot policy backend (policy
@@ -78,7 +78,7 @@ say "building the web UI ($(node --version))"
 (cd "$CYCLO_DIR/orchestrator/ui" && npm ci --legacy-peer-deps && npm run build)
 
 say "done - build the workspace (colcon build --symlink-install), then"
-say "       ros2 launch orchestrator cyclo_bringup.launch.py"
+say "       ros2 launch orchestrator omniman_cyclo_bringup.launch.py"
 if [ "$(readlink -f /workspace 2>/dev/null)" != "$(readlink -f "$CYCLO_HOME/workspace")" ]; then
     say "still needed once: sudo ln -sfn $CYCLO_HOME/workspace /workspace"
 fi

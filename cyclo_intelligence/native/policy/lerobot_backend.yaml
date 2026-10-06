@@ -1,0 +1,18 @@
+# Which engine runs the LeRobot policy. Read each time the backend starts:
+# edit, then press Restart on the LeRobot card.
+
+# lerobot_engine  Cyclo's own, unchanged. It asks the policy for its whole
+#                 action chunk and plays it from a queue (ACT: 100 actions,
+#                 3.3 s at 30 fps). The model's temporal_ensemble_coeff and
+#                 n_action_steps (config.json) have no effect.
+# omniman_act     ACT the way physical_ai_server ran it (cyclo_brain/policy/lerobot/omniman_act):
+#                 LeRobot's own select_action() once per step, so the model's
+#                 config.json decides - temporal_ensemble_coeff 0.01 averages
+#                 the overlapping predictions of every step. Also needs:
+#                   - Action Request = Sync: UI button, or action_request_mode
+#                     in omniman_vla/config/policy_runner.yaml
+#                   - Dataset FPS = the dataset's fps (inference_hz in
+#                     policy_runner.yaml, 30 for omniman_pick_and_place)
+#                 and services.py then starts the runtime without
+#                 interpolation (POSTPROCESS_ACTIONS=false).
+engine: lerobot_engine
