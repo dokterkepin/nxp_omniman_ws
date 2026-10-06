@@ -15,11 +15,13 @@
 exclude: |
   (?x)^(
     cybergear_hardware/|
+    cyclo_intelligence/|
     dynamixel_hardware/|
     moveit_servo/|
     open_manipulator/|
     physical_ai_tools/|
     rf2o_laser_odometry/|
+    robotis_interfaces/|
     rplidar_ros/|
     moveit_config/|
     topic_based_ros2_control/

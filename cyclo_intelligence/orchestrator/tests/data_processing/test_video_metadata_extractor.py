@@ -1,0 +1,126 @@
+# Copyright 2025 ROBOTIS CO., LTD.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import tempfile
+from pathlib import Path
+import pytest
+
+# D5/D6 moved this module from orchestrator/data_processing/ to
+# cyclo_data/reader/, then D17 nested it under cyclo_data/cyclo_data/.
+# The previous importlib-from-file shim is obsolete — both
+# cyclo_data.reader and its __init__.py are pure Python with no ROS2
+# imports, so a plain import works after `source install/setup.bash`.
+from cyclo_data.reader.video_metadata_extractor import VideoMetadataExtractor
+
+
+class TestVideoMetadataExtractor:
+    @pytest.fixture
+    def temp_bag_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def extractor(self):
+        return VideoMetadataExtractor()
+
+    def test_robot_specific_topics_do_not_infer_camera_names(self, extractor):
+        topic = "/zed/zed_node/left/image_rect_color/compressed"
+        assert extractor.extract_camera_name_from_topic(topic) == "zed"
+
+    # Legacy `/robot/camera/<cam_name>/...` — preserve embedded name verbatim
+    def test_extract_camera_name_legacy_robot_camera(self, extractor):
+        topic = "/robot/camera/cam_left_head/image_raw/compressed"
+        assert extractor.extract_camera_name_from_topic(topic) == "cam_left_head"
+
+    def test_extract_camera_name_fallback(self, extractor):
+        topic = "/custom_camera/image"
+        assert extractor.extract_camera_name_from_topic(topic) == "custom_camera"
+
+    def test_calculate_fps_from_timestamps_30fps(self, extractor):
+        timestamps = [0.0, 0.0333, 0.0666, 0.1, 0.1333]
+        fps = extractor.calculate_fps_from_timestamps(timestamps)
+        assert 28 < fps < 32
+
+    def test_calculate_fps_from_timestamps_60fps(self, extractor):
+        timestamps = [0.0, 0.0166, 0.0333, 0.05, 0.0666]
+        fps = extractor.calculate_fps_from_timestamps(timestamps)
+        assert 55 < fps < 65
+
+    def test_calculate_fps_from_timestamps_empty(self, extractor):
+        fps = extractor.calculate_fps_from_timestamps([])
+        assert fps == 30.0
+
+    def test_calculate_fps_from_timestamps_single(self, extractor):
+        fps = extractor.calculate_fps_from_timestamps([0.0])
+        assert fps == 30.0
+
+    def test_get_video_files_empty(self, extractor, temp_bag_dir):
+        files = extractor.get_video_files(temp_bag_dir)
+        assert files == []
+
+    def test_get_video_files_success(self, extractor, temp_bag_dir):
+        videos_dir = temp_bag_dir / "videos"
+        videos_dir.mkdir()
+        (videos_dir / "cam_left_head.mp4").touch()
+        (videos_dir / "cam_left_wrist.mp4").touch()
+
+        files = extractor.get_video_files(temp_bag_dir)
+        assert len(files) == 2
+        assert "videos/cam_left_head.mp4" in files
+        assert "videos/cam_left_wrist.mp4" in files
+
+    def test_get_video_files_segmented(self, extractor, temp_bag_dir):
+        segment_dir = temp_bag_dir / "videos" / "100_0"
+        segment_dir.mkdir(parents=True)
+        (segment_dir / "cam_left_head.mp4").touch()
+
+        files = extractor.get_video_files(temp_bag_dir)
+
+        assert files == ["videos/100_0/cam_left_head.mp4"]
+
+    def test_build_video_info_empty(self, extractor, temp_bag_dir):
+        result = extractor.build_video_info(temp_bag_dir, {}, {})
+        assert result["video_files"] == []
+        assert result["video_topics"] == []
+        assert result["video_names"] == []
+        assert result["video_fps"] == []
+        assert result["frame_counts"] == {}
+
+    def test_build_video_info_with_videos(self, extractor, temp_bag_dir):
+        videos_dir = temp_bag_dir / "videos"
+        videos_dir.mkdir()
+        (videos_dir / "_zed_zed_node_left_image_rect_color_compressed.mp4").touch()
+
+        image_metadata = {
+            "/zed/zed_node/left/image_rect_color/compressed": [
+                (0, 0.0),
+                (1, 0.033),
+                (2, 0.066),
+                (3, 0.1),
+            ]
+        }
+        camera_name_map = {
+            "/zed/zed_node/left/image_rect_color/compressed": "cam_left_head"
+        }
+
+        result = extractor.build_video_info(
+            temp_bag_dir, image_metadata, camera_name_map
+        )
+        assert len(result["video_files"]) == 1
+        assert result["video_names"][0] == "cam_left_head"
+        assert result["frame_counts"]["cam_left_head"] == 4
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

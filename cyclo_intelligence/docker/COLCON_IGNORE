@@ -1,0 +1,4 @@
+The docker/ tree is not a ROS 2 workspace source tree.
+
+It contains Docker build assets and cached upstream interface definitions under
+zenoh_cache/ that are used as data by tooling, not as overlay colcon packages.

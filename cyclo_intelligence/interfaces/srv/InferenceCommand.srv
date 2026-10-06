@@ -1,0 +1,61 @@
+########################################
+# Constants — inference lifecycle commands
+########################################
+# Sent by orchestrator to a cyclo_brain/policy/<backend> container's Main
+# process to drive the policy session. Main forwards model work to the Engine
+# process over EngineCommand and owns the robot-facing control loop.
+#
+# Replaces the old StartInference.srv + the SendCommand.srv inference
+# branches (START_INFERENCE / STOP_INFERENCE / RESUME_INFERENCE /
+# *_INFERENCE_RECORD). SendCommand.srv itself stays owned by orchestrator
+# as the UI-facing entry point; orchestrator translates into this srv.
+
+uint8 LOAD               = 0   # Load model_path in Engine. Returns action_keys.
+uint8 START              = 1   # Start Main control loop publishing/refilling.
+uint8 PAUSE              = 2   # Pause command publishing; keep policy loaded.
+uint8 RESUME             = 3
+uint8 STOP               = 4   # Stop loop; keep model in GPU memory.
+uint8 UNLOAD             = 5   # Free GPU memory.
+uint8 UPDATE_INSTRUCTION = 6   # Re-condition language instruction mid-run.
+                               # Requires LOAD + START already issued. Touches
+                               # task_instruction only — no lifecycle change.
+
+uint8 command
+
+# LOAD fields — required when command = LOAD, "" otherwise.
+string model_path
+string embodiment_tag
+string robot_type
+# Language instruction for language-conditioned policies. Consumed on
+# LOAD (training-time conditioning) and refreshed on RESUME (online
+# re-conditioning without re-loading the model).
+string task_instruction
+# Safety gate. false means dry-run / 3D preview only; true permits Main runtime
+# to publish robot command topics. Default false for regenerated clients.
+bool publish_to_robot
+# Action chunk request scheduling at LOAD time. Empty / "async" preserves the
+# current prefetch behavior. "sync" requests only after the active buffer drains.
+string action_request_mode
+# Runtime acceleration selected at LOAD time. Empty / "pytorch" means normal
+# PyTorch inference. "tensorrt_dit" enables GR00T DiT-only TensorRT when
+# supported by the backend.
+string acceleration_mode
+# Optional engine file/directory. Empty lets the backend use its model-local
+# default path.
+string acceleration_engine_path
+# Main-runtime timing configured at LOAD time. Zero values preserve the
+# policy container's environment/default settings.
+uint16 control_hz
+uint16 inference_hz
+float64 chunk_align_window_s
+# LOAD-time initial-pose synchronization settings. Ignored unless
+# publish_to_robot is true.
+bool initial_pose_sync
+float64 initial_pose_sync_duration_s
+---
+bool success
+string message
+# Populated only by LOAD: ordered action modality keys from the model's
+# modality_config (e.g. ["arm_left", "arm_right", "gripper"]). Main uses this
+# order when publishing a flat action vector through RobotClient.
+string[] action_keys

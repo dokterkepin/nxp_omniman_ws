@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>omniman_cyclo</name>
+  <version>0.1.0</version>
+  <description>
+    Cyclo Intelligence (src/cyclo_intelligence) for omniman: robot types,
+    behaviour-tree nodes (base correction, policies, grasp check, retries,
+    control lock, Nav2) and running Cyclo natively with ros2 launch.
+  </description>
+  <maintainer email="btw.sneakythief33@gmail.com">dokterkepin</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>orchestrator</exec_depend>
+  <exec_depend>cyclo_data</exec_depend>
+  <exec_depend>shared</exec_depend>
+  <exec_depend>interfaces</exec_depend>
+  <exec_depend>rosbag_recorder</exec_depend>
+  <exec_depend>rosbridge_server</exec_depend>
+  <exec_depend>web_video_server</exec_depend>
+  <exec_depend>omniman_interfaces</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

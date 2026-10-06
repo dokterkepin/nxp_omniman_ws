@@ -1,0 +1,323 @@
+/*
+ * Copyright 2025 ROBOTIS CO., LTD.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Author: Kiwoong Park, Seongwoo Kim
+ */
+
+/* Mission Canvas typography (warm-minimal): Hanken Grotesk (UI) + IBM Plex Mono
+ * (data), self-hosted (OFL) so offline robot PCs render them without any network
+ * fetch. Latin subsets; Korean glyphs fall back to Pretendard (declared below). */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('../public/fonts/hanken-grotesk-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('../public/fonts/hanken-grotesk-500.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('../public/fonts/hanken-grotesk-600.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('../public/fonts/hanken-grotesk-700.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('../public/fonts/hanken-grotesk-800.woff2') format('woff2');
+  font-weight: 800; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('../public/fonts/ibm-plex-mono-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('../public/fonts/ibm-plex-mono-500.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard Variable';
+  src: url('../public/fonts/PretendardVariable.woff2') format('woff2-variations');
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
+
+html,
+body {
+  font-family: 'Pretendard Variable', sans-serif;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+/* Thin scrollbar for Chrome, Safari and Opera */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.8);
+}
+
+.dark body {
+  background: #020617;
+  color: #e2e8f0;
+}
+
+.dark .bg-white,
+.dark .bg-gray-50,
+.dark .bg-gray-100 {
+  background-color: #0f172a !important;
+}
+
+.dark .bg-white\/90,
+.dark .bg-gray-50\/90,
+.dark .bg-gray-100\/90 {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+}
+
+.dark .bg-gray-200 {
+  background-color: #1e293b !important;
+}
+
+.dark .bg-gray-300 {
+  background-color: #334155 !important;
+}
+
+.dark .bg-blue-50 {
+  background-color: rgba(30, 64, 175, 0.24) !important;
+}
+
+.dark .bg-blue-100 {
+  background-color: rgba(37, 99, 235, 0.24) !important;
+}
+
+.dark .bg-purple-100 {
+  background-color: rgba(126, 34, 206, 0.25) !important;
+}
+
+.dark .bg-yellow-100 {
+  background-color: rgba(202, 138, 4, 0.22) !important;
+}
+
+.dark .bg-green-100 {
+  background-color: rgba(22, 163, 74, 0.22) !important;
+}
+
+.dark .bg-red-100 {
+  background-color: rgba(220, 38, 38, 0.22) !important;
+}
+
+.dark .from-orange-50 {
+  --tw-gradient-from: rgba(154, 52, 18, 0.28) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgba(154, 52, 18, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+.dark .to-red-50 {
+  --tw-gradient-to: rgba(127, 29, 29, 0.28) var(--tw-gradient-to-position);
+}
+
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-gray-600,
+.dark .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+.dark .text-gray-400 {
+  color: #64748b !important;
+}
+
+.dark .text-blue-600 {
+  color: #60a5fa !important;
+}
+
+.dark .text-purple-600 {
+  color: #c084fc !important;
+}
+
+.dark .text-green-700,
+.dark .text-green-900 {
+  color: #86efac !important;
+}
+
+.dark .text-red-600,
+.dark .text-red-700 {
+  color: #fca5a5 !important;
+}
+
+.dark .text-orange-600 {
+  color: #fdba74 !important;
+}
+
+.dark .border-gray-50,
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 {
+  border-color: #334155 !important;
+}
+
+.dark .shadow-sm,
+.dark .shadow,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl {
+  --tw-shadow-color: rgba(0, 0, 0, 0.45);
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b;
+}
+
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover,
+.dark .hover\:bg-gray-200:hover,
+.dark .hover\:bg-gray-300:hover {
+  background-color: #1e293b !important;
+}
+
+.dark .active\:bg-gray-400:active {
+  background-color: #475569 !important;
+}
+
+.dark .disabled\:bg-gray-100:disabled,
+.dark .disabled\:bg-gray-300:disabled,
+.dark .disabled\:bg-gray-400:disabled {
+  background-color: #334155 !important;
+}
+
+.dark .disabled\:text-gray-500:disabled,
+.dark .disabled\:text-gray-300:disabled {
+  color: #64748b !important;
+}
+/*
+ * Mission Canvas design tokens (warm-minimal palette — clay accent, sage live, warm paper).
+ * `--mc-*` are the source of truth; `--vscode-*` aliases keep shared map
+ * chrome theme-correct without coupling it to a standalone page.
+ */
+.autonomy-studio-page {
+  --mc-bg: #f3f1ea;            /* app / stage fill (warm paper) */
+  --mc-canvas: #efece3;        /* map + behavior-tree canvas */
+  --mc-surface: #ffffff;        /* cards, panels */
+  --mc-surface-2: #f6f4ee;      /* inset surfaces, inputs */
+  --mc-surface-hover: #efece3;  /* hover / active surface */
+  --mc-border: #e7e3d9;         /* hairline borders */
+  --mc-border-strong: #dcd7ca;  /* button / panel borders */
+  --mc-text: #1c1a17;           /* near-black warm ink */
+  --mc-text-muted: #6f6a5d;
+  --mc-text-subtle: #a49d8c;
+  --mc-accent: #c96442;         /* clay */
+  --mc-accent-fg: #ffffff;
+  --mc-accent-hover: #b5563a;
+  --mc-accent-soft: #f4e5dc;    /* clay tint (selected rows, chips) */
+  --mc-success: #5b8266;        /* muted sage — "live" / running-ok */
+  --mc-danger: #b0483a;         /* muted brick */
+  --mc-danger-border: #d1796b;
+  --mc-warning: #b4762f;
+  --mc-focus: #c96442;
+  --mc-shadow: 0 1px 2px rgba(28, 26, 23, 0.05), 0 8px 24px -14px rgba(28, 26, 23, 0.18);
+
+  --vscode-foreground: var(--mc-text);
+  --vscode-descriptionForeground: var(--mc-text-muted);
+  --vscode-editor-background: var(--mc-surface);
+  --vscode-panel-border: var(--mc-border-strong);
+  --vscode-focusBorder: var(--mc-focus);
+  --vscode-button-foreground: var(--mc-accent-fg);
+  --vscode-button-background: var(--mc-accent);
+  --vscode-input-foreground: var(--mc-text);
+  --vscode-input-background: var(--mc-surface);
+  --vscode-input-border: var(--mc-border-strong);
+  --vscode-list-activeSelectionBackground: var(--mc-accent-soft);
+  --vscode-inputValidation-errorBackground: var(--mc-danger);
+  --vscode-inputValidation-errorBorder: var(--mc-danger-border);
+
+  color: var(--mc-text);
+}
+
+
+/* ReactFlow injects its own DOM (BT editor); Tailwind utilities can't reach it.
+ * Warm neutrals to match the paper canvas. */
+.autonomy-studio-page .react-flow__controls-button {
+  background: #faf8f3;
+  border-color: #e7e3d9;
+  color: #6f6a5d;
+  fill: currentColor;
+}
+.autonomy-studio-page .react-flow__controls-button:hover {
+  background: #efece3;
+}
+
+/* ── Typography (scoped): Hanken Grotesk UI, IBM Plex Mono for data —
+ * both fall back to Pretendard / system mono when the webfont is absent. */
+.autonomy-studio-page {
+  font-family: "Hanken Grotesk", "Pretendard Variable", Pretendard, system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+.autonomy-studio-page .font-mono,
+.autonomy-studio-page code,
+.autonomy-studio-page kbd {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0;
+}

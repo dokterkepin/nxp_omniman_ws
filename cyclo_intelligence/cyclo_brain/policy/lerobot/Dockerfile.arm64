@@ -1,0 +1,104 @@
+# LeRobot Docker Container for Jetson (ARM64).
+#
+# Two-process policy runtime: s6-overlay supervises main-runtime
+# and engine-process over Zenoh. Runtime Python source and the per-policy
+# lerobot_engine package are bind-mounted at runtime; this image only bakes
+# LeRobot dependencies and generic s6 unit files.
+#
+# Build context: cyclo_brain/policy/
+# Usage:         docker build -f lerobot/Dockerfile.arm64 \
+#                  -t robotis/lerobot-zenoh:1.4.1-arm64 .
+
+# Jetson LeRobot base image. This already carries Python 3.12 plus
+# CUDA-enabled PyTorch wheels built for JetPack 6.x. Do not install
+# PyTorch manually from pypi.jetson-ai-lab here: that index may expose
+# cp310-only torch wheels while upstream LeRobot requires Python 3.12.
+ARG BASE_IMAGE=dustynv/lerobot:r36.4.0-cu128-24.04
+FROM ${BASE_IMAGE}
+
+ARG S6_OVERLAY_VERSION=3.2.0.2
+
+# The base already sets up Ubuntu 24.04, Python 3.12, CUDA PyTorch,
+# OpenCV, ffmpeg, and en_US.UTF-8. Keep this image thin: adding apt
+# steps here makes builds sensitive to external apt repository state
+# and Docker storage pressure on Jetson targets.
+ENV LANG=en_US.UTF-8
+ENV PIP_INDEX_URL=https://pypi.org/simple
+ENV PIP_EXTRA_INDEX_URL=
+
+# s6-overlay supervises the two runtime processes.
+RUN curl -fsSL -o /tmp/s6-overlay-noarch.tar.xz \
+      https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz \
+    && curl -fsSL -o /tmp/s6-overlay-aarch64.tar.xz \
+      https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-aarch64.tar.xz \
+    && tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
+    && tar -C / -Jxpf /tmp/s6-overlay-aarch64.tar.xz \
+    && rm /tmp/s6-overlay-*.tar.xz
+
+WORKDIR /lerobot
+
+# Replace the upstream LeRobot checkout baked in the base image with this
+# repository's pinned submodule copy.
+RUN pip uninstall -y lerobot || true \
+    && rm -rf /opt/lerobot
+
+# Copy LeRobot source. Paths are relative to the cyclo_brain/policy/ build
+# context used by docker-compose.yml.
+COPY lerobot/lerobot/setup.py lerobot/lerobot/pyproject.toml lerobot/lerobot/README.md lerobot/lerobot/MANIFEST.in ./
+COPY lerobot/lerobot/src/ ./src/
+
+# Install training/inference + VLA extras. The base image's CUDA PyTorch
+# already satisfies LeRobot's torch constraints.
+RUN pip install --no-cache-dir ".[training,smolvla,xvla,molmoact2,vla_jepa,fastwam,hilserl,async,peft]"
+
+COPY lerobot/lerobot/ ./
+
+# Zenoh + runtime deps. SDKs are bind-mounted (see docker-compose.yml).
+RUN pip install --no-cache-dir "eclipse-zenoh>=1.6.0,<1.7.0" "rosbags>=0.11.0" "GitPython>=3.1.18" "json5>=0.9.14" pyyaml \
+    && mkdir -p /zenoh_sdk /robot_client_sdk /action_chunk_processing_sdk /orchestrator_config \
+                /policy_runtime /app
+
+# s6 unit files come from cyclo_brain/policy/common/. Generic across all
+# policy backends.
+COPY common/s6-services/ /etc/s6-overlay/s6-rc.d/
+RUN chmod +x /etc/s6-overlay/s6-rc.d/main-runtime/run \
+             /etc/s6-overlay/s6-rc.d/engine-process/run
+
+# HuggingFace cache
+ENV HF_HOME=/root/.cache/huggingface
+ENV HF_LEROBOT_HOME=/root/.cache/huggingface/lerobot
+ENV TORCH_HOME=/root/.cache/torch
+
+# Zenoh SDK path
+ENV ZENOH_SDK_PATH=/zenoh_sdk
+
+ENV ROBOT_CLIENT_SDK_PATH=/robot_client_sdk
+ENV ACTION_CHUNK_PROCESSING_SDK_PATH=/action_chunk_processing_sdk
+ENV ORCHESTRATOR_CONFIG_PATH=/orchestrator_config
+
+# Common runtime dispatch
+ENV POLICY_BACKEND=lerobot
+ENV POLICY_ENGINE_MODULE=lerobot_engine
+
+RUN { \
+    echo ""; \
+    echo "# Cyclo ROS/Zenoh runtime environment."; \
+    echo "# For a remote Zenoh router, comment the local line and uncomment the remote example."; \
+    echo "export ROS_DOMAIN_ID=30"; \
+    echo "export RMW_IMPLEMENTATION=rmw_zenoh_cpp"; \
+    echo "export ZENOH_CONFIG_OVERRIDE='transport/shared_memory/enabled=true'"; \
+    echo "# export ZENOH_CONFIG_OVERRIDE='transport/shared_memory/enabled=true;mode=\"client\";connect/endpoints=[\"tcp/192.168.60.139:7447\"]'"; \
+    } > /tmp/cyclo_bashrc && \
+    if [ -f /root/.bashrc ]; then cat /root/.bashrc >> /tmp/cyclo_bashrc; fi && \
+    mv /tmp/cyclo_bashrc /root/.bashrc
+
+WORKDIR /lerobot
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD S6_SVSTAT="$(ls /package/admin/s6-*/command/s6-svstat 2>/dev/null | head -1)" \
+     && [ -n "$S6_SVSTAT" ] \
+     && "$S6_SVSTAT" /run/service/main-runtime 2>&1 | grep -q "up" \
+     && "$S6_SVSTAT" /run/service/engine-process 2>&1 | grep -q "up" \
+     || exit 1
+
+ENTRYPOINT ["/init"]

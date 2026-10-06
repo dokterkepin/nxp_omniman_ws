@@ -1,0 +1,52 @@
+# omniman for Cyclo Intelligence - arm-only policies (the same layout as
+# physical_ai_server/config/omniman_config.yaml, so the ACT data and policies
+# made with physical_ai_tools keep the same 7 dimensions).
+#
+# For a policy that also drives the base, use omniman_mobile.
+#
+# Linked into src/cyclo_intelligence/shared/shared/robot_configs/.
+
+orchestrator:
+  ros__parameters:
+    omniman:
+      robot_name: "omniman"
+
+      # What the policy reads.
+      observation:
+        images:
+          cam:
+            topic: /image_raw/compressed
+            msg_type: sensor_msgs/msg/CompressedImage
+
+        state:
+          arm:
+            topic: /joint_states
+            msg_type: sensor_msgs/msg/JointState
+            joint_names:
+              - shoulder_yaw_joint
+              - upper_shoulder_pitch_joint
+              - arm_yaw_joint
+              - forearm_pitch_joint
+              - wrist_pitch_joint
+              - palm_yaw_joint
+              - gripper_prismatic_joint
+
+      # What the policy commands. /leader/joint_trajectory is the leader arm's
+      # topic during teleop; teleop_bridges_launch.py relays it to
+      # /arm_controller/joint_trajectory - the same path as physical_ai_server.
+      action:
+        arm:
+          topic: /leader/joint_trajectory
+          msg_type: trajectory_msgs/msg/JointTrajectory
+          joint_names:
+            - shoulder_yaw_joint
+            - upper_shoulder_pitch_joint
+            - arm_yaw_joint
+            - forearm_pitch_joint
+            - wrist_pitch_joint
+            - palm_yaw_joint
+            - gripper_prismatic_joint
+
+      recording:
+        extra_topics:
+          - /tf

@@ -1,0 +1,59 @@
+orchestrator:
+  ros__parameters:
+    omy_f3m:
+      robot_name: "OMY F3M"
+      urdf_path: urdf/omy_f3m.urdf
+
+      # ────────────────────────────────────────────────────────────────
+      # Observation — every signal the policy reads from the robot.
+      # Recording subscribes to all topics referenced here. Inference
+      # Process A subscribes to these same topics for live obs.
+      # ────────────────────────────────────────────────────────────────
+      observation:
+        images:
+          # Initial live camera grid placement follows YAML insertion order.
+          # UI cell indexes: 0=left, 1=center, 2=right.
+          # The first three image entries map to UI cells [1, 0, 2].
+          # rotation_deg, when set, must be one of: 0, 90, 180, 270.
+          cam_wrist:
+            topic: /camera/cam_wrist/color/image_rect_raw/compressed
+            msg_type: sensor_msgs/msg/CompressedImage
+
+        state:
+          arm:
+            topic: /joint_states
+            msg_type: sensor_msgs/msg/JointState
+            joint_names:
+              - joint1
+              - joint2
+              - joint3
+              - joint4
+              - joint5
+              - joint6
+              - rh_r1_joint
+
+      # ────────────────────────────────────────────────────────────────
+      # Action — every modality the policy commands. Each entry's topic
+      # is BOTH the inference command target (Process B publishes here)
+      # AND the rosbag record target.
+      # ────────────────────────────────────────────────────────────────
+      action:
+        arm:
+          topic: /leader/joint_trajectory
+          msg_type: trajectory_msgs/msg/JointTrajectory
+          joint_names:
+            - joint1
+            - joint2
+            - joint3
+            - joint4
+            - joint5
+            - joint6
+            - rh_r1_joint
+
+      # ────────────────────────────────────────────────────────────────
+      # Recording — auxiliary topics that need to be in the bag but are
+      # NOT VLA training data.
+      # ────────────────────────────────────────────────────────────────
+      recording:
+        extra_topics:
+          - /tf

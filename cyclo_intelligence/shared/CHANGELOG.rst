@@ -1,0 +1,153 @@
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Changelog for package shared
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1.4.0 (2026-08-31)
+------------------
+* Added ``BT_SUPPORTED_ROBOT_TYPES`` and ``is_bt_supported()`` to ``robot_configs.schema``.
+* Contributors: Seongwoo Kim
+
+1.3.1 (2026-08-26)
+------------------
+* None
+
+1.3.0 (2026-08-14)
+------------------
+* None
+
+1.2.2 (2026-08-10)
+------------------
+* Added F1 robot configuration, URDF, and mesh assets, including base and wrist camera meshes.
+* Added regression coverage for F1 state/action dimensions and URDF mesh resolution.
+* Contributors: Taehyeong Kim
+
+1.2.1 (2026-08-05)
+------------------
+* Updated the F2 head camera compressed image topic to ``/camera_head/camera_head/color/image_raw/compressed``.
+* Contributors: Taehyeong Kim
+
+1.2.0 (2026-07-10)
+------------------
+* None
+
+1.1.5 (2026-07-07)
+------------------
+* Updated Cyclo release metadata to 1.1.5.
+* Contributors: Taehyeong Kim
+
+1.1.4 (2026-07-07)
+------------------
+* Updated Cyclo release metadata to 1.1.4.
+* Contributors: Taehyeong Kim
+
+1.1.3 (2026-07-07)
+------------------
+* Updated Cyclo release metadata to 1.1.3.
+* Contributors: Taehyeong Kim
+
+1.1.2 (2026-07-06)
+------------------
+* Updated Cyclo release metadata to 1.1.2.
+* Contributors: Taehyeong Kim
+
+1.1.1 (2026-07-03)
+------------------
+* Documented live camera grid placement order and supported ``rotation_deg`` values in robot configs.
+* Updated F2, SG2, BG2, and SH5 camera configuration metadata for live camera display.
+* Contributors: Taehyeong Kim
+
+1.1.0 (2026-07-01)
+------------------
+* Added F2 robot configuration, URDF, and mesh assets for RealSense-head robot workflows.
+* Added current robot type configuration assets, including OMY, OMX, and SH5 layouts.
+* Updated Cyclo release metadata to 1.1.0.
+* Contributors: Taehyeong Kim
+
+1.0.0 (2026-06-29)
+------------------
+* Updated Cyclo release metadata to 1.0.0.
+* Contributors: Taehyeong Kim
+
+0.2.2 (2026-06-26)
+------------------
+* Updated Cyclo release metadata to 0.2.2.
+* Contributors: Taehyeong Kim
+
+0.2.1 (2026-06-26)
+------------------
+* None
+
+0.2.0 (2026-06-25)
+------------------
+* None
+
+0.1.16 (2026-06-23)
+-------------------
+* None
+
+0.1.15 (2026-06-22)
+-------------------
+* None
+
+0.1.14 (2026-06-17)
+-------------------
+* None
+
+0.1.13 (2026-06-11)
+-------------------
+* None
+
+0.1.12 (2026-06-05)
+-------------------
+* None
+
+0.1.11 (2026-06-05)
+-------------------
+* None
+
+0.1.10 (2026-06-04)
+-------------------
+* None
+
+0.1.9 (2026-06-02)
+------------------
+* None
+
+0.1.8 (2026-06-01)
+------------------
+* None
+
+0.1.7 (2026-05-27)
+------------------
+* None
+
+0.1.6 (2026-05-27)
+------------------
+* None
+
+0.1.5 (2026-05-26)
+------------------
+* Renamed robot configuration camera keys to canonical ``cam_<side>_<part>`` names.
+* Contributors: Taehyeong Kim
+
+0.1.4 (2026-05-22)
+------------------
+* None
+
+0.1.3 (2026-05-22)
+------------------
+* None
+
+0.1.2 (2026-05-20)
+------------------
+* None
+
+0.1.1 (2026-05-15)
+------------------
+* None
+
+0.1.0 (2026-05-15)
+------------------
+* Initial open-source release of shared Cyclo Intelligence utilities.
+* Added robot configuration assets, schema helpers, URDF assets, and common IO helpers shared by runtime packages.
+* Contributors: Taehyeong Kim

@@ -1,0 +1,66 @@
+# omniman for Cyclo Intelligence - policies that drive the base too
+# (a base-driving VLA, like the AI Worker's): the arm as in omniman, plus the
+# mecanum base - its velocity in the observation, /cmd_vel in the action.
+#
+# Data recorded with this type has 10 action dimensions (7 arm + 3 base), so
+# it trains policies that only work with this type; arm-only data and
+# policies stay with omniman.
+#
+# Linked into src/cyclo_intelligence/shared/shared/robot_configs/.
+
+orchestrator:
+  ros__parameters:
+    omniman_mobile:
+      robot_name: "omniman (mobile)"
+
+      observation:
+        images:
+          cam:
+            topic: /image_raw/compressed
+            msg_type: sensor_msgs/msg/CompressedImage
+
+        state:
+          arm:
+            topic: /joint_states
+            msg_type: sensor_msgs/msg/JointState
+            joint_names:
+              - shoulder_yaw_joint
+              - upper_shoulder_pitch_joint
+              - arm_yaw_joint
+              - forearm_pitch_joint
+              - wrist_pitch_joint
+              - palm_yaw_joint
+              - gripper_prismatic_joint
+          mobile:
+            topic: /mecanum_drive_controller/odometry
+            msg_type: nav_msgs/msg/Odometry
+            joint_names:
+              - linear_x
+              - linear_y
+              - angular_z
+
+      action:
+        arm:
+          topic: /leader/joint_trajectory
+          msg_type: trajectory_msgs/msg/JointTrajectory
+          joint_names:
+            - shoulder_yaw_joint
+            - upper_shoulder_pitch_joint
+            - arm_yaw_joint
+            - forearm_pitch_joint
+            - wrist_pitch_joint
+            - palm_yaw_joint
+            - gripper_prismatic_joint
+        # /cmd_vel feeds twist_to_twist_stamped -> mecanum_drive_controller,
+        # the same input Nav2, visual_align and the joystick use.
+        mobile:
+          topic: /cmd_vel
+          msg_type: geometry_msgs/msg/Twist
+          joint_names:
+            - linear_x
+            - linear_y
+            - angular_z
+
+      recording:
+        extra_topics:
+          - /tf

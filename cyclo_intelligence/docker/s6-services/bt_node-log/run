@@ -1,0 +1,4 @@
+#!/command/with-contenv sh
+# bt_node log consumer — wraps s6-log via logutil-service.
+
+exec logutil-service /var/log/bt_node

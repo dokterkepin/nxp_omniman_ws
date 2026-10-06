@@ -1,0 +1,575 @@
+// Copyright 2025 ROBOTIS CO., LTD.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// Author: Kiwoong Park, Seongwoo Kim
+
+import React, { useEffect, useRef, useState } from 'react';
+import clsx from 'clsx';
+import { MdHome, MdVideocam, MdMemory, MdWidgets, MdAccountTree } from 'react-icons/md';
+import { TbMapRoute } from 'react-icons/tb';
+import { GoGraph } from 'react-icons/go';
+import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import './App.css';
+import ThemeToggle from './components/ThemeToggle';
+import HomePage from './pages/HomePage';
+import RecordPage from './pages/RecordPage';
+import InferencePage from './pages/InferencePage';
+import TrainingPage from './pages/TrainingPage';
+import EditDatasetPage from './pages/EditDatasetPage';
+import { useRosTopicSubscription } from './hooks/useRosTopicSubscription';
+import rosConnectionManager from './utils/rosConnectionManager';
+import { useDispatch, useSelector } from 'react-redux';
+import { moveToPage, persistCurrentPage } from './features/ui/uiSlice';
+import { persistRobotType } from './features/tasks/taskSlice';
+import PageType from './constants/pageType';
+import {
+  formatBtSupportedRobotTypes,
+  isBtRobotSupported,
+} from './constants/btSupport';
+import {
+  fetchBtSupport,
+  selectBtSupportSettled,
+  selectBtSupportedRobotTypes,
+} from './features/actionCanvas/btSupportSlice';
+
+const AutonomyStudioPage = React.lazy(() => import('./pages/AutonomyStudioPage'));
+
+function getAutonomyStudioBlockMessage(robotType, supportedRobotTypes) {
+  const normalizedRobotType = String(robotType || '').trim();
+
+  if (!normalizedRobotType) {
+    return 'Please select a robot type first in the Home page';
+  }
+
+  if (!isBtRobotSupported(normalizedRobotType, supportedRobotTypes)) {
+    return `Autonomy Studio currently supports only ${formatBtSupportedRobotTypes(supportedRobotTypes)}. Current robot type: ${normalizedRobotType}`;
+  }
+
+  return '';
+}
+
+function AutonomyStudioIcon({ size = 36 }) {
+  const treeSize = Math.round(size * 0.48);
+  return (
+    <span
+      className="relative inline-flex items-center justify-center mb-1"
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+    >
+      <TbMapRoute size={size} />
+      <span
+        className="absolute inline-flex items-center justify-center rounded-full"
+        style={{
+          width: treeSize + 6,
+          height: treeSize + 6,
+          right: -5,
+          bottom: -10,
+          color: 'var(--vscode-button-foreground, #ffffff)',
+          backgroundColor: 'var(--vscode-button-background, #0e639c)',
+          border: '1px solid var(--vscode-sideBar-background, #111827)',
+        }}
+      >
+        <MdAccountTree size={treeSize} />
+      </span>
+    </span>
+  );
+}
+
+function App() {
+  const dispatch = useDispatch();
+  const recordTopicReceived = useSelector(
+    (state) => state.tasks.recordStatus.topicReceived
+  );
+  const inferenceTopicReceived = useSelector(
+    (state) => state.tasks.inferenceStatus.topicReceived
+  );
+  const taskInfo = useSelector((state) => state.tasks.taskInfo);
+  const trainingTopicReceived = useSelector((state) => state.training.topicReceived);
+
+  const page = useSelector((state) => state.ui.currentPage);
+  const restoredPageFromSession = useSelector(
+    (state) => state.ui.restoredPageFromSession
+  );
+  const robotType = useSelector((state) => state.tasks.robotType);
+  const btSupportedRobotTypes = useSelector(selectBtSupportedRobotTypes);
+  const btSupportSettled = useSelector(selectBtSupportSettled);
+  const hasSyncedTaskInfo = useSelector((state) => Boolean(
+    state.tasks.taskInfoSync.serverTaskInfo ||
+    state.tasks.inferenceTaskInfoSync.serverTaskInfo
+  ));
+  const taskStatusReceived = recordTopicReceived || inferenceTopicReceived;
+
+  const isFirstLoad = useRef(true);
+  // A user entering from the app rail gets the Autonomy Studio workspace chooser.
+  // A restored/deep-linked Autonomy Studio session skips it and resumes exactly
+  // where it was, preserving the existing open-source session behavior.
+  const [showMissionWorkspaceChooser, setShowMissionWorkspaceChooser] = useState(false);
+
+  // Subscribe to task status from ROS topic (always active)
+  const rosSubscriptionControls = useRosTopicSubscription();
+
+  // rosHost is now seeded by rosSlice initialState (window.location.hostname),
+  // so we no longer need to dispatch it here.
+
+  // Register the on-connected callback once.
+  useEffect(() => {
+    rosConnectionManager.setOnConnected(rosSubscriptionControls.initializeSubscriptions);
+  }, [rosSubscriptionControls.initializeSubscriptions]);
+
+  // Disconnect ROS connection when app unmounts
+  useEffect(() => {
+    return () => {
+      console.log('App unmounting, cleaning up global ROS connection');
+      rosConnectionManager.disconnect();
+    };
+  }, []);
+
+  // Click anywhere on a toast to dismiss it.
+  useEffect(() => {
+    const handler = () => toast.dismiss();
+    const attach = () => {
+      const el = document.getElementById('_rht_toaster');
+      if (el) {
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', handler);
+      }
+    };
+    // Toaster mounts after first render; retry once.
+    attach();
+    const t = setTimeout(attach, 500);
+    return () => {
+      clearTimeout(t);
+      const el = document.getElementById('_rht_toaster');
+      if (el) el.removeEventListener('click', handler);
+    };
+  }, []);
+
+  useEffect(() => {
+    persistCurrentPage(page);
+  }, [page]);
+
+  useEffect(() => {
+    persistRobotType(robotType);
+  }, [robotType]);
+
+  // The map and task workspaces currently share the SG2-specific runtime.
+  // Keep restored/deep-linked sessions behind the same guard as rail entry.
+  // The supervisor API (backed by shared.robot_configs.schema) owns the list
+  // of robots the task engine supports; fetch it once per app load.
+  useEffect(() => {
+    fetchBtSupport(dispatch);
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (page !== PageType.AUTONOMY_STUDIO) return;
+    // A restored session must be judged on the supervisor's list, not on the
+    // pre-fetch fallback.
+    if (!btSupportSettled) return;
+
+    const blockMessage = getAutonomyStudioBlockMessage(robotType, btSupportedRobotTypes);
+    if (!blockMessage) return;
+
+    setShowMissionWorkspaceChooser(false);
+    dispatch(moveToPage(PageType.HOME));
+    toast.error(blockMessage, { duration: 5000 });
+  }, [btSupportSettled, btSupportedRobotTypes, dispatch, page, robotType]);
+
+  useEffect(() => {
+    if (isFirstLoad.current && restoredPageFromSession) {
+      isFirstLoad.current = false;
+      return;
+    }
+
+    if (
+      isFirstLoad.current &&
+      page === PageType.HOME &&
+      taskStatusReceived &&
+      hasSyncedTaskInfo
+    ) {
+      if (taskInfo?.taskType === PageType.RECORD) {
+        dispatch(moveToPage(PageType.RECORD));
+      } else if (taskInfo?.taskType === PageType.INFERENCE) {
+        dispatch(moveToPage(PageType.INFERENCE));
+      }
+      isFirstLoad.current = false;
+    } else if (isFirstLoad.current && page === PageType.HOME && trainingTopicReceived) {
+      dispatch(moveToPage(PageType.TRAINING));
+      isFirstLoad.current = false;
+    }
+  }, [
+    dispatch,
+    hasSyncedTaskInfo,
+    page,
+    restoredPageFromSession,
+    taskInfo?.taskType,
+    taskStatusReceived,
+    trainingTopicReceived,
+  ]);
+
+  const handleHomePageNavigation = () => {
+    isFirstLoad.current = false;
+    setShowMissionWorkspaceChooser(false);
+    dispatch(moveToPage(PageType.HOME));
+  };
+
+  const handleAppHubNavigation = () => {
+    if (typeof window === 'undefined') return;
+    window.location.href = 'http://localhost:3000/app';
+  };
+
+  // Check conditions for Record page navigation
+  const handleRecordPageNavigation = () => {
+    if (process.env.REACT_APP_DEBUG === 'true') {
+      console.log('handleRecordPageNavigation');
+      isFirstLoad.current = false;
+      dispatch(moveToPage(PageType.RECORD));
+      return;
+    }
+
+    // Allow navigation if task is in progress
+    if (robotType && robotType !== '') {
+      console.log('robot type:', robotType, '=> allowing navigation to Record page');
+      isFirstLoad.current = false;
+      dispatch(moveToPage(PageType.RECORD));
+      return;
+    }
+
+    // Block navigation if robot type is not set
+    if (!robotType || robotType.trim() === '') {
+      toast.error('Please select a robot type first in the Home page', {
+        duration: 4000,
+      });
+      console.log('Robot type not set, blocking navigation to Record page');
+      return;
+    }
+
+    // Allow navigation if conditions are met
+    console.log('Robot type set, allowing navigation to Record page');
+    dispatch(moveToPage(PageType.RECORD));
+  };
+
+  const handleInferencePageNavigation = () => {
+    if (process.env.REACT_APP_DEBUG === 'true') {
+      console.log('handleInferencePageNavigation');
+      isFirstLoad.current = false;
+      dispatch(moveToPage(PageType.INFERENCE));
+      return;
+    }
+
+    // Allow navigation if task is in progress
+    if (robotType && robotType !== '') {
+      console.log('robot type:', robotType, '=> allowing navigation to Inference page');
+      isFirstLoad.current = false;
+      dispatch(moveToPage(PageType.INFERENCE));
+      return;
+    }
+
+    // Block navigation if robot type is not set
+    if (!robotType || robotType.trim() === '') {
+      toast.error('Please select a robot type first in the Home page', {
+        duration: 4000,
+      });
+      console.log('Robot type not set, blocking navigation to Inference page');
+      return;
+    }
+
+    // Allow navigation if conditions are met
+    console.log('Robot type set, allowing navigation to Inference page');
+    dispatch(moveToPage(PageType.INFERENCE));
+  };
+
+  const handleTrainingPageNavigation = () => {
+    if (process.env.REACT_APP_DEBUG === 'true') {
+      console.log('handleTrainingPageNavigation');
+      isFirstLoad.current = false;
+      dispatch(moveToPage(PageType.TRAINING));
+      return;
+    }
+
+    // Allow navigation if task is in progress
+    if (robotType && robotType !== '') {
+      console.log('robot type:', robotType, '=> allowing navigation to Training Guide page');
+      isFirstLoad.current = false;
+      dispatch(moveToPage(PageType.TRAINING));
+      return;
+    }
+
+    // Block navigation if robot type is not set
+    if (!robotType || robotType.trim() === '') {
+      toast.error('Please select a robot type first in the Home page', {
+        duration: 4000,
+      });
+      console.log('Robot type not set, blocking navigation to Training Guide page');
+      return;
+    }
+
+    // Allow navigation if conditions are met
+    console.log('Robot type set, allowing navigation to Training Guide page');
+    dispatch(moveToPage(PageType.TRAINING));
+  };
+
+  const handleEditDatasetPageNavigation = () => {
+    isFirstLoad.current = false;
+    dispatch(moveToPage(PageType.EDIT_DATASET));
+  };
+
+  const handleAutonomyStudioPageNavigation = () => {
+    const blockMessage = getAutonomyStudioBlockMessage(robotType, btSupportedRobotTypes);
+    if (blockMessage) {
+      toast.error(blockMessage, { duration: 5000 });
+      return;
+    }
+
+    isFirstLoad.current = false;
+    setShowMissionWorkspaceChooser(true);
+    dispatch(moveToPage(PageType.AUTONOMY_STUDIO));
+  };
+
+  const classPageButton = clsx(
+    'flex',
+    'flex-col',
+    'items-center',
+    'rounded-2xl',
+    'border-none',
+    'py-5',
+    'px-4',
+    'text-base',
+    'text-gray-800',
+    'dark:text-slate-100',
+    'cursor-pointer',
+    'transition-colors',
+    'duration-150',
+    'outline-none',
+    'w-24'
+  );
+
+  const classShortcutButton = clsx(
+    'h-8',
+    'rounded-full',
+    'border',
+    'border-gray-200',
+    'bg-white',
+    'px-2',
+    'text-xs',
+    'font-semibold',
+    'text-gray-700',
+    'shadow-sm',
+    'transition-all',
+    'duration-150',
+    'hover:border-blue-400',
+    'hover:text-blue-600',
+    'hover:shadow-md',
+    'dark:border-slate-700',
+    'dark:bg-slate-800',
+    'dark:text-slate-100',
+    'dark:hover:border-blue-400',
+    'dark:hover:text-blue-300'
+  );
+
+  const managerHref =
+    typeof window === 'undefined'
+      ? 'http://localhost:3000/home'
+      : `http://${window.location.hostname}:3000/home`;
+
+  return (
+    <div className="flex min-h-screen w-screen bg-white text-gray-900 dark:bg-slate-950 dark:text-slate-100">
+      {page !== PageType.AUTONOMY_STUDIO && (
+        <aside
+          aria-label="Cyclo Intelligence navigation"
+          className="w-30 min-w-28 bg-gray-100 dark:bg-slate-900 min-h-screen flex flex-col items-center gap-4 shadow-[inset_0_0_2px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_0_0_1px_rgba(148,163,184,0.12)]"
+        >
+        <div className="w-full h-screen flex flex-col gap-2 items-center overflow-y-auto scrollbar-thin">
+          <div className="w-full px-2 pt-3 pb-2 flex flex-col gap-2 border-b border-gray-200 dark:border-slate-800">
+            <ThemeToggle />
+            <div className="flex items-center justify-center gap-1.5">
+              <button
+                type="button"
+                className={clsx(classShortcutButton, 'min-w-12', {
+                  'bg-gray-300 text-gray-900 dark:bg-slate-700 dark:text-white': page === PageType.HOME,
+                })}
+                onClick={handleAppHubNavigation}
+                title="Cyclo Apps"
+                aria-label="Cyclo Apps"
+              >
+                Home
+              </button>
+              <a
+                href={managerHref}
+                className={clsx(classShortcutButton, 'w-8 px-0 flex items-center justify-center no-underline')}
+                title="Cyclo Manager"
+                aria-label="Cyclo Manager"
+              >
+                M
+              </a>
+              <button
+                type="button"
+                className={clsx(classShortcutButton, 'w-8 px-0', {
+                  'bg-gray-300 text-gray-900 dark:bg-slate-700 dark:text-white': page === PageType.HOME,
+                })}
+                onClick={handleHomePageNavigation}
+                title="Cyclo Intelligence"
+                aria-label="Cyclo Intelligence"
+              >
+                C
+              </button>
+            </div>
+          </div>
+          {/* Home page button */}
+          <button
+            className={clsx(classPageButton, {
+              'hover:bg-gray-200 active:bg-gray-400 dark:hover:bg-slate-800 dark:active:bg-slate-700': page !== PageType.HOME,
+              'bg-gray-300 dark:bg-slate-700': page === PageType.HOME,
+            })}
+            onClick={handleHomePageNavigation}
+          >
+            <MdHome size={32} className="mb-1.5" />
+            <span className="mt-1 text-sm">Home</span>
+          </button>
+
+          {/* Record page button */}
+          <button
+            className={clsx(classPageButton, {
+              'hover:bg-gray-200 active:bg-gray-400 dark:hover:bg-slate-800 dark:active:bg-slate-700': page !== PageType.RECORD,
+              'bg-gray-300 dark:bg-slate-700': page === PageType.RECORD,
+            })}
+            onClick={handleRecordPageNavigation}
+          >
+            <MdVideocam size={32} className="mb-1.5" />
+            <span className="mt-1 text-sm">Record</span>
+          </button>
+          {/* Edit dataset page button */}
+          <button
+            className={clsx(classPageButton, {
+              'hover:bg-gray-200 active:bg-gray-400 dark:hover:bg-slate-800 dark:active:bg-slate-700': page !== PageType.EDIT_DATASET,
+              'bg-gray-300 dark:bg-slate-700': page === PageType.EDIT_DATASET,
+            })}
+            onClick={handleEditDatasetPageNavigation}
+          >
+            <MdWidgets size={28} className="mb-2" />
+            <span className="mt-1 text-sm whitespace-nowrap">Data Tools</span>
+          </button>
+
+          {/* Training Guide page button */}
+          <button
+            className={clsx(classPageButton, {
+              'hover:bg-gray-200 active:bg-gray-400 dark:hover:bg-slate-800 dark:active:bg-slate-700': page !== PageType.TRAINING,
+              'bg-gray-300 dark:bg-slate-700': page === PageType.TRAINING,
+            })}
+            onClick={handleTrainingPageNavigation}
+          >
+            <GoGraph size={28} className="mb-1.5" />
+            <span className="mt-1 text-center text-sm leading-tight">
+              Training<br />Guide
+            </span>
+          </button>
+
+          {/* Inference page button */}
+          <button
+            className={clsx(classPageButton, {
+              'hover:bg-gray-200 active:bg-gray-400 dark:hover:bg-slate-800 dark:active:bg-slate-700': page !== PageType.INFERENCE,
+              'bg-gray-300 dark:bg-slate-700': page === PageType.INFERENCE,
+            })}
+            onClick={handleInferencePageNavigation}
+          >
+            <MdMemory size={32} className="mb-1.5" />
+            <span className="mt-1 text-sm">Inference</span>
+          </button>
+
+          {/* Divider line */}
+          <div
+            role="separator"
+            aria-label="Navigation sections"
+            className="w-24 h-1 border-t-2 rounded-full border-gray-200 dark:border-slate-800 mt-3"
+          />
+
+          {/* Autonomy Studio workspace entry */}
+          <button
+            className={clsx(classPageButton, {
+              'hover:bg-gray-200 active:bg-gray-400 dark:hover:bg-slate-800 dark:active:bg-slate-700': page !== PageType.AUTONOMY_STUDIO,
+              'bg-gray-300 dark:bg-slate-700': page === PageType.AUTONOMY_STUDIO,
+            })}
+            onClick={handleAutonomyStudioPageNavigation}
+          >
+            <AutonomyStudioIcon />
+            <span className="mt-1 text-center text-sm leading-tight">
+              Autonomy<br />Studio
+            </span>
+          </button>
+
+        </div>
+        </aside>
+      )}
+      <main className="flex-1 flex flex-col h-screen bg-white dark:bg-slate-950">
+        {page === PageType.HOME ? (
+          <HomePage />
+        ) : page === PageType.RECORD ? (
+          <RecordPage isActive={page === PageType.RECORD} />
+        ) : page === PageType.INFERENCE ? (
+          <InferencePage isActive={page === PageType.INFERENCE} />
+        ) : page === PageType.TRAINING ? (
+          <TrainingPage isActive={page === PageType.TRAINING} />
+        ) : page === PageType.EDIT_DATASET ? (
+          <EditDatasetPage isActive={page === PageType.EDIT_DATASET} />
+        ) : page === PageType.AUTONOMY_STUDIO ? (
+          <React.Suspense fallback={<div className="flex-1 flex items-center justify-center">Loading Autonomy Studio...</div>}>
+            <AutonomyStudioPage
+              onBackHome={handleHomePageNavigation}
+              showWorkspaceChooser={showMissionWorkspaceChooser}
+            />
+          </React.Suspense>
+        ) : (
+          <HomePage />
+        )}
+      </main>
+      <Toaster
+        position="top-center"
+        gutter={8}
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+            maxWidth: '500px',
+            wordWrap: 'break-word',
+            whiteSpace: 'pre-wrap',
+            lineHeight: '1.4',
+          },
+          success: {
+            duration: 3000,
+            style: {
+              background: '#10b981',
+              maxWidth: '500px',
+              wordWrap: 'break-word',
+              whiteSpace: 'pre-wrap',
+              lineHeight: '1.4',
+            },
+          },
+          error: {
+            duration: 6000,
+            style: {
+              background: '#ef4444',
+              maxWidth: '500px',
+              wordWrap: 'break-word',
+              whiteSpace: 'pre-wrap',
+              lineHeight: '1.4',
+            },
+          },
+        }}
+      />
+    </div>
+  );
+}
+
+export default App;

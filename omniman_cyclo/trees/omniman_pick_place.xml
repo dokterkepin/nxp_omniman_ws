@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  omniman pick and place - the Studio version of commander/pick_place_bt.py.
+  Each OnFailure is one task: its first child is the work, the rest the
+  recovery. A recovery ending in StartAgain makes the outer Attempts run the
+  mission again from the start (up to 3 runs).
+-->
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Attempts name="pick and place" max_attempts="3">
+
+      <OnFailure name="go to pick area">
+        <OmnimanNavigate name="nav to pick_area" place="pick_area"/>
+        <OmnimanNavigate name="nav home" place="home"/>
+        <StartAgain name="start again"/>
+      </OnFailure>
+
+      <OnFailure name="pick">
+        <Attempts name="pick, 3 tries" max_attempts="3">
+          <OmnimanAlign name="align to the cup" target="yellow cup lid" timeout_s="60.0"/>
+          <OmnimanPolicy name="pick policy" instruction="pick the object" timeout_s="90.0"/>
+          <OmnimanGraspCheck name="grasp succeeded" holding="true"/>
+        </Attempts>
+        <OmnimanNavigate name="nav home" place="home"/>
+        <StartAgain name="start again"/>
+      </OnFailure>
+
+      <WhileHolding name="carry" holding="true">
+        <OmnimanNavigate name="nav to place_area" place="place_area"/>
+      </WhileHolding>
+
+      <OnFailure name="place">
+        <Attempts name="place, 3 tries" max_attempts="3">
+          <OmnimanAlign name="align to the mark" target="black square" timeout_s="60.0"/>
+          <OmnimanPolicy name="place policy" instruction="place the object" timeout_s="90.0"/>
+          <OmnimanGraspCheck name="cup released" holding="false"/>
+        </Attempts>
+        <OmnimanNavigate name="nav home" place="home"/>
+        <StartAgain name="start again"/>
+      </OnFailure>
+
+      <OmnimanNavigate name="go home" place="home"/>
+    </Attempts>
+  </BehaviorTree>
+</root>

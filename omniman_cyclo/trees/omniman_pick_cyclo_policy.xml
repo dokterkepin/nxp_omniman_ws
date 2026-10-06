@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A pick run by one of Cyclo's own policy containers (GR00T, LeRobot 0.6)
+  instead of policy_runner, with omniman's base correction, lock, end-of-run
+  check and grasp check around it. Cyclo has no "finished" for a run, so
+  OmnimanArmHome decides it: arm home for dwell_s, then STOP. Set
+  policy_path to a model under /workspace/model/<backend>/.
+-->
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Sequence name="pick with a Cyclo policy">
+      <SendCommand name="load model" command="LOAD"
+        model="groot:n17"
+        policy_path="/workspace/model/groot/your_model_path"
+        task_instruction="pick the object"
+        inference_mode="robot"
+        inference_hz="15"
+        control_hz="100"
+        chunk_align_window_s="0.3"/>
+      <OmnimanNavigate name="nav to pick_area" place="pick_area"/>
+      <OnFailure name="pick">
+        <Attempts name="pick, 3 tries" max_attempts="3">
+          <OmnimanAlign name="align to the cup" target="yellow cup lid" timeout_s="60.0"/>
+          <WithControlLock name="policy has the robot" owner="policy">
+            <OnFailure name="run until the arm is home">
+              <Sequence name="run">
+                <SendCommand name="run the policy" command="RESUME" task_instruction="pick the object"/>
+                <OmnimanArmHome name="arm back home" dwell_s="7.0" timeout_s="90.0"/>
+              </Sequence>
+              <!-- never leave it running: stop it, then fail this try -->
+              <SendCommand name="stop the policy" command="STOP"/>
+              <StartAgain name="policy did not finish" reason="policy did not finish - stopped"/>
+            </OnFailure>
+            <SendCommand name="stop the policy" command="STOP"/>
+          </WithControlLock>
+          <OmnimanGraspCheck name="grasp succeeded" holding="true"/>
+        </Attempts>
+        <SendCommand name="stop the policy" command="STOP"/>
+        <OmnimanNavigate name="nav home" place="home"/>
+      </OnFailure>
+      <SendCommand name="unload model" command="CLEAR"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

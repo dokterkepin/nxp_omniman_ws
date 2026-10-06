@@ -1,0 +1,203 @@
+# NVIDIA Isaac GR00T N1.7 Docker Container with Zenoh Communication Support
+# for ARM64 / NVIDIA Jetson Orin.
+#
+# This image is inference-focused. GR00T training/finetuning is owned by the
+# forked Isaac-GR00T repo and its official entrypoints.
+#
+# Build context: cyclo_intelligence/cyclo_brain/policy/groot/
+# Usage:
+#   docker build --network host -f Dockerfile.arm64 -t robotis/groot-zenoh:1.3.5-arm64 .
+
+ARG BASE_IMAGE=nvcr.io/nvidia/l4t-jetpack:r36.4.0
+FROM ${BASE_IMAGE}
+
+SHELL ["/bin/bash", "-c"]
+
+ARG S6_OVERLAY_VERSION=3.2.0.2
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute
+
+# JetPack 6 / Orin defaults used by Isaac-GR00T N1.7 deployment scripts.
+ENV CUDA_HOME=/usr/local/cuda-12.6
+ENV CUDA_PATH=/usr/local/cuda-12.6
+ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
+
+# Locale.
+RUN apt-get update && apt-get install -y --no-install-recommends locales \
+    && locale-gen en_US en_US.UTF-8 \
+    && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
+    && rm -rf /var/lib/apt/lists/*
+ENV LANG=en_US.UTF-8
+
+# System dependencies for GR00T N1.7 Orin install, torchcodec fallback build,
+# TensorRT/CUDA runtime paths, and the Cyclo two-process runtime.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf \
+    automake \
+    build-essential \
+    ca-certificates \
+    cmake \
+    curl \
+    ffmpeg \
+    git \
+    libass-dev \
+    libavcodec-dev \
+    libavdevice-dev \
+    libavfilter-dev \
+    libavformat-dev \
+    libavutil-dev \
+    libegl1-mesa \
+    libegl1-mesa-dev \
+    libfreetype6-dev \
+    libglib2.0-0 \
+    libgl1-mesa-glx \
+    libgles2-mesa \
+    libopenblas-dev \
+    libswresample-dev \
+    libswscale-dev \
+    libtool \
+    libusb-1.0-0-dev \
+    libvorbis-dev \
+    ninja-build \
+    pkg-config \
+    pybind11-dev \
+    python-is-python3 \
+    python3-dev \
+    python3-pip \
+    python3-venv \
+    texinfo \
+    tmux \
+    wget \
+    yasm \
+    && rm -rf /var/lib/apt/lists/*
+
+# s6-overlay supervises main-runtime and engine-process.
+RUN curl -fsSL -o /tmp/s6-overlay-noarch.tar.xz \
+      https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz \
+    && curl -fsSL -o /tmp/s6-overlay-aarch64.tar.xz \
+      https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-aarch64.tar.xz \
+    && tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
+    && tar -C / -Jxpf /tmp/s6-overlay-aarch64.tar.xz \
+    && rm /tmp/s6-overlay-*.tar.xz
+
+# Install uv into a stable path.
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+
+WORKDIR /gr00t
+
+# Copy the pinned N1.7 Isaac-GR00T checkout from the submodule.
+COPY Isaac-GR00T/ ./
+
+# Use the official Orin-specific N1.7 dependency manifest instead of manually
+# listing torch / triton / flash-attn versions in this Dockerfile.
+ENV VIRTUAL_ENV=/gr00t/.venv
+ENV UV_PROJECT_ENVIRONMENT=/gr00t/.venv
+ENV UV_HTTP_TIMEOUT=300
+ENV UV_CONCURRENT_DOWNLOADS=4
+ENV PATH="/gr00t/.venv/bin:/usr/local/cuda/bin:${PATH}"
+RUN uv sync --project /gr00t/scripts/deployment/orin --frozen --no-install-project --no-cache \
+    && uv pip install --python /gr00t/.venv/bin/python --no-cache --no-deps -e /gr00t
+
+# nvidia-cudss-cu12 is needed by Jetson PyTorch at runtime. Install it with
+# --no-deps so uv does not pull CUDA libraries that conflict with JetPack.
+RUN uv pip install --python /gr00t/.venv/bin/python --no-cache --no-deps nvidia-cudss-cu12
+
+# Expose JetPack system Python packages such as TensorRT to the venv.
+RUN echo "/usr/lib/python3.10/dist-packages" \
+    > /gr00t/.venv/lib/python3.10/site-packages/jetpack-system-packages.pth
+
+ENV CPATH=/usr/local/cuda-12.6/include
+ENV C_INCLUDE_PATH=/usr/local/cuda-12.6/include
+ENV CPLUS_INCLUDE_PATH=/usr/local/cuda-12.6/include
+ENV LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:/gr00t/.venv/lib/python3.10/site-packages/torch/lib:/gr00t/.venv/lib/python3.10/site-packages/nvidia/cu12/lib:/gr00t/.venv/lib/python3.10/site-packages/nvidia/cudss/lib
+
+# N1.7 defaults to torchcodec for video decoding. Use a real local wheel when
+# present; Git LFS pointer files are tiny, so fall back to a source build.
+RUN TORCHCODEC_WHL="$(find /gr00t/scripts/deployment/orin/wheels -name 'torchcodec-*.whl' -size +1M -print -quit 2>/dev/null)" \
+    && if [ -n "${TORCHCODEC_WHL}" ]; then \
+        uv pip install --python /gr00t/.venv/bin/python --no-cache --force-reinstall --no-deps "${TORCHCODEC_WHL}"; \
+    else \
+        uv pip install --python /gr00t/.venv/bin/python --no-cache setuptools wheel \
+        && git clone --depth 1 --branch v0.10.0 https://github.com/pytorch/torchcodec.git /tmp/torchcodec \
+        && cd /tmp/torchcodec \
+        && I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION=1 uv pip install --python /gr00t/.venv/bin/python --no-cache . --no-build-isolation \
+        && cd /gr00t \
+        && rm -rf /tmp/torchcodec; \
+    fi
+
+# Zenoh + Cyclo runtime Python dependencies. SDKs are mounted as volumes at
+# runtime, matching docker/docker-compose.yml.
+RUN uv pip install --python /gr00t/.venv/bin/python --no-cache \
+    "eclipse-zenoh>=1.6.0,<1.7.0" \
+    "rosbags>=0.11.0" \
+    "GitPython>=3.1.18" \
+    "json5>=0.9.14" \
+    pyyaml \
+    && mkdir -p /zenoh_sdk /robot_client_sdk /action_chunk_processing_sdk \
+                /orchestrator_config /policy_runtime
+
+# Cyclo two-process runtime. Compose also bind-mounts these directories during
+# development, but copying them keeps the image runnable by itself.
+WORKDIR /app
+COPY runtime/ /app/runtime/
+COPY groot_engine/ /app/groot_engine/
+COPY scripts/ /app/scripts/
+COPY s6-services/ /etc/s6-overlay/s6-rc.d/
+RUN chmod +x /etc/s6-overlay/s6-rc.d/main-runtime/run \
+             /etc/s6-overlay/s6-rc.d/engine-process/run \
+    && chmod +x /app/scripts/smoke_groot_n17.py
+
+# EGL configuration for headless rendering / TensorRT paths used by GR00T.
+RUN mkdir -p /usr/share/glvnd/egl_vendor.d && \
+    cat >/usr/share/glvnd/egl_vendor.d/10_nvidia.json <<'EOF'
+{
+    "file_format_version" : "1.0.0",
+    "ICD" : {
+        "library_path" : "libEGL_nvidia.so.0"
+    }
+}
+EOF
+
+ENV HF_HOME=/root/.cache/huggingface
+ENV TORCH_HOME=/root/.cache/torch
+
+ENV ZENOH_SDK_PATH=/zenoh_sdk
+
+ENV ROBOT_CLIENT_SDK_PATH=/robot_client_sdk
+ENV ACTION_CHUNK_PROCESSING_SDK_PATH=/action_chunk_processing_sdk
+ENV ORCHESTRATOR_CONFIG_PATH=/orchestrator_config
+
+ENV GROOT_VERSION=N1.7
+ENV GROOT_WORKSPACE=/workspace
+ENV LEROBOT_WORKSPACE=/workspace
+ENV POLICY_BACKEND=groot
+ENV POLICY_ENGINE_MODULE=groot_engine
+
+# Start N1.7 integration in PyTorch eager mode. Turn this on after basic model
+# load/action smoke tests pass on the target robot.
+ENV GROOT_TRT_ENABLED=false
+ENV PYTHONPATH=/app:/gr00t
+
+RUN { \
+    echo ""; \
+    echo "# Cyclo ROS/Zenoh runtime environment."; \
+    echo "# For a remote Zenoh router, comment the local line and uncomment the remote example."; \
+    echo "export ROS_DOMAIN_ID=30"; \
+    echo "export RMW_IMPLEMENTATION=rmw_zenoh_cpp"; \
+    echo "export ZENOH_CONFIG_OVERRIDE='transport/shared_memory/enabled=true'"; \
+    echo "# export ZENOH_CONFIG_OVERRIDE='transport/shared_memory/enabled=true;mode=\"client\";connect/endpoints=[\"tcp/192.168.60.139:7447\"]'"; \
+    } > /tmp/cyclo_bashrc && \
+    if [ -f /root/.bashrc ]; then cat /root/.bashrc >> /tmp/cyclo_bashrc; fi && \
+    mv /tmp/cyclo_bashrc /root/.bashrc
+
+WORKDIR /gr00t
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD S6_SVSTAT="$(ls /package/admin/s6-*/command/s6-svstat 2>/dev/null | head -1)" \
+     && [ -n "$S6_SVSTAT" ] \
+     && "$S6_SVSTAT" /run/service/main-runtime 2>&1 | grep -q "up" \
+     && "$S6_SVSTAT" /run/service/engine-process 2>&1 | grep -q "up" \
+     || exit 1
+
+ENTRYPOINT ["/init"]

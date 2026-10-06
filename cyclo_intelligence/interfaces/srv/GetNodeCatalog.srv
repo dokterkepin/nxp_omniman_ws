@@ -1,0 +1,5 @@
+---
+string catalog_json
+string schema_version
+bool success
+string message
