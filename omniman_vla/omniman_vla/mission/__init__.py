@@ -54,7 +54,7 @@ What the robot knows (robot.py) - for conditions and your own log lines
     robot.arm_state()       policy_runner: how far the arm is from home
     robot.align_status()    visual_align: searching | aligning | aligned | failed
     robot.policy_status()   policy_runner: idle | starting | working
-    robot.task_phase()      physical_ai_server: INFERENCING | READY | ...
+    robot.task_phase()      Cyclo orchestrator: LOADING | INFERENCING | PAUSED | READY
     robot.control_owner()   the control lock: nav | align | policy | ""
     robot.base_pose()       (x, y, yaw) from odometry
     robot.base_twist()      (vx, vy, wz) from odometry

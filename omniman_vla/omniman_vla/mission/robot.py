@@ -10,7 +10,7 @@ from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
 from omniman_interfaces.msg import ControlOwner
 from omniman_interfaces.srv import AcquireControl, ReleaseControl, RunPolicy
-from physical_ai_interfaces.msg import TaskStatus
+from interfaces.msg import InferenceStatus
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool, String
 from std_srvs.srv import Trigger
@@ -24,9 +24,8 @@ NAV = 'nav'
 LATCHED = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
                      durability=DurabilityPolicy.TRANSIENT_LOCAL)
 
-# physical_ai_server's phase numbers, for the log.
-TASK_PHASE = {0: 'READY', 1: 'WARMING_UP', 2: 'RESETTING', 3: 'RECORDING', 4: 'SAVING',
-              5: 'STOPPED', 6: 'INFERENCING'}
+# Cyclo orchestrator's inference phases (interfaces/msg/InferenceStatus), for the log.
+TASK_PHASE = {0: 'READY', 1: 'LOADING', 2: 'INFERENCING', 3: 'PAUSED', 4: 'SYNCING'}
 
 
 # ---- places ---------------------------------------------------------------
@@ -68,7 +67,7 @@ class Robot:
         self.holding = False
         self.grasp_state = 'no reading from grasp_monitor'
         self.arm_state_text = 'no reading from policy_runner'
-        self.task_phase_num = -1        # physical_ai_server /task/status
+        self.task_phase_num = -1        # orchestrator /task/inference_status
         self.task_phase_at = 0.0
         self.still_since = None
         self.last_odom = 0.0
@@ -87,7 +86,8 @@ class Robot:
                                 lambda m: setattr(self, 'holding', m.data), LATCHED)
         nav.create_subscription(String, '/grasp_monitor/state',
                                 lambda m: setattr(self, 'grasp_state', m.data), LATCHED)
-        nav.create_subscription(TaskStatus, '/task/status', self._on_task_status, 10)
+        nav.create_subscription(InferenceStatus, '/task/inference_status',
+                                self._on_task_status, 10)
         nav.create_subscription(Odometry, '/mecanum_drive_controller/odometry',
                                 self._on_odom, 10)
         self.target_pub = nav.create_publisher(String, '/visual_align/target', LATCHED)
@@ -115,18 +115,16 @@ class Robot:
             self.still_since = now
 
     def _on_task_status(self, msg):
-        self.task_phase_num, self.task_phase_at = msg.phase, time.monotonic()
+        self.task_phase_num, self.task_phase_at = msg.inference_phase, time.monotonic()
 
     def task_phase_text(self):
-        """What physical_ai_server is doing, or how long it has said nothing
-        (it publishes /task/status on every inference tick and goes quiet in
-        between runs)."""
+        """What the orchestrator's policy is doing, and since when (it
+        announces each change of phase, not a continuous stream)."""
         if self.task_phase_num < 0:
-            return '/task/status: nothing yet'
-        quiet = time.monotonic() - self.task_phase_at
+            return '/task/inference_status: nothing yet'
+        since = time.monotonic() - self.task_phase_at
         name = TASK_PHASE.get(self.task_phase_num, self.task_phase_num)
-        return (f'/task/status: {name}' if quiet < 1.0
-                else f'/task/status: {name} (quiet for {quiet:.0f}s)')
+        return f'/task/inference_status: {name} for {since:.0f}s'
 
     # ---- what the robot knows, for conditions and for logging ------------
 
@@ -151,7 +149,7 @@ class Robot:
         return self.policy_status_text
 
     def task_phase(self):
-        """physical_ai_server's phase, e.g. "INFERENCING" or "READY"."""
+        """The orchestrator's policy phase, e.g. "INFERENCING" or "READY"."""
         return self.task_phase_text()
 
     def control_owner(self):

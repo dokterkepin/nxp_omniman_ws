@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 """
-Runs a physical_ai_server policy under the control lock (control_arbiter).
+Runs a policy through Cyclo Intelligence's orchestrator under the control lock
+(control_arbiter).
 
     ~/run     omniman_interfaces/srv/RunPolicy   acquire control, START_INFERENCE
-    ~/stop    std_srvs/srv/Trigger               FINISH, release control
+    ~/stop    std_srvs/srv/Trigger               STOP_INFERENCE, release control
     ~/status  std_msgs/msg/String   latched      idle | starting | working
     ~/arm     std_msgs/msg/String   latched      how far the arm is from home,
               and for how long - the signal FINISHED below is made of
 
 A run: acquire control as owner_name ("policy") - refused while someone else
-holds it, unless the caller forces - then START_INFERENCE. The call returns
-once the policy has started; follow /control/owner or ~/status to see it end.
+holds it, unless the caller forces - then START_INFERENCE on the orchestrator's
+/task/command for `backend` (lerobot), robot mode. The orchestrator loads the
+policy if it is not loaded yet (phase LOADING, up to load_timeout_s), then
+runs it (INFERENCING); the phases come on /task/inference_status. A run ends
+with STOP_INFERENCE, which pauses the policy but keeps it loaded, so the next
+run of the same policy starts at once. The call returns once the policy has
+been asked to start; follow /control/owner or ~/status to see it end.
 
 FINISHED
     The arm returns to its home pose briefly, as a reset between attempts, and
@@ -22,20 +28,23 @@ FINISHED
     home_tolerance; leaving means some joint beyond it. Keep the arm's resting
     pose well inside home_tolerance, or it flips in and out of home and the
     dwell never completes. Positions only - at rest the reported joint
-    velocities are pure noise. On finish: FINISH, then release
+    velocities are pure noise. On finish: STOP_INFERENCE, then release
     control, which is the "I'm done" whoever is waiting listens for.
 
 A run also ends - and control is given back if still held - when
   - run_timeout_s passes (0 = no limit): the arm never settles at home (it keeps
     moving), so FINISHED above can never happen and the run would hang
-  - control is taken away (a forced acquire): FINISH at once
-  - inference stops from outside, e.g. in the physical_ai_manager UI
-  - inference never begins within warmup_timeout_s
+  - control is taken away (a forced acquire): STOP_INFERENCE at once
+  - inference stops from outside, e.g. in Cyclo's UI
+  - the policy fails to load, or is not loaded within load_timeout_s
+  - inference never begins within warmup_timeout_s (time spent LOADING
+    does not count)
   - ~/stop is called, or the runner shuts down
 
 Nothing here is specific to one task: the caller picks the policy and the
 instruction; the home pose and tolerances are parameters (policy_runner.yaml).
-RECORDING is never touched - only phase INFERENCING is ever finished.
+The orchestrator must know the robot type (omniman_cyclo's launch sets it).
+Recording is never touched - only inference is ever stopped.
 
 Run (with control_arbiter, and its parameters from policy_runner.yaml):
   ros2 launch omniman_vla control_launch.py
@@ -47,8 +56,8 @@ import time
 import rclpy
 from omniman_interfaces.msg import ControlOwner
 from omniman_interfaces.srv import AcquireControl, ReleaseControl, RunPolicy
-from physical_ai_interfaces.msg import TaskStatus
-from physical_ai_interfaces.srv import SendCommand
+from interfaces.msg import InferenceStatus
+from interfaces.srv import SendCommand
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
@@ -57,10 +66,6 @@ from rclpy.signals import SignalHandlerOptions
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
-
-# physical_ai_server publishes /task/status on every inference tick (~30 Hz)
-# and goes quiet once inference ends, so an old INFERENCING is not trusted.
-STATUS_STALE_S = 1.0
 
 CALL_TIMEOUT_S = 15.0
 
@@ -83,11 +88,14 @@ class PolicyRunner(Node):
         self.declare_parameter('owner_name', 'policy')
         self.declare_parameter('policy_path', '')
         self.declare_parameter('instruction', '')
-        self.declare_parameter('fps', 30)
+        self.declare_parameter('backend', 'lerobot')
+        self.declare_parameter('inference_hz', 15)
+        self.declare_parameter('control_hz', 100)
         self.declare_parameter('home_pose', [0.0] * len(ARM_JOINTS))
         self.declare_parameter('home_tolerance', 0.20)
         self.declare_parameter('finished_dwell_s', 5.0)
         self.declare_parameter('warmup_timeout_s', 60.0)
+        self.declare_parameter('load_timeout_s', 300.0)
         self.declare_parameter('run_timeout_s', 0.0)
 
         # Service handlers call other services and wait for the answer, which
@@ -114,9 +122,12 @@ class PolicyRunner(Node):
         self.arm_pub = self.create_publisher(String, '~/arm', latched)
         self.arm_said = 0.0
 
-        # Server phase, whoever started it.
+        # Orchestrator's inference phase, whoever started it. It is published on
+        # changes only (LOADING, INFERENCING, PAUSED, READY), not continuously.
         self.phase = None
-        self.phase_time = 0.0
+        self.phase_error = ''
+        self.loading_since = None    # set while the policy is loading
+        self.load_spent = 0.0        # loading time of this run so far
         self.owner = ''
 
         # idle -> starting -> working (server inferencing) -> ending -> idle
@@ -131,8 +142,8 @@ class PolicyRunner(Node):
 
         self.create_subscription(
             ControlOwner, '/control/owner', self.on_owner, latched, callback_group=group)
-        self.create_subscription(
-            TaskStatus, '/task/status', self.on_task_status, 10, callback_group=group)
+        self.create_subscription(InferenceStatus, '/task/inference_status',
+                                 self.on_inference_status, 10, callback_group=group)
         self.create_subscription(
             JointState, '/joint_states', self.on_joint_states, 10, callback_group=group)
         self.create_service(RunPolicy, '~/run', self.on_run, callback_group=group)
@@ -153,8 +164,7 @@ class PolicyRunner(Node):
             self.status_pub.publish(String(data=state))
 
     def inferencing(self):
-        return (self.phase == TaskStatus.INFERENCING
-                and time.monotonic() - self.phase_time < STATUS_STALE_S)
+        return self.phase == InferenceStatus.INFERENCING
 
     def call(self, client, request):
         """Call a service and wait for its answer; None on timeout."""
@@ -166,9 +176,10 @@ class PolicyRunner(Node):
         return future.result() if done.wait(CALL_TIMEOUT_S) else None
 
     def finish(self):
-        # FINISH, not STOP: only FINISH clears the server's on_inference flag.
+        # STOP_INFERENCE pauses the policy and keeps it loaded (FINISH would
+        # unload it, and the next run would wait for a full load again).
         req = SendCommand.Request()
-        req.command = SendCommand.Request.FINISH
+        req.command = SendCommand.Request.STOP_INFERENCE
         self.call(self.command_client, req)
 
     def release(self):
@@ -210,6 +221,8 @@ class PolicyRunner(Node):
                 return response
             self.set_state('starting')
             self.started_at = time.monotonic()
+            self.loading_since = None
+            self.load_spent = 0.0
             self.at_home = False
             self.left_home = False
 
@@ -236,14 +249,17 @@ class PolicyRunner(Node):
         start.command = SendCommand.Request.START_INFERENCE
         start.task_info.policy_path = path
         start.task_info.task_instruction = [instruction]
-        start.task_info.fps = int(self.get_parameter('fps').value)
+        start.task_info.service_type = self.get_parameter('backend').value
+        start.task_info.inference_mode = 'robot'       # publish to the robot, not a preview
+        start.task_info.inference_hz = int(self.get_parameter('inference_hz').value)
+        start.task_info.control_hz = int(self.get_parameter('control_hz').value)
         start.task_info.record_inference_mode = False
         res = self.call(self.command_client, start)
         if res is None or not res.success:
             self.end_run('START refused', finish=False)
             response.success = False
             response.message = (f'START refused: {res.message}' if res
-                                else 'physical_ai_server not answering')
+                                else 'orchestrator not answering (/task/command)')
             return response
 
         with self.lock:
@@ -283,9 +299,18 @@ class PolicyRunner(Node):
             # Control is already gone, so there is nothing to release.
             self.end_run(f'control taken by {taker}', release=False)
 
-    def on_task_status(self, msg):
-        self.phase = msg.phase
-        self.phase_time = time.monotonic()
+    def on_inference_status(self, msg):
+        self.phase = msg.inference_phase
+        self.phase_error = msg.error
+        now = time.monotonic()
+        if msg.inference_phase == InferenceStatus.LOADING:
+            self.loading_since = self.loading_since or now
+        elif self.loading_since is not None:
+            self.load_spent += now - self.loading_since
+            self.loading_since = None
+        if self.state == 'starting' and msg.error:
+            self.end_run(f'policy failed to start: {msg.error}', finish=False)
+            return
         if self.state == 'starting' and self.inferencing():
             with self.lock:
                 if self.state != 'starting':
@@ -340,20 +365,24 @@ class PolicyRunner(Node):
     def tick(self):
         now = time.monotonic()
         run_timeout = self.get_parameter('run_timeout_s').value
-        if (self.state == 'starting'
-                and now - self.started_at > self.get_parameter('warmup_timeout_s').value):
+        loading = now - self.loading_since if self.loading_since is not None else 0.0
+        if self.state == 'starting' and loading > self.get_parameter('load_timeout_s').value:
+            self.end_run(f'policy not loaded after {loading:.0f}s')
+        elif (self.state == 'starting' and not loading
+                and now - self.started_at - self.load_spent
+                > self.get_parameter('warmup_timeout_s').value):
             self.end_run('inference never started')
         elif (self.state == 'working' and run_timeout > 0.0
                 and now - self.started_at > run_timeout):
             self.end_run(f'run timed out after {run_timeout:.0f}s - the arm never stayed '
                          f'home for {self.get_parameter("finished_dwell_s").value}s')
         elif self.state == 'working' and not self.inferencing():
-            # Stopped from outside: nothing left to FINISH.
+            # Stopped from outside: nothing left to stop.
             self.end_run('inference stopped from outside', finish=False)
 
 
 def main():
-    # rclpy's SIGINT handler would shut the context down before the FINISH and
+    # rclpy's SIGINT handler would shut the context down before the STOP and
     # release below could be sent; Python's default just raises KeyboardInterrupt.
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = PolicyRunner()

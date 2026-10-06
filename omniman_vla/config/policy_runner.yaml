@@ -6,9 +6,18 @@ policy_runner:
     owner_name: policy
 
     # Defaults when ~/run does not name a policy or instruction.
-    policy_path: /home/dokterkepin/output/omniman_pick_and_place_v3/checkpoints/last/pretrained_model
+    policy_path: /home/dokterkepin/output/omniman_pick_and_place_v4/checkpoints/last/pretrained_model
     instruction: "pick the object"
-    fps: 30
+    # Cyclo's policy backend that runs it (its /<backend>/inference_command):
+    # lerobot = LeRobot 0.6 (ACT, SmolVLA, ...).
+    backend: lerobot
+    # The fps of the dataset the policy was trained on - Cyclo's "Dataset FPS".
+    # Cyclo spaces the actions of each predicted chunk 1/inference_hz apart, so
+    # a wrong value plays the policy too slow or too fast (15 with a 30 fps
+    # dataset ran every motion at half speed). omniman_pick_and_place: 30.
+    inference_hz: 30
+    # How often actions are sent to the arm (Cyclo interpolates the chunk).
+    control_hz: 100
 
     # The arm's home pose (shoulder_yaw, upper_shoulder_pitch, arm_yaw,
     # forearm_pitch, wrist_pitch, palm_yaw), measured at rest. No gripper.
@@ -29,8 +38,11 @@ policy_runner:
     # Only a default: a mission sets it per step (PolicyStep dwell_s=...);
     # this applies to callers that do not, like the web UI's Policy switch.
     finished_dwell_s: 8.0
-    # Give up, and give control back, if inference has not begun by then.
+    # Give up, and give control back, if inference has not begun by then -
+    # not counting the time the policy spends loading, which has its own limit
+    # (the first run of a policy loads it; later runs of it start at once).
     warmup_timeout_s: 10.0
+    load_timeout_s: 300.0
     # Stop a run that can never finish: the arm never leaves home (the policy
     # does nothing), or never comes back (it keeps reaching for something that
     # is not there). FINISH, release, report idle - a mission then sees the

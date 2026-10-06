@@ -3,16 +3,20 @@
 Cyclo Intelligence (src/cyclo_intelligence) with omniman's layer, natively -
 the counterpart of physical_ai_server_bringup.launch.py:
 
-    ros2 launch omniman_cyclo cyclo_bringup.launch.py
-    ros2 launch omniman_cyclo cyclo_bringup.launch.py robot_type:=omniman_mobile
+    ros2 launch orchestrator cyclo_bringup.launch.py
+    ros2 launch orchestrator cyclo_bringup.launch.py robot_type:=omniman_mobile
 
 Starts Cyclo's supervisor (its UI backend) and web UI on http://<this pc>:7080,
 and with them the orchestrator (+ rosbridge, rosbag recorder, web_video_server),
-cyclo_data and the behaviour-tree engine for `robot_type`. The UI's buttons
-stop and start those as in Cyclo's container. Ctrl+C stops everything.
+cyclo_data and the behaviour-tree engine for `robot_type`, and selects
+`robot_type` in the orchestrator (what the UI's Home page does). The UI's
+buttons stop and start those as in Cyclo's container. Ctrl+C stops everything.
+
+Policies run in the LeRobot backend (LeRobot 0.6, cyclo_lerobot conda env),
+started from the UI's Inference / Training pages or by policy_runner.
 
 Once, before the first launch: colcon build, then
-src/omniman_cyclo/native/install.sh (Python packages, the web UI, data folder).
+src/cyclo_intelligence/native/install.sh (Python packages, the web UI, data folder).
 
 ROS_DOMAIN_ID / RMW_IMPLEMENTATION are the shell's. Runtime files - Python
 environment, logs, recordings - are in nxp_omniman_ws/cyclo/ (outside git).
@@ -21,7 +25,7 @@ environment, logs, recordings - are in nxp_omniman_ws/cyclo/ (outside git).
 import os
 from pathlib import Path
 
-from ament_index_python.packages import get_package_prefix, get_package_share_directory
+from ament_index_python.packages import get_package_prefix
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, ExecuteProcess, LogInfo, OpaqueFunction,
                             SetEnvironmentVariable)
@@ -29,15 +33,18 @@ from launch.substitutions import LaunchConfiguration
 
 
 def paths():
-    """Workspace paths. With --symlink-install the installed scripts link back
-    into src/; otherwise the workspace is two levels above the install prefix."""
-    native = Path(get_package_share_directory('omniman_cyclo')) / 'native'
-    src = (native / 'web.py').resolve().parents[2]
-    if not (src / 'cyclo_intelligence').is_dir():
-        src = Path(get_package_prefix('omniman_cyclo')).parents[1] / 'src'
+    """Workspace paths. With --symlink-install this installed launch file links
+    back into src/cyclo_intelligence/orchestrator/launch/; otherwise the
+    workspace is two levels above the install prefix."""
+    here = Path(__file__).resolve()
+    if here.parents[2].name == 'cyclo_intelligence':
+        cyclo = here.parents[2]
+    else:
+        cyclo = Path(get_package_prefix('orchestrator')).parents[1] / 'src' / 'cyclo_intelligence'
+    src = cyclo.parent
     ws = src.parent
     home = Path(os.environ.get('CYCLO_HOME', ws / 'cyclo'))
-    return native, src, ws, home
+    return cyclo / 'native', src, ws, home
 
 
 def setup(context):
@@ -45,7 +52,7 @@ def setup(context):
     cyclo = src / 'cyclo_intelligence'
     venv_site = home / 'venv' / 'lib' / 'python3.12' / 'site-packages'
     if not venv_site.is_dir() or not (cyclo / 'orchestrator' / 'ui' / 'build').is_dir():
-        return [LogInfo(msg=f'[cyclo] not installed yet - run {src}/omniman_cyclo/native/'
+        return [LogInfo(msg=f'[cyclo] not installed yet - run {cyclo}/native/'
                             'install.sh, then launch again')]
     workspace = home / 'workspace'
     env = {
@@ -80,6 +87,18 @@ def setup(context):
                        name='cyclo_supervisor', output='screen', sigterm_timeout='20'),
         ExecuteProcess(cmd=['python3', str(native / 'web.py')],
                        name='cyclo_web', output='screen'),
+        # The arm's 7 joints alone, in the trained order, for the policy and the
+        # recorder (robot_configs: state.arm.topic) - /joint_states has the wheels too.
+        ExecuteProcess(cmd=['python3', str(native / 'arm_state_relay.py')],
+                       name='cyclo_arm_state', output='screen'),
+    ]
+    if 'orchestrator' in env['CYCLO_AUTOSTART']:
+        # Waits for the orchestrator's service, then sets the robot type once.
+        actions.append(ExecuteProcess(
+            cmd=['ros2', 'service', 'call', '/set_robot_type', 'interfaces/srv/SetRobotType',
+                 f"{{robot_type: '{env['CYCLO_ROBOT_TYPE']}'}}"],
+            name='cyclo_set_robot_type', output='log'))
+    actions += [
         LogInfo(msg=f'[cyclo] UI: http://localhost:{env["CYCLO_UI_PORT"]} '
                     f'(ROS_DOMAIN_ID={os.environ.get("ROS_DOMAIN_ID", "0")}, '
                     f'{os.environ.get("RMW_IMPLEMENTATION", "default RMW")})'),
