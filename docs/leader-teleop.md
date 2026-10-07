@@ -2,7 +2,7 @@
 
 How the XM430 leader arm is hand-guided and how its motion drives the omniman follower.
 
-This is the foundation for [vla-training.md](vla-training.md) — demonstrations cannot be
+This is the foundation for [physical_ai.md](physical_ai.md) — demonstrations cannot be
 recorded until teleoperation works.
 
 ---
