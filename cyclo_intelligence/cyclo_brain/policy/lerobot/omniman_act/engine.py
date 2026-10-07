@@ -15,11 +15,9 @@ loading, all inherited and unchanged - with one difference: each call returns
 one action from select_action(), as a chunk of length 1.
 
 What it needs from the runtime (the settings are Cyclo's own):
-  - Action Request = Sync (UI button, or action_request_mode in
-    omniman_vla/config/policy_runner.yaml): the runtime asks for the next
-    action only when its queue is empty - one request per step, as the ensemble
-    expects. In async mode it would ask in bursts and the ensemble would run
-    faster than real time (a warning below says so).
+  - Action Request: sync or async both work. Each answer is one action, so
+    the runtime's queue is always low and it asks once per step either way
+    (measured: 30.0 asks/s in both modes at Dataset FPS 30).
   - POSTPROCESS_ACTIONS=false (set by services.py when this engine is chosen):
     no interpolation to 100 Hz, the loop runs at the model's rate - Dataset
     FPS, 30 for omniman_pick_and_place.
@@ -41,7 +39,7 @@ logger = logging.getLogger('zenoh_ros2_sdk.omniman_act')
 # paused (the runtime does not ask while paused): the policy forgets what it
 # predicted before, as at the start of an episode.
 RESET_AFTER_S = 1.0
-# Asking much faster than the dataset rate means async mode (see above).
+# Asking much faster than the dataset rate is a wrong rate setting (Dataset FPS).
 BURST_RATE_HZ = 45.0
 REPORT_EVERY_S = 5.0
 
@@ -89,7 +87,7 @@ class OmnimanActEngine(LeRobotEngine):
             logger.info(f'asked {rate:.1f} times/s, prediction {spent / calls * 1000:.0f} ms avg')
             if rate > BURST_RATE_HZ:
                 logger.warning(f'asked {rate:.0f} times/s - faster than a dataset rate: '
-                               'set Action Request to Sync, or the ensemble runs too fast')
+                               'check Dataset FPS, or the ensemble runs too fast')
             self._window = [now, 0, 0.0]
 
     def cleanup(self):

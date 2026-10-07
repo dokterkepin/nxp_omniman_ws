@@ -9,10 +9,11 @@
 #                 LeRobot's own select_action() once per step, so the model's
 #                 config.json decides - temporal_ensemble_coeff 0.01 averages
 #                 the overlapping predictions of every step. Also needs:
-#                   - Action Request = Sync: UI button, or action_request_mode
-#                     in omniman_vla/config/policy_runner.yaml
 #                   - Dataset FPS = the dataset's fps (inference_hz in
 #                     policy_runner.yaml, 30 for omniman_pick_and_place)
 #                 and services.py then starts the runtime without
 #                 interpolation (POSTPROCESS_ACTIONS=false).
-engine: lerobot_engine
+#                 Action Request: sync and async behave the same with it
+#                 (one action per answer, so it is asked once per step).
+# engine: lerobot_engine
+engine: omniman_act
