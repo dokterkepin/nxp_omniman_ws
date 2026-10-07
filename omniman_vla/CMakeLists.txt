@@ -30,7 +30,7 @@ install(PROGRAMS
   communication/policy_runner.py
   communication/visual_align.py
   communication/grasp_monitor.py
-  # perception: SAM 3 target detector (GPU PC, lerobot_jazzy env)
+  # perception: SAM 3 target detector (GPU PC, physical_lerobot env)
   perception/sam_detector.py
   perception/efficient_sam_detector.py
   # commander: missions

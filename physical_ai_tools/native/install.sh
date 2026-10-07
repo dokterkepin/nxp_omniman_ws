@@ -5,11 +5,12 @@
 #   colcon build --symlink-install
 #
 # This script sets up:
-#   conda env lerobot_jazzy   Python 3.12 with PyTorch (CUDA), and the LeRobot
+#   conda env physical_lerobot   Python 3.12 with PyTorch (CUDA), and the LeRobot
 #                             that ships in physical_ai_tools/lerobot (0.2.0),
 #                             installed editable - not the upstream release,
 #                             which does not match. datasets is pinned to
-#                             <=3.6.0 and numpy to <2, as in the Dockerfile.
+#                             <=3.6.0 and numpy to <2, as in the Dockerfile;
+#                             OpenCV is kept below 4.12, which needs numpy 2.
 #                             Training (lerobot.scripts.train) runs in it, and
 #                             physical_ai_server imports it through PYTHONPATH.
 #   physical_ai_manager       the web UI: npm install (git-ignored node_modules).
@@ -23,7 +24,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS="$(cd "$HERE/.." && pwd)"
 CONDA="${CONDA:-$HOME/miniconda3/bin/conda}"
-ENV="${PHYSICAL_AI_ENV:-$HOME/miniconda3/envs/lerobot_jazzy}"
+ENV="${PHYSICAL_AI_ENV:-$HOME/miniconda3/envs/physical_lerobot}"
 say() { echo "[physical_ai native] $*"; }
 
 # ---- what must be there already -------------------------------------------------
@@ -60,7 +61,8 @@ say "installing PyTorch into $ENV"
 "$ENV/bin/pip" install -q torch torchvision
 say "installing LeRobot from $TOOLS/lerobot (editable)"
 "$ENV/bin/pip" install -q -e "$TOOLS/lerobot[smolvla]"
-"$ENV/bin/pip" install -q 'datasets>=2.19.0,<=3.6.0' 'numpy<2'
+"$ENV/bin/pip" install -q 'datasets>=2.19.0,<=3.6.0' 'numpy<2' \
+    'opencv-python-headless<4.12'
 "$ENV/bin/python" - <<'EOF'
 import lerobot, torch
 print(f"[physical_ai native] lerobot {lerobot.__version__} from {lerobot.__file__}")

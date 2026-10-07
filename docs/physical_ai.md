@@ -31,7 +31,7 @@ It needs Miniconda in `~/miniconda3`, Node 22 or newer, and the ROS packages
 
 | What | Details |
 |---|---|
-| conda env `lerobot_jazzy` | Python 3.12, PyTorch with CUDA, and the LeRobot 0.2.0 that ships in `physical_ai_tools/lerobot`, installed editable, with `datasets` pinned to `<=3.6.0` (4.x breaks dataset loading) and `numpy<2`. Training and the dataset viewer run in it. |
+| conda env `physical_lerobot` | Python 3.12, PyTorch with CUDA, and the LeRobot 0.2.0 that ships in `physical_ai_tools/lerobot`, installed editable, with `datasets` pinned to `<=3.6.0` (4.x breaks dataset loading) and `numpy<2` (with `opencv-python-headless<4.12`, the last OpenCV that works with numpy 1.x). Training and the dataset viewer run in it. |
 | web UI | `npm install` in `physical_ai_tools/physical_ai_manager` |
 
 The LeRobot has to be that copy: `pip install lerobot` pulls the latest upstream release, which
@@ -42,9 +42,19 @@ env that had a newer one is moved to it.
 When it finishes it prints where `lerobot` is imported from and `CUDA available: True`. If CUDA is
 `False`, training and inference would run on the CPU: check the NVIDIA driver.
 
+pip may print `ERROR: ... physical-ai-bt requires lxml` (or `orchestrator requires ...`). These
+are harmless and not from the env: in a terminal with ROS sourced, `PYTHONPATH` includes the
+workspace's packages, so pip checks them too. `unset PYTHONPATH` before the installer hides them.
+
+> **Don't `conda activate` in the terminal that runs ROS.** An active env puts its `python3` ahead of
+> the system one, and ROS programs that start with `#!/usr/bin/env python3` (like `rosbridge`) then
+> die at once with `No module named 'tornado'`; the UI shows `ROS connection failed`. Run `conda
+> deactivate` there (the prompt shows no `(env)`), and keep `conda activate physical_lerobot` for
+> a separate terminal, for training and the dataset viewer.
+
 In the terminal that launches `physical_ai_server`, load the env's packages first:
 ```bash
-export PYTHONPATH=$HOME/miniconda3/envs/lerobot_jazzy/lib/python3.12/site-packages:$HOME/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot/src:$PYTHONPATH
+export PYTHONPATH=$HOME/miniconda3/envs/physical_lerobot/lib/python3.12/site-packages:$HOME/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot/src:$PYTHONPATH
 ```
 
 ---
@@ -127,7 +137,7 @@ wc -l ~/.cache/huggingface/lerobot/<user>/<task_name>/meta/episodes.jsonl
 
 Inspect episodes visually (same UI as the HF `visualize_dataset` Space, run locally):
 ```bash
-conda activate lerobot_jazzy
+conda activate physical_lerobot
 cd ~/workspaces/nxp_omniman_ws/src/physical_ai_tools/lerobot
 PYTHONPATH=src python -m lerobot.scripts.visualize_dataset_html \
     --repo-id <user>/<task_name> \
@@ -139,7 +149,7 @@ Open `http://<this-pc-ip>:9091` (e.g. `http://192.168.51.114:9091`). Add `--epis
 - `--root` — needed when the dataset isn't in `~/.cache/huggingface/lerobot`.
 - `--host 0.0.0.0` — without it the viewer only answers on `127.0.0.1`, so other machines can't reach it.
 - `--port 9091` — the default 9090 collides with rosbridge.
-- Run it in `lerobot_jazzy` — system `python3` has no `flask`.
+- Run it in `physical_lerobot` — system `python3` has no `flask`.
 
 Private alternative: drop `--host`, and from your laptop run `ssh -L 9091:127.0.0.1:9091 dokterkepin@192.168.51.114`, then open `http://localhost:9091`.
 

@@ -25,7 +25,7 @@ WHY
 The source dataset is never modified; this writes a new one. videos/ is
 hard-linked (no extra disk, survives the source being renamed or deleted).
 
-Usage (run in the lerobot_jazzy env):
+Usage (run in the physical_lerobot env):
     python trim_state.py SRC_DATASET DST_DATASET [--keep N]
 
     python trim_state.py omniman_base_correct_v5 omniman_base_correct_v6
