@@ -30,6 +30,11 @@ huggingface.co/Simon7108528/EfficientSAM3 (efficientsam3_ft/*.pt). The
 released checkpoints use the MobileCLIP-S0 text encoder, context 16 - with
 S1 the text weights do not load and nothing is ever detected.
 
+Always on once a target is set: every camera frame is detected (the newest
+only) and ~/detections and the debug image are published whether or not
+anything subscribes. Until the state machine sets a target, it publishes the
+plain camera picture ("no target") and empty detections.
+
 Settings: config/visual_align.yaml, section efficient_sam_detector - read from
 the file directly (no ROS parameters). Saved edits to conf apply
 within a second; the model settings and image_topic only at start.
@@ -166,13 +171,26 @@ class EfficientSamDetector(Node):
                 found.append((prompt, float(scores[j]), mask))
         return found
 
+    def publish_idle(self, msg, frame):
+        """No target yet: still publish - an empty detections message and the plain
+        camera picture as the debug image - so the topics are alive."""
+        out = Detection2DArray()
+        out.header = msg.header
+        self.det_pub.publish(out)
+        cv2.putText(frame, 'no target - waiting for /visual_align/target', (8, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        dbg = CompressedImage()
+        dbg.header = msg.header
+        dbg.format = 'jpeg'
+        dbg.data = cv2.imencode('.jpg', frame)[1].tobytes()
+        self.debug_pub.publish(dbg)
+
     def on_image(self, msg):
-        want_det = self.det_pub.get_subscription_count() > 0
-        want_debug = self.debug_pub.get_subscription_count() > 0
-        if not self.target or not (want_det or want_debug):
-            return
         frame = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
         if frame is None:
+            return
+        if not self.target:
+            self.publish_idle(msg, frame)
             return
 
         t = time.monotonic()
@@ -206,21 +224,20 @@ class EfficientSamDetector(Node):
             drawn.append((prompt, score, mask, cx, cy))
         self.det_pub.publish(out)
 
-        if want_debug:
-            for i, (prompt, score, mask, cx, cy) in enumerate(drawn):
-                color = DEBUG_COLORS[prompts.index(prompt) % len(DEBUG_COLORS)]
-                frame[mask] = (0.5 * frame[mask] + 0.5 * np.array(color)).astype(np.uint8)
-                cv2.circle(frame, (int(cx), int(cy)), 5, color, -1)
-                label = f'{i + 1}. {prompt} {score:.2f}' + ('  <- align' if i == 0 else '')
-                cv2.putText(frame, label, (int(cx) - 40, max(int(cy) - 12, 16)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
-            cv2.putText(frame, f'{ms:.0f} ms', (8, 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            dbg = CompressedImage()
-            dbg.header = msg.header
-            dbg.format = 'jpeg'
-            dbg.data = cv2.imencode('.jpg', frame)[1].tobytes()
-            self.debug_pub.publish(dbg)
+        for i, (prompt, score, mask, cx, cy) in enumerate(drawn):
+            color = DEBUG_COLORS[prompts.index(prompt) % len(DEBUG_COLORS)]
+            frame[mask] = (0.5 * frame[mask] + 0.5 * np.array(color)).astype(np.uint8)
+            cv2.circle(frame, (int(cx), int(cy)), 5, color, -1)
+            label = f'{i + 1}. {prompt} {score:.2f}' + ('  <- align' if i == 0 else '')
+            cv2.putText(frame, label, (int(cx) - 40, max(int(cy) - 12, 16)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
+        cv2.putText(frame, f'{ms:.0f} ms', (8, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        dbg = CompressedImage()
+        dbg.header = msg.header
+        dbg.format = 'jpeg'
+        dbg.data = cv2.imencode('.jpg', frame)[1].tobytes()
+        self.debug_pub.publish(dbg)
 
 
 def main():
