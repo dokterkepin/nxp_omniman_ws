@@ -42,7 +42,7 @@ settings:
   # (rad) of it - a tighter value than the arm's resting error (about 0.003 at
   # ready1) would never finish.
   arm_move_s: 3.0
-  arm_tolerance: 0.03
+  arm_tolerance: 0.05
   arm_timeout_s: 10.0
 
   # Look (search_align's first pass, without turning): how many detector
