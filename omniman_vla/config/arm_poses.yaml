@@ -1,0 +1,40 @@
+# Arm poses for the ArmPose step (omniman_vla.mission) - joint angles in rad,
+# one entry per arm joint. The gripper is not set here: a move keeps it as it
+# is. Read when a mission starts.
+#
+# search_align (pick_place_bt.py) looks for the target from ready1, then
+# ready2, then ready3: at each one the arm moves there and visual_align turns
+# the base looking for it. Once found and aligned, the arm goes back to ready1
+# for the policy.
+#
+# The wrist camera is on palm_link, so wrist_pitch_joint tilts the camera.
+# Joint limits: wrist_pitch_joint -1.86 .. 1.69, upper_shoulder_pitch_joint
+# -1.70 .. 1.70, forearm_pitch_joint -2.33 .. 2.4.
+
+# The arm at rest, where the policy starts = home_pose in policy_runner.yaml.
+ready1:
+  shoulder_yaw_joint: 0.000
+  upper_shoulder_pitch_joint: 0.585
+  arm_yaw_joint: 0.000
+  forearm_pitch_joint: -1.506
+  wrist_pitch_joint: 1.391
+  palm_yaw_joint: 0.000
+
+# ready1 with the wrist (and camera) pitched 0.2 rad one way. A first guess -
+# tune on the robot by watching /sam_detector/debug/compressed.
+ready2:
+  shoulder_yaw_joint: 0.000
+  upper_shoulder_pitch_joint: 0.585
+  arm_yaw_joint: 0.000
+  forearm_pitch_joint: -1.506
+  wrist_pitch_joint: 1.191
+  palm_yaw_joint: 0.000
+
+# ready1 with the wrist pitched 0.2 rad the other way.
+ready3:
+  shoulder_yaw_joint: 0.000
+  upper_shoulder_pitch_joint: 0.355
+  arm_yaw_joint: 0.000
+  forearm_pitch_joint: -1.506
+  wrist_pitch_joint: 1.000
+  palm_yaw_joint: 0.000

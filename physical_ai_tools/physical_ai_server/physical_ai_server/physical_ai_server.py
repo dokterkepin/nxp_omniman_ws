@@ -553,6 +553,7 @@ class PhysicalAIServer(Node):
             if not self.inference_manager.load_policy():
                 self.get_logger().error('Failed to load policy')
                 return
+            self.get_logger().info(self.inference_manager.describe_policy())
 
         try:
             if not self.on_inference:

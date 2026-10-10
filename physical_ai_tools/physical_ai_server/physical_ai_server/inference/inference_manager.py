@@ -16,7 +16,9 @@
 #
 # Author: Dongyun Kim
 
+import hashlib
 import os
+import time
 
 from lerobot.policies.pretrained import PreTrainedPolicy
 import numpy as np
@@ -77,6 +79,48 @@ class InferenceManager:
         except Exception as e:
             print(f'Failed to load policy from {self.policy_path}: {e}')
             return False
+
+    def describe_policy(self):
+        """What the server actually loaded, as text for the log: read from the
+        loaded policy and the files it came from, not from the path it was
+        asked for. The fingerprint comes from the weights in memory - two
+        checkpoints with the same fingerprint are the same weights."""
+        try:
+            policy, path = self.policy, self.policy_path
+            real = os.path.realpath(path)
+            lines = [f'asked for  : {path}']
+            if real != os.path.abspath(path):
+                lines.append(f'resolved   : {real}')
+            step = os.path.basename(os.path.dirname(real))
+            if step.isdigit():
+                lines.append(f'checkpoint : step {int(step)}')
+            weights = os.path.join(real, 'model.safetensors')
+            if os.path.exists(weights):
+                info = os.stat(weights)
+                saved = time.strftime('%Y-%m-%d %H:%M', time.localtime(info.st_mtime))
+                lines.append(f'weights    : model.safetensors, {info.st_size / 1e6:.0f} MB, '
+                             f'saved {saved}')
+            n_params = sum(p.numel() for p in policy.parameters())
+            lines.append(f'policy     : {type(policy).__name__}, {n_params / 1e6:.1f}M '
+                         f'parameters, on {next(policy.parameters()).device}')
+            config = policy.config
+            settings = [f'{k} {getattr(config, k)}' for k in
+                        ('chunk_size', 'n_action_steps', 'temporal_ensemble_coeff')
+                        if hasattr(config, k)]
+            lines.append(f'config     : {", ".join(settings)}')
+            train = read_json_file(os.path.join(real, 'train_config.json')) or {}
+            dataset = train.get('dataset') or {}
+            if dataset or train.get('steps'):
+                lines.append(f'trained on : {dataset.get("root") or dataset.get("repo_id")} '
+                             f'({train.get("steps")} steps, batch {train.get("batch_size")})')
+            digest = hashlib.sha256()
+            with torch.no_grad():
+                for name, tensor in sorted(policy.state_dict().items()):
+                    digest.update(f'{name}:{tensor.double().sum().item():.6f}'.encode())
+            lines.append(f'fingerprint: {digest.hexdigest()[:12]} (of the weights in memory)')
+            return 'Policy loaded:\n  ' + '\n  '.join(lines)
+        except Exception as e:
+            return f'Policy loaded, but describing it failed: {e}'
 
     def clear_policy(self):
         if hasattr(self, 'policy'):

@@ -11,9 +11,10 @@ from nav2_simple_commander.robot_navigator import BasicNavigator
 from omniman_interfaces.srv import ReleaseControl
 from py_trees.common import Status
 from rclpy.signals import SignalHandlerOptions
+from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
-from .robot import NAV, Robot, load_poses, make_pose
+from .robot import ARM, NAV, Robot, load_arm_poses, load_poses, make_pose
 from .step import Step
 
 # Internal: messages handled per tick at most. Odometry alone arrives faster
@@ -23,8 +24,9 @@ SPIN_PER_TICK = 50
 
 
 # mission.yaml `settings:` keys this package needs.
-SETTINGS = ['tick_s', 'log_every_s', 'service_wait_s', 'still_time_s', 'still_linear',
-            'still_angular', 'settle_timeout_s']
+SETTINGS = ['tick_s', 'log_every_s', 'service_wait_s', 'still_linear', 'still_angular',
+            'settle_timeout_s', 'arm_move_s', 'arm_tolerance', 'arm_timeout_s', 'look_frames',
+            'holding_timeout_s']
 
 
 def call_sync(nav, client, request, timeout_s=5.0):
@@ -60,6 +62,7 @@ def run_mission(build, node_name, initial_pose='home'):
     with open(mission_file) as f:
         cfg = yaml.safe_load(f)
     cfg['poses'] = load_poses(mission_file)
+    cfg['arm_poses'] = load_arm_poses(mission_file)
     log.info(f'mission: {mission_file}')
     missing = [k for k in SETTINGS if k not in (cfg.get('settings') or {})]
     if missing:
@@ -114,14 +117,16 @@ def run_mission(build, node_name, initial_pose='home'):
         root.stop(Status.INVALID)
     finally:
         # Never leave the robot driving, aligning, running a policy or
-        # holding "nav"; each stop is a no-op when that part is idle.
+        # holding "nav" or "arm"; each stop is a no-op when that part is idle.
         nav.cancelTask()
+        robot.target_pub.publish(String(data=''))     # the detector goes idle
         call_sync(nav, robot.align_stop, Trigger.Request())
         call_sync(nav, robot.policy_stop, Trigger.Request())
-        if robot.owner == NAV:
-            req = ReleaseControl.Request()
-            req.owner = NAV
-            call_sync(nav, robot.release_client, req)
+        for owner in (NAV, ARM):
+            if robot.owner == owner:
+                req = ReleaseControl.Request()
+                req.owner = owner
+                call_sync(nav, robot.release_client, req)
         nav.destroy_node()
         rclpy.try_shutdown()
     return root.status == Status.SUCCESS

@@ -4,11 +4,11 @@ Pick and place as a behaviour tree - the worked example of a mission built
 from omniman_vla.mission (docs/omniman_vla.md, part 3).
 
     pick and place                 mission: a failed task starts it again (restarts 2)
-     ├─ go to pick area            task: nav to pick_area           | on failure: nav home
-     ├─ pick                       task (3 tries): align, pick,
-     │                                 grasp succeeded              | on failure: nav home
+     ├─ go to pick area            task: nav to pick_area          | on failure: nav home
+     ├─ pick                       task (2 tries): search and align, pick,
+     │                                 grasp succeeded              | on failure: pick again
      ├─ carry                      task: nav to place_area while holding
-     ├─ place                      task (3 tries): align, place,
+     ├─ place                      task (3 tries): search and align, place,
      │                                 cup released                 | on failure: nav home
      └─ go home                    task: nav to home
 
@@ -25,6 +25,15 @@ pick-with-retry pattern (BehaviorTree.CPP's RetryUntilSuccessful; py_trees'
 Retry, Selector and EternalGuard) with QT-Opt's style of grasp check (gripper
 not fully closed).
 
+The pick looks for the cup, and the place for the mark, from up to three arm
+poses (search_align: ready1, ready2, ready3 in arm_poses.yaml). Each look
+starts by moving the arm to its pose - so the base correction always starts
+at ready1, the pose the camera heading is right for - and visual_align turns
+the base looking for the target and aligns. The arm goes back to ready1, and a
+second search_align aligns again from there: if the first look was from
+ready2 or ready3 it only brought the base closer, so this one does the fine
+correction at the policy's view.
+
 What to align to and what to tell the policy are written below, in each
 task (Align's target is the detector's prompt - any text works). Timing
 settings and the policy path from config/mission.yaml, places from poses.yaml.
@@ -37,8 +46,8 @@ Run:
 """
 
 import py_trees
-from omniman_vla.mission import (Align, Holding, Navigate, PolicyStep, mission, run_mission,
-                                 start_again, task)
+from omniman_vla.mission import (Holding, Navigate, PolicyStep, mission, run_mission,
+                                 search_align, start_again, task)
 
 
 CUP = 'yellow cup lid'           # what to pick - the detector looks for this
@@ -58,7 +67,11 @@ def build(robot):
                       on_failure=[Navigate(robot, 'home'), start_again()])
 
     pick = task('pick',
-                steps=[Align(robot, CUP, timeout_s=60),
+                # search_align twice: the first finds the cup, from whichever arm
+                # pose sees it, and gets closer; the second, with the arm back
+                # at ready1 (the policy's view), aligns again to finish.
+                steps=[search_align(robot, CUP, timeout_s=60),
+                       search_align(robot, CUP, timeout_s=60),
                        PolicyStep(robot, 'pick', 'pick the object',
                                   policy_path=policy, timeout_s=90),
                        Holding(robot, 'grasp succeeded', holding=True)],
@@ -76,7 +89,8 @@ def build(robot):
                      condition=robot.is_holding)])
 
     place = task('place',
-                 steps=[Align(robot, MARK, timeout_s=60),
+                 steps=[search_align(robot, MARK, timeout_s=60),
+                        search_align(robot, MARK, timeout_s=60),
                         PolicyStep(robot, 'place', 'place the object',
                                    policy_path=policy, timeout_s=90),
                         Holding(robot, 'cup released', holding=False)],
