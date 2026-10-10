@@ -15,13 +15,12 @@
 
 policies:
   manipulate:
-    path: /home/dokterkepin/output/omniman_pick_and_place_v4/checkpoints/last/pretrained_model
+    path: /home/dokterkepin/output/omniman_pick_and_place_v4/checkpoints/100000/pretrained_model
 
 settings:
   # After each nav leg the mission waits for wheel odometry to show the base
-  # has actually stopped, instead of sleeping a fixed time. still_time_s is how
-  # long it must stay stopped; settle_timeout_s gives up if it never does.
-  still_time_s: 0.5
+  # has actually stopped, instead of sleeping a fixed time; settle_timeout_s
+  # gives up if it never does.
   settle_timeout_s: 5.0
   # "Still" = every odometry speed under these (odometry is never exactly 0).
   # Raise them a little if a stopped base still reads "did not settle".
@@ -36,6 +35,23 @@ settings:
   tick_s: 0.1
   # How often the running step logs one line about what it is waiting for.
   log_every_s: 2.0
+
+  # ArmPose (arm poses in arm_poses.yaml): how long a move takes, and when to
+  # give up. A move is finished when /arm_controller/controller_state says its
+  # trajectory reached the target AND every arm joint is within arm_tolerance
+  # (rad) of it - a tighter value than the arm's resting error (about 0.003 at
+  # ready1) would never finish.
+  arm_move_s: 3.0
+  arm_tolerance: 0.05
+  arm_timeout_s: 10.0
+
+  # Look (search_align's first pass, without turning): how many detector
+  # frames to see without the target before saying "not seen from here". It
+  # counts frames, not seconds - the detector runs at about 10 frames a second.
+  look_frames: 10
+  # Holding waits for grasp_monitor to agree with what the gripper reads right
+  # now; it fails if they never agree within this long.
+  holding_timeout_s: 5.0
 
 # Is the gripper holding something? (grasp_monitor.py - read by the node from
 # this file directly; saved edits apply within a second.)

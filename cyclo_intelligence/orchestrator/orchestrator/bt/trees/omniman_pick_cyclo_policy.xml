@@ -5,6 +5,11 @@
   check and grasp check around it. Cyclo has no "finished" for a run, so
   OmnimanArmHome decides it: arm home for dwell_s, then STOP. Set
   policy_path to a model under /workspace/model/<backend>/.
+
+  OmnimanSearchAlign (twice, see omniman_pick_place.xml) finds and aligns to the
+  cup; OmnimanWaitSettled then waits for the base to be still, the arm to have
+  finished and a camera frame to arrive after both, because SendCommand RESUME
+  does not check that (OmnimanPolicy does).
 -->
 <root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
@@ -20,7 +25,9 @@
       <OmnimanNavigate name="nav to pick_area" place="pick_area"/>
       <OnFailure name="pick">
         <Attempts name="pick, 3 tries" max_attempts="3">
-          <OmnimanAlign name="align to the cup" target="yellow cup lid" timeout_s="60.0"/>
+          <OmnimanSearchAlign name="find the cup" target="yellow cup lid" timeout_s="60.0"/>
+          <OmnimanSearchAlign name="align to the cup" target="yellow cup lid" timeout_s="60.0"/>
+          <OmnimanWaitSettled name="robot settled" timeout_s="30.0"/>
           <WithControlLock name="policy has the robot" owner="policy">
             <OnFailure name="run until the arm is home">
               <Sequence name="run">

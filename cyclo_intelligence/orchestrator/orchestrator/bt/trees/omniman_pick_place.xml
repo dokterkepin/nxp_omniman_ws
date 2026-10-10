@@ -4,6 +4,11 @@
   Each OnFailure is one task: its first child is the work, the rest the
   recovery. A recovery ending in StartAgain makes the outer Attempts run the
   mission again from the start (up to 3 runs).
+
+  OmnimanSearchAlign finds the target from the arm's ready poses (first without
+  turning the base, then by turning) and aligns to it. It is used twice: the
+  first may find the target from ready2 or ready3, whose view is not the
+  policy's; the second aligns again from ready1.
 -->
 <root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
@@ -17,7 +22,8 @@
 
       <OnFailure name="pick">
         <Attempts name="pick, 3 tries" max_attempts="3">
-          <OmnimanAlign name="align to the cup" target="yellow cup lid" timeout_s="60.0"/>
+          <OmnimanSearchAlign name="find the cup" target="yellow cup lid" timeout_s="60.0"/>
+          <OmnimanSearchAlign name="align to the cup" target="yellow cup lid" timeout_s="60.0"/>
           <OmnimanPolicy name="pick policy" instruction="pick the object" timeout_s="90.0"/>
           <OmnimanGraspCheck name="grasp succeeded" holding="true"/>
         </Attempts>
@@ -31,7 +37,8 @@
 
       <OnFailure name="place">
         <Attempts name="place, 3 tries" max_attempts="3">
-          <OmnimanAlign name="align to the mark" target="black square" timeout_s="60.0"/>
+          <OmnimanSearchAlign name="find the mark" target="black square" timeout_s="60.0"/>
+          <OmnimanSearchAlign name="align to the mark" target="black square" timeout_s="60.0"/>
           <OmnimanPolicy name="place policy" instruction="place the object" timeout_s="90.0"/>
           <OmnimanGraspCheck name="cup released" holding="false"/>
         </Attempts>

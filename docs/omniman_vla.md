@@ -124,6 +124,7 @@ A mission is a list of steps, each handled by one building block:
 
 ```
 drive to the table        -> Nav2                     (owner "nav")
+arm to a ready pose       -> arm_controller           (owner "arm")
 line the base up          -> visual_align + detector  (owner "align")
 pick the cup              -> policy_runner            (owner "policy")
 did it really pick?       -> grasp_monitor            (no owner, only reads)
@@ -212,8 +213,10 @@ once.
 6. **It is opt-in.** Programs that never acquire (RViz's 2D Goal Pose, the
    joystick) can still move the robot. The lock is an agreement, not a wall.
 
-**Owner names in use:** `nav` (missions driving with Nav2), `align`
-(visual_align), `policy` (policy_runner).
+**Owner names in use:** `nav` (missions driving with Nav2), `arm` (the mission's
+`ArmPose` moving the arm to a ready pose), `align` (visual_align), `policy`
+(policy_runner). While `arm` is held nothing else can start; `ArmPose` gives it
+back only once the arm has finished moving.
 
 **By hand**
 
@@ -318,14 +321,16 @@ works; nothing has to be kept in sync with a YAML file.
 
 **behaviour**
 
-1. **Nothing is detected until a target is set.** Before the first `Align`,
-   detections and the debug image stay empty.
-2. **The target is latched.** After an `Align` ends the detector keeps the
-   last target (for the debug view and the web UI's Align switch) until a new
-   one is set or it restarts.
-3. **It only runs while someone listens.** visual_align subscribes only during
-   a run, so SAM uses the GPU only during `Align` steps. An open debug image
-   keeps it running.
+1. **Nothing is detected until a target is set.** With no prompt (or an empty
+   one) the detector runs no model. It still publishes the plain camera
+   frame, labelled "no target", on the debug image, and empty detections - so
+   the topics are alive and `rqt_image_view` shows the camera.
+2. **The mission clears the prompt.** `Align` and `Look` send an empty prompt
+   when they end, so the detector goes idle (no GPU) while the policy runs.
+   `/visual_align/target` is latched: a prompt set by hand stays until
+   something replaces it.
+3. **While a prompt is set it always runs**, on every frame, whether or not
+   anything subscribes (about 100 ms a frame for SAM 3, 3.4 GB GPU).
 4. **It warms up at start.** It runs the model once on a black image, so the
    slow first load (weights to the GPU, CUDA kernels) happens during the
    launch. `model ready in Xs` in the log means it is really ready.
@@ -414,8 +419,12 @@ because the policy drives the gripper through `arm_controller`.
 
 **behaviour**
 
-1. **Read it after the gripper has settled** (it waits `stable_s`, 0.3 s,
-   before changing). After a policy run has finished, it has.
+1. **It changes its answer only after a reading has held for `stable_s`**
+   (0.3 s), so right after a policy ends it can still be one step behind a
+   gripper that is closing or opening. The mission's `Holding` handles that:
+   it waits until `/gripper/holding` agrees with what the gripper joint reads
+   now (same thresholds), and fails only if they never agree within
+   `holding_timeout_s`.
 2. **It only reads** - no lock, no owner.
 3. **Tune the two thresholds** in `mission.yaml` (`grasp_monitor:`) from real
    readings: `ros2 topic echo /grasp_monitor/state` with the gripper on the
@@ -497,19 +506,22 @@ questions: *which steps? how many tries? what if it still fails?*
 ```
 pick and place                  mission: a failed task starts it again (restarts 2)
  ├─ go to pick area             nav to pick_area              | on failure: nav home, start again
- ├─ pick (1 try)                align cup, pick policy,
+ ├─ pick (2 tries)              search and align cup (twice), pick policy,
  │                              grasp succeeded               | on failure: nav pick_area,
  │                                                            |   pick policy, grasp succeeded
  ├─ carry                       nav to place_area while holding
- ├─ place (3 tries)             align mark, place policy,
+ ├─ place (2 tries)             search and align mark (twice), place policy,
  │                              cup released                  | on failure: nav home, start again
  └─ go home                     nav to home
 ```
 
-Read it aloud: *drive to the pick area; align, pick and confirm the grasp - if
-that fails, drive back and pick once more without aligning; carry the cup,
-and if it drops start over; try up to 3 times to align, place and confirm the
-release - if that fails, go home and start over; drive home.*
+Read it aloud: *drive to the pick area; find the cup from the arm's ready
+poses and align to it, pick and confirm the grasp - if that fails, drive back
+and pick once more without aligning; carry the cup, and if it drops start over;
+find the mark and align to it, place and confirm the release (twice at most) -
+if that fails, go home and start over; drive home.* The second `search_align`
+in a task aligns again with the arm back at `ready1`: the first may have found
+the target from `ready2` or `ready3`, whose view is not the policy's.
 
 ### Step 2 - build it from the library
 
@@ -590,8 +602,11 @@ an `Align` in the list.
 |---|---|---|
 | `Navigate(robot, place)` | drive with Nav2 to a place from `poses.yaml`, wait until the base is still. Holds owner `nav` only while driving | `place`: name in `poses.yaml` |
 | `Align(robot, target)` | set the detector's prompt, `visual_align` to it, wait until the base is still | `target`: any text, e.g. `'yellow cup lid'` |
-| `PolicyStep(robot, label, instruction, policy_path='')` | run an arm policy through `policy_runner` until the arm is finished | `label`: name in the log; `instruction`: the policy's task text; `policy_path`: checkpoint, empty = `policy_runner.yaml`'s default |
-| `Holding(robot, name, holding=True)` | condition on `grasp_monitor` | `holding=True`: SUCCESS if holding (a pick worked); `False`: SUCCESS if not (a place let go) |
+| `PolicyStep(robot, label, instruction, policy_path='')` | run an arm policy through `policy_runner` until the arm is finished. It starts only when the base is still and a camera frame has arrived after the robot settled; it logs the checkpoint (path, policy, config) first | `label`: name in the log; `instruction`: the policy's task text; `policy_path`: checkpoint, empty = `policy_runner.yaml`'s default |
+| `ArmPose(robot, pose)` | move the arm to a pose in `arm_poses.yaml` and wait until it has **finished**. Holds owner `arm` while moving; nothing is sent (and no lock taken) if the arm is already there | `pose`: name in `arm_poses.yaml` (`ready1`, `ready2`, `ready3`) |
+| `Look(robot, target)` | look for the target from where the arm is, **without turning**: SUCCESS when the detector reports it, FAILURE after `look_frames` detector frames without it | `target`: any text |
+| `search_align(robot, target, poses)` | find the target from the arm poses, then align. First **without turning**: for each pose, `ArmPose`, `Look`, `Align`. Only if none sees it, **by turning**: for each pose, `ArmPose`, `Align` (the base turns up to `search_turns`). Ends with the arm back at the first pose, where the policy starts | `poses`: default `('ready1', 'ready2', 'ready3')` |
+| `Holding(robot, name, holding=True)` | condition on `grasp_monitor`; waits until it agrees with the gripper's current reading, then judges | `holding=True`: SUCCESS if holding (a pick worked); `False`: SUCCESS if not (a place let go) |
 
 **Timings, per step** - optional arguments; left out, the setting of the same
 name in `mission.yaml` is used:
@@ -601,9 +616,28 @@ name in `mission.yaml` is used:
 | `timeout_s` | `Align`, `PolicyStep` | stop it and fail after this long (None = no limit) |
 | `settle_timeout_s` | `Navigate`, `Align` | how long to wait for the base to stop |
 | `service_wait_s` | all | how long to wait for its service to exist |
+| `move_s`, `timeout_s` | `ArmPose` | how long the move takes (`arm_move_s`), and when to give up (`arm_timeout_s`) |
 
 A step that fails stops what it started (Nav2 goal, visual_align, policy), so
 a retry starts clean.
+
+**How the steps wait.** Nothing waits a fixed time. A step moves on when a
+message says so, and the time settings only decide when to give up:
+
+- *Base still*: the latest wheel odometry is below `still_linear` /
+  `still_angular`.
+- *Arm finished*: `/arm_controller/controller_state` says its trajectory has
+  reached the target, and every joint is within `arm_tolerance`. `ArmPose`
+  then gives the lock back and waits for the release to be confirmed before
+  the next step starts.
+- *Result of a run* (`Align`, `PolicyStep`): only a result seen after the run
+  was busy counts. If a result never comes, the step waits until its
+  `timeout_s`.
+- *Policy start*: the base is still **and** a camera frame has arrived after
+  the robot settled. This is judged by when frames arrive here, not by their
+  header stamps: the wrist camera's stamps are about 0.6 s early, while the
+  picture itself reacts about 0.04 s after the joints (measured by moving the
+  wrist).
 
 Each step already follows its building block's behaviour from part 2: waits
 until the service exists, reads the latched status correctly, cancels what it
@@ -639,8 +673,8 @@ around the tree:
 | `robot.align_status()` | `visual_align`: `searching` / `aligning` / `aligned` / `failed: ...` |
 | `robot.policy_status()` | `policy_runner`: `idle` / `starting` / `working` |
 | `robot.task_phase()` | physical_ai_server: `INFERENCING`, `READY`, ... |
-| `robot.control_owner()` | the lock: `nav`, `align`, `policy` or `""` |
-| `robot.base_pose()`, `robot.base_twist()`, `robot.base_still()` | odometry: `(x, y, yaw)`, `(vx, vy, wz)`, stopped or not |
+| `robot.control_owner()` | the lock: `nav`, `arm`, `align`, `policy` or `""` |
+| `robot.base_pose()`, `robot.base_twist()`, `robot.base_still()` | odometry: `(x, y, yaw)`, `(vx, vy, wz)`, below the still limits right now or not |
 
 ### Step 4 - settings
 
@@ -649,8 +683,11 @@ once when the mission starts:
 
 | Setting | Used for |
 |---|---|
-| `still_time_s`, `still_linear`, `still_angular` | when the base counts as stopped (after driving and aligning): every odometry speed below `still_linear` (m/s) / `still_angular` (rad/s) for `still_time_s` |
+| `still_linear`, `still_angular` | when the base counts as stopped (after driving and aligning): every odometry speed below `still_linear` (m/s) / `still_angular` (rad/s) |
 | `settle_timeout_s` | how long to wait for that before failing |
+| `arm_move_s`, `arm_tolerance`, `arm_timeout_s` | `ArmPose`: how long a move takes, how close (rad) every joint must be once the controller says the trajectory is done, and when to give up. Do not set the tolerance below the arm's resting error at a pose (about 0.003 at `ready1`, about 0.03 at `ready2` / `ready3`) |
+| `look_frames` | `Look`: detector frames without the target before "not seen from here" (a count, not seconds) |
+| `holding_timeout_s` | `Holding`: how long grasp_monitor may disagree with the gripper's reading before the step fails |
 | `service_wait_s` | how long a step waits for a service before "not answering" |
 | `tick_s` | how often the tree is ticked |
 | `log_every_s` | how often a running step logs what it is waiting for |
@@ -673,7 +710,7 @@ and add `<exec_depend>omniman_vla</exec_depend>` to its `package.xml`.
 
 ### Step 6 - a new kind of step
 
-When a competition needs something the four steps do not do - open a door,
+When a competition needs something the library's steps do not do - open a door,
 wait for a person, call a new service - write a step. Subclass
 `omniman_vla.mission.Step`; it gives you `fail()`, `succeed()`, `send()`,
 `interrupted()` and `settle()`. The shape is always the same:
@@ -763,7 +800,8 @@ the object drops - and check the tree ends the way you expect. That is how
 
 | File | Read by | What is in it |
 |---|---|---|
-| `mission.yaml` | missions, grasp_monitor | default policy path; `settings:` (timing shared by all missions: `still_*`, `settle_timeout_s`, `service_wait_s`, `tick_s`, `log_every_s`); `grasp_monitor:` thresholds |
+| `mission.yaml` | missions, grasp_monitor | default policy path; `settings:` (shared by all missions: `still_*`, `settle_timeout_s`, `service_wait_s`, `tick_s`, `log_every_s`, `arm_*`, `look_frames`, `holding_timeout_s`); `grasp_monitor:` thresholds |
+| `arm_poses.yaml` | missions | named arm poses (`ready1` = the policy's start pose = `home_pose`, `ready2`, `ready3`), joint angles in rad; the gripper is not set |
 | `poses.yaml` | missions, web UI | named places in the map frame, yaw in **degrees**. Written by the web UI's "Save here" - comments are not kept |
 | `visual_align.yaml` | detectors, visual_align | detector sections (model, `conf`, ... - no prompts, those come from the mission) and `visual_align:` (aim point, tolerances, gains, search, `detections_topic`) |
 | `policy_runner.yaml` | policy_runner | default policy, `home_pose`, tolerances, `finished_dwell_s`, `warmup_timeout_s`, `run_timeout_s` |
@@ -785,3 +823,5 @@ restart, no `ros2 param set`. Topic names are read only at start.
 | | `k_angular`, `k_forward`, `min_*`, `max_*` | too slow / overshoots; `min_*` below the speed that moves the base at all does nothing |
 | | `search_turns`, `search_direction` | how far and which way to look when the target is not in view |
 | grasp check | `closed_empty_position`, `holding_min_effort` | real readings from `/grasp_monitor/state` sit on the wrong side of a threshold |
+| arm poses | `arm_poses.yaml`: `ready2`, `ready3` (wrist pitch +/- 0.2 rad from `ready1`) | the cup is still out of the picture from them - look at `/sam_detector/debug/compressed` from each pose and move them |
+| | `arm_tolerance` | a move ends with `not finished after 10s` although the arm looks there: raise it just above the tracking error in the log |

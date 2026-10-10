@@ -7,7 +7,7 @@
 # restart; only topics, model, half, imgsz and rate_hz are read once at start.
 # Note: a node reads the copy of this file on the PC it runs on.
 
-# SAM 3 (sam_detector.py, GPU PC, lerobot_jazzy env). Weights: sam3.pt from
+# SAM 3 (sam_detector.py, GPU PC, omniman_vla env). Weights: sam3.pt from
 # huggingface.co/facebook/sam3 (gated - request access first).
 sam_detector:
   image_topic: /image_raw/compressed
@@ -49,7 +49,7 @@ efficient_sam_detector:
 
 visual_align:
   owner_name: align
-  detections_topic: /efficient_sam_detector/detections
+  detections_topic: /sam_detector/detections
   cmd_vel_topic: /cmd_vel
   odom_topic: /mecanum_drive_controller/odometry
   rate_hz: 20.0
@@ -66,7 +66,7 @@ visual_align:
   # x 299-343, y 201-260 (middle half of the episodes).
   aim_x: 320.0
   tolerance_x: 30.0
-  aim_y: 300.0
+  aim_y: 320.0
   tolerance_y: 30.0
   # Aligned = this many detections in a row with every axis in tolerance.
   settle_frames: 5

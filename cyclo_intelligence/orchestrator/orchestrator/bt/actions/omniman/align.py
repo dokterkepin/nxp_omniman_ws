@@ -15,7 +15,9 @@ class OmnimanAlign(_Step, BaseAction):
     """Base correction: visual_align moves the base until the detector's
     `target` sits where the policy expects it (aim point in
     visual_align.yaml), then waits for the base to be still. `target` is any
-    text - it is the SAM detector's prompt, e.g. "yellow cup lid"."""
+    text - it is the SAM detector's prompt, e.g. "yellow cup lid". When the node
+    ends the prompt is cleared, so the detector goes idle (it only shows the
+    camera picture) until the next one."""
 
     def __init__(self, node, target: str = 'yellow cup lid', timeout_s: float = 60.0,
                  settle_timeout_s: float = 5.0):
@@ -29,11 +31,24 @@ class OmnimanAlign(_Step, BaseAction):
     def _clear(self):
         self.phase, self.future, self.busy_seen = 'start', None, False
         self.since = time.monotonic()
+        self.active = False         # the detector has our prompt until _release_prompt()
+
+    def _release_prompt(self):
+        if self.active:
+            self.om.target_pub.publish(String(data=''))
+            self.active = False
 
     def tick(self):
+        status = self._tick()
+        if status != RUNNING:
+            self._release_prompt()
+        return status
+
+    def _tick(self):
         om, now = self.om, time.monotonic()
         if self.phase == 'start':
             om.target_pub.publish(String(data=self.target))
+            self.active = True
             self.log_info(f'align to "{self.target}"')
             self.phase, self.since = 'call', now
         if self.phase == 'call':
@@ -88,4 +103,5 @@ class OmnimanAlign(_Step, BaseAction):
         if self.phase == 'align':
             self.log_warn('stopped - align stopped')
         self._stop()
+        self._release_prompt()
         self._clear()

@@ -25,8 +25,21 @@ Steps (steps.py)
     Navigate(robot, place)                  drive with Nav2 to a place in poses.yaml
     Align(robot, target)                    base correction with visual_align;
                                             target = any text, the detector's prompt
-    PolicyStep(robot, label, instruction)   run the arm policy until the arm is home
-    Holding(robot, name, holding=True)      is the gripper holding something (or not)
+    ArmPose(robot, pose)                    move the arm to a pose in arm_poses.yaml; holds
+                                            control as "arm" until it has arrived
+    together(name, [steps])                 run the steps at the same time (e.g. drive
+                                            and move the arm); fails if one fails
+    Look(robot, target)                     look for the target from where the arm is,
+                                            without turning (detector frames, no time)
+    search_align(robot, target, poses)      find the target from each arm pose - first
+                                            without turning (Look), then by turning
+                                            (Align) - align to it, back to the first pose
+    PolicyStep(robot, label, instruction)   run the arm policy until the arm is home;
+                                            starts only on a camera frame taken after
+                                            the base stopped and the arm arrived
+    Holding(robot, name, holding=True)      is the gripper holding something (or not);
+                                            waits for grasp_monitor to agree with the
+                                            gripper's reading first
     task(name, steps, attempts, on_failure) one state: its steps, how many tries,
                                             and what to run if it still fails -
                                             if those succeed the mission carries on
@@ -42,6 +55,7 @@ Steps (steps.py)
     timeout_s          Align, PolicyStep   stop it and fail after this long
     settle_timeout_s   Navigate, Align     wait this long for the base to stop
     service_wait_s     all                 wait this long for the service to exist
+    move_s             ArmPose             how long the arm move takes (arm_move_s)
   A step that fails stops what it started, so attempts() around it can retry.
 
   Log: the tree is printed whenever a step changes status; in between, the
@@ -55,10 +69,10 @@ What the robot knows (robot.py) - for conditions and your own log lines
     robot.align_status()    visual_align: searching | aligning | aligned | failed
     robot.policy_status()   policy_runner: idle | starting | working
     robot.task_phase()      Cyclo orchestrator: LOADING | INFERENCING | PAUSED | READY
-    robot.control_owner()   the control lock: nav | align | policy | ""
+    robot.control_owner()   the control lock: nav | arm | align | policy | ""
     robot.base_pose()       (x, y, yaw) from odometry
     robot.base_twist()      (vx, vy, wz) from odometry
-    robot.base_still()      odometry says the base has stopped
+    robot.base_still()      the latest odometry is below still_linear / still_angular
   e.g. py_trees.decorators.EternalGuard('while holding', step, condition=robot.is_holding)
 
 run_mission(build, node_name) (runner.py)
@@ -75,15 +89,17 @@ Files
     robot.py      Robot: topics, services, what they last said
     runner.py     run_mission()
 
-Settings: mission.yaml `settings:`; places: poses.yaml beside it.
+Settings: mission.yaml `settings:`; places: poses.yaml beside it; arm poses:
+arm_poses.yaml beside it.
 Needs py_trees: sudo apt install ros-jazzy-py-trees
 """
 
 from .robot import Robot
 from .runner import run_mission
 from .step import Step
-from .steps import (Align, Holding, Navigate, PolicyStep, attempts, mission, on_failure,
-                    start_again, task)
+from .steps import (Align, ArmPose, Holding, Look, Navigate, PolicyStep, attempts, mission,
+                    on_failure, search_align, start_again, task, together)
 
-__all__ = ['Align', 'Holding', 'Navigate', 'PolicyStep', 'Robot', 'Step', 'attempts',
-           'mission', 'on_failure', 'run_mission', 'start_again', 'task']
+__all__ = ['Align', 'ArmPose', 'Holding', 'Look', 'Navigate', 'PolicyStep', 'Robot', 'Step',
+           'attempts', 'mission', 'on_failure', 'run_mission', 'search_align', 'start_again',
+           'task', 'together']

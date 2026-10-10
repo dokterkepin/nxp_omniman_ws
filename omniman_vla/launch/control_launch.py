@@ -79,8 +79,8 @@ def generate_launch_description():
     # /efficient_sam_detector/... - set visual_align's detections_topic to match.
     detector = Node(
         package='omniman_vla',
-        executable='efficient_sam_detector.py',
-        name='efficient_sam_detector',
+        executable='sam_detector.py',
+        name='sam_detector',
         output='screen',
         arguments=QUIET,
     )

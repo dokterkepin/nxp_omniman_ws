@@ -28,9 +28,11 @@ Needs the GPU and the omniman_vla conda env (omniman_vla/requirements.txt), and 
 weights: sam3.pt from https://huggingface.co/facebook/sam3 (gated - request
 access, then `hf download facebook/sam3 sam3.pt --local-dir ~/models`).
 
-Inference only runs while something subscribes to ~/detections or the debug
-image, and only on the newest frame - slower than the camera, older frames
-are dropped.
+Always on once a target is set: every camera frame is detected (the newest
+only - slower than the camera, older frames are dropped) and ~/detections and
+the debug image are published whether or not anything subscribes. It uses the
+GPU all the time. Until the state machine sets a target, it publishes the plain
+camera picture ("no target") and empty detections.
 
 Settings: config/visual_align.yaml, section sam_detector - read from the file
 directly (no ROS parameters). Saved edits to conf apply within a
@@ -159,13 +161,26 @@ class SamDetector(Node):
                 found.append((prompt, scores[j], masks[j].cpu().numpy() > 0.5))
         return found
 
+    def publish_idle(self, msg, frame):
+        """No target yet: still publish - an empty detections message and the plain
+        camera picture as the debug image - so the topics are alive."""
+        out = Detection2DArray()
+        out.header = msg.header
+        self.det_pub.publish(out)
+        cv2.putText(frame, 'no target - waiting for /visual_align/target', (8, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        dbg = CompressedImage()
+        dbg.header = msg.header
+        dbg.format = 'jpeg'
+        dbg.data = cv2.imencode('.jpg', frame)[1].tobytes()
+        self.debug_pub.publish(dbg)
+
     def on_image(self, msg):
-        want_det = self.det_pub.get_subscription_count() > 0
-        want_debug = self.debug_pub.get_subscription_count() > 0
-        if not self.target or not (want_det or want_debug):
-            return
         frame = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
         if frame is None:
+            return
+        if not self.target:
+            self.publish_idle(msg, frame)
             return
 
         t = time.monotonic()
@@ -199,21 +214,20 @@ class SamDetector(Node):
             drawn.append((prompt, score, mask, cx, cy))
         self.det_pub.publish(out)
 
-        if want_debug:
-            for i, (prompt, score, mask, cx, cy) in enumerate(drawn):
-                color = DEBUG_COLORS[prompts.index(prompt) % len(DEBUG_COLORS)]
-                frame[mask] = (0.5 * frame[mask] + 0.5 * np.array(color)).astype(np.uint8)
-                cv2.circle(frame, (int(cx), int(cy)), 5, color, -1)
-                label = f'{i + 1}. {prompt} {score:.2f}' + ('  <- align' if i == 0 else '')
-                cv2.putText(frame, label, (int(cx) - 40, max(int(cy) - 12, 16)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
-            cv2.putText(frame, f'{ms:.0f} ms', (8, 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            dbg = CompressedImage()
-            dbg.header = msg.header
-            dbg.format = 'jpeg'
-            dbg.data = cv2.imencode('.jpg', frame)[1].tobytes()
-            self.debug_pub.publish(dbg)
+        for i, (prompt, score, mask, cx, cy) in enumerate(drawn):
+            color = DEBUG_COLORS[prompts.index(prompt) % len(DEBUG_COLORS)]
+            frame[mask] = (0.5 * frame[mask] + 0.5 * np.array(color)).astype(np.uint8)
+            cv2.circle(frame, (int(cx), int(cy)), 5, color, -1)
+            label = f'{i + 1}. {prompt} {score:.2f}' + ('  <- align' if i == 0 else '')
+            cv2.putText(frame, label, (int(cx) - 40, max(int(cy) - 12, 16)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
+        cv2.putText(frame, f'{ms:.0f} ms', (8, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        dbg = CompressedImage()
+        dbg.header = msg.header
+        dbg.format = 'jpeg'
+        dbg.data = cv2.imencode('.jpg', frame)[1].tobytes()
+        self.debug_pub.publish(dbg)
 
 
 def main():

@@ -255,6 +255,28 @@ Copy it under `/workspace/model` first, then:
 Select the new `pretrained_model_migrated` folder as the Policy Path. Checkpoints trained with
 Cyclo's LeRobot (below) need no conversion.
 
+### Pick and place from the behaviour-tree engine
+
+omniman's mission steps are nodes in Cyclo's Autonomy Studio, under `omniman` in the palette. The
+example trees are `omniman_pick_place.xml` (policy through `policy_runner`) and
+`omniman_pick_cyclo_policy.xml` (policy through Cyclo's own `SendCommand`). They do the same as
+the `omniman_vla` mission (see [omniman_vla.md](omniman_vla.md)); every wait is for a message,
+never a fixed delay.
+
+| Node | What it does |
+|---|---|
+| `OmnimanNavigate` | Nav2 to a place in `poses.yaml`, holding the control lock as `nav` |
+| `OmnimanArmPose` | move the arm to a pose in `arm_poses.yaml`, wait until the arm controller says it arrived |
+| `OmnimanLook` | wait for new camera frames, then ask whether the detector sees the target |
+| `OmnimanAlign` | base correction with `visual_align` on the target; clears the prompt when done |
+| `OmnimanSearchAlign` | find the target from `ready1`, `ready2`, `ready3` (first without turning, then turning), then align. Use it twice: the second aligns again from `ready1`, where the policy starts |
+| `OmnimanWaitSettled` | base still, arm finished and a camera frame after both. Put it before Cyclo's `SendCommand` RESUME |
+| `OmnimanPolicy` | log the checkpoint, wait as `OmnimanWaitSettled`, run the policy until the arm is home |
+| `OmnimanArmHome` | end of a run started with `SendCommand` |
+| `OmnimanGraspCheck` | wait until `grasp_monitor` agrees with the gripper, then check holding (or not) |
+
+New node files need `colcon build --symlink-install` once.
+
 ---
 
 ## 4. Training

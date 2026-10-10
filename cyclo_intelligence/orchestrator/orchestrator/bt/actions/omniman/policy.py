@@ -8,15 +8,22 @@ from omniman_interfaces.srv import RunPolicy
 from orchestrator.bt.actions.base_action import BaseAction
 from std_srvs.srv import Trigger
 from orchestrator.bt.actions.omniman.common import (
-    FAILURE, RUNNING, _Step, _text
+    FAILURE, RUNNING, SUCCESS, _Step, _text
 )
+from orchestrator.bt.actions.omniman.policy_info import policy_info
 
 
 class OmnimanPolicy(_Step, BaseAction):
-    """Run an arm policy through omniman's policy_runner (physical_ai_server -
-    the ACT policies trained with physical_ai_tools) until the arm is back
+    """Run an arm policy through omniman's policy_runner until the arm is back
     home. `policy_path` empty = policy_runner.yaml's default. timeout_s
-    stops a policy that never settles at home."""
+    stops a policy that never settles at home, and also gives up waiting to
+    start (see below).
+
+    It starts only when the base is still, the arm has finished its last move
+    and a camera frame has arrived after both. It logs the checkpoint first:
+    path, policy type, weights, device and the chunk_size / n_action_steps /
+    temporal_ensemble_coeff of its config.json. Its end is a result seen after
+    the run was busy - there is no timed fallback."""
 
     def __init__(self, node, instruction: str = 'pick the object', policy_path: str = '',
                  timeout_s: float = 90.0):
@@ -28,11 +35,22 @@ class OmnimanPolicy(_Step, BaseAction):
         self._clear()
 
     def _clear(self):
-        self.phase, self.future, self.busy_seen = 'call', None, False
+        self.phase, self.future, self.busy_seen = 'fresh', None, False
         self.since = time.monotonic()
+        self.announced = False
 
     def tick(self):
         om, now = self.om, time.monotonic()
+        if self.phase == 'fresh':
+            if not self.announced:
+                self.log_info(f'policy: "{self.instruction}"')
+                for line in policy_info(self.policy_path):
+                    self.log_info(line)
+                self.announced = True
+            status = self.wait_settled(self.since, self.timeout_s)
+            if status != SUCCESS:
+                return status
+            self.phase, self.since = 'call', now
         if self.phase == 'call':
             if self.future is None:
                 req = RunPolicy.Request()
@@ -43,8 +61,6 @@ class OmnimanPolicy(_Step, BaseAction):
                 if self.future == 'gone':
                     self.phase = 'done'
                     return self.fail('policy_runner not answering (/policy_runner/run)')
-                if self.future is not None:
-                    self.log_info(f'policy: "{self.instruction}"')
                 return RUNNING
             if not self.future.done():
                 return RUNNING
@@ -65,7 +81,7 @@ class OmnimanPolicy(_Step, BaseAction):
             if om.policy_status != 'idle':
                 self.busy_seen = True
                 return RUNNING
-            if self.busy_seen or now - self.since > 5.0:
+            if self.busy_seen:
                 self.phase = 'done'
                 return self.succeed(f'arm back home after {now - self.since:.0f}s')
             return RUNNING
