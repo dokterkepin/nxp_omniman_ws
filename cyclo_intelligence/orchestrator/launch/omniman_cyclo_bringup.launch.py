@@ -111,8 +111,10 @@ def generate_launch_description():
         DeclareLaunchArgument('robot_type', default_value='omniman',
                               description='robot type for the behaviour-tree engine '
                                           '(omniman, omniman_mobile)'),
-        DeclareLaunchArgument('autostart', default_value='orchestrator,cyclo_data,bt_node',
-                              description='services to start right away; "" = from the UI'),
+        DeclareLaunchArgument('autostart', default_value='orchestrator,cyclo_data,bt_node,lerobot',
+                              description='services to start right away; "" = from the UI. '
+                                          'lerobot = the policy backend, so a mission can run '
+                                          'a policy without anyone pressing ON in the UI'),
         DeclareLaunchArgument('ui_port', default_value='7080'),
         OpaqueFunction(function=setup),
     ])

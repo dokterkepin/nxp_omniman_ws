@@ -175,7 +175,9 @@ def autostart():
         robot_type = cyclo._validate_bt_robot_type(os.environ.get('CYCLO_ROBOT_TYPE', ''))
         services.BT_ROBOT_TYPE_FILE.write_text(robot_type + '\n')
     for name in names:
-        ok, message = services.up(name)
+        # a policy backend (lerobot) is not a plain service: it is a few processes
+        start = services.backend_up if name in services.BACKENDS else services.up
+        ok, message = start(name)
         print(f'[supervisor_native] {message}', flush=True)
 
 

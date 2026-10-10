@@ -6,7 +6,7 @@ policy_runner:
     owner_name: policy
 
     # Defaults when ~/run does not name a policy or instruction.
-    policy_path: /home/dokterkepin/output/omniman_pick_and_place_v4/checkpoints/last/pretrained_model
+    policy_path: /workspace/model/lerobot/omniman_pick_and_place_v5/checkpoints/100000/pretrained_model
     instruction: "pick the object"
     # Cyclo's policy backend that runs it (its /<backend>/inference_command):
     # lerobot = LeRobot 0.6 (ACT, SmolVLA, ...).
@@ -20,7 +20,7 @@ policy_runner:
     # whenever its queue runs low (Cyclo's default); sync = only when the queue
     # is empty, one request per step. omniman_act (native/policy/lerobot_backend.yaml)
     # works with either: it returns one action per answer.
-    action_request_mode: async
+    action_request_mode: sync
     # How often actions are sent to the arm (Cyclo interpolates the chunk).
     control_hz: 100
 

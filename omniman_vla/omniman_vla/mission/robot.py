@@ -96,6 +96,7 @@ class Robot:
         self.holding = False
         self.grasp_state = 'no reading from grasp_monitor'
         self.arm_state_text = 'no reading from policy_runner'
+        self.arm_state_at = 0.0         # when it arrived (monotonic)
         self.task_phase_num = -1        # orchestrator /task/inference_status
         self.task_phase_at = 0.0
         self.still_at = None            # when odometry first showed the base still, this stop
@@ -119,8 +120,7 @@ class Robot:
                                 lambda m: setattr(self, 'owner', m.owner), LATCHED)
         nav.create_subscription(String, '/policy_runner/status',
                                 lambda m: setattr(self, 'policy_status_text', m.data), STATUS)
-        nav.create_subscription(String, '/policy_runner/arm',
-                                lambda m: setattr(self, 'arm_state_text', m.data), LATCHED)
+        nav.create_subscription(String, '/policy_runner/arm', self._on_arm_state, LATCHED)
         nav.create_subscription(String, '/visual_align/status',
                                 lambda m: setattr(self, 'align_status_text', m.data), STATUS)
         nav.create_subscription(Bool, '/gripper/holding',
@@ -167,6 +167,9 @@ class Robot:
             self.still_at = None
         elif self.still_at is None:
             self.still_at = self.now()
+
+    def _on_arm_state(self, msg):
+        self.arm_state_text, self.arm_state_at = msg.data, time.monotonic()
 
     def _on_joints(self, msg):
         self.joints.update(zip(msg.name, msg.position))

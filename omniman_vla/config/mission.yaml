@@ -15,7 +15,7 @@
 
 policies:
   manipulate:
-    path: /home/dokterkepin/output/omniman_pick_and_place_v4/checkpoints/100000/pretrained_model
+    path: /workspace/model/lerobot/omniman_pick_and_place_v5/checkpoints/100000/pretrained_model
 
 settings:
   # After each nav leg the mission waits for wheel odometry to show the base

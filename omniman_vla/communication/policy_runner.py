@@ -265,8 +265,10 @@ class PolicyRunner(Node):
             return response
 
         with self.lock:
-            # Control may have been taken while START was on its way.
-            ended = self.state != 'starting'
+            # Control may have been taken while START was on its way. A policy
+            # that is already loaded reports INFERENCING before START answers,
+            # which makes the state 'working' - that is not an end.
+            ended = self.state not in ('starting', 'working')
         if ended:
             self.finish()
             response.success = False

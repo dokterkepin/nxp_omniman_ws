@@ -20,11 +20,6 @@ install(DIRECTORY
 )
 
 install(PROGRAMS
-  # recorder: data collection
-  recorder/replay_arm.py
-  recorder/replay_base.py
-  recorder/joy_discrete_base.py
-  recorder/trim_state.py
   # communication: the control lock and the nodes that take part in it
   communication/control_arbiter.py
   communication/policy_runner.py

@@ -520,7 +520,15 @@ class PolicyStep(Step):
             if res is None or not res.success:
                 return self.fail(f'policy_runner refused: {res.message if res else "no answer"}')
             self.phase, self.since = 'watch', time.monotonic()
+            self.left_home = False
             return Status.RUNNING
+        # policy_runner says where the arm is every 0.5 s while it runs; only a
+        # reading from this run counts (the topic is latched).
+        if (not self.left_home and r.arm_state_at > self.since
+                and r.arm_state().startswith('away')):
+            self.left_home = True
+            self.log.info(f'{self.name}: arm left home after '
+                          f'{time.monotonic() - self.since:.1f}s')
         if self.timeout_s is not None and time.monotonic() - self.since > self.timeout_s:
             r.policy_stop.call_async(Trigger.Request())
             self.phase = 'done'
