@@ -52,6 +52,10 @@ settings:
   # Holding waits for grasp_monitor to agree with what the gripper reads right
   # now; it fails if they never agree within this long.
   holding_timeout_s: 5.0
+  # A pause before every policy starts, counted from when the policy step
+  # begins (right after the base correction). The base, arm and camera checks
+  # still have to pass as well. 0 = no pause.
+  policy_pause_s: 2.0
 
 # Is the gripper holding something? (grasp_monitor.py - read by the node from
 # this file directly; saved edits apply within a second.)

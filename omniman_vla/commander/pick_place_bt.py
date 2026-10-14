@@ -63,7 +63,7 @@ def build(robot):
     # on_failure can be any steps - Navigate(robot, '<any place in
     # poses.yaml>'), PolicyStep(robot, 'label', '<any instruction>'), Align...
     go_to_pick = task('go to pick area',
-                      steps=[Navigate(robot, 'pick_area')],
+                      steps=[Navigate(robot, 'pick_area1')],
                       on_failure=[Navigate(robot, 'home'), start_again()])
 
     pick = task('pick',
@@ -78,14 +78,14 @@ def build(robot):
                 attempts=2,
                 # Back to the pick area and straight into the policy - no base
                 # correction this time. If this grasp works too, carry on.
-                on_failure=[Navigate(robot, 'pick_area'),
+                on_failure=[Navigate(robot, 'pick_area1'),
                             PolicyStep(robot, 'pick', 'pick the object',
                                        policy_path=policy, timeout_s=90),
                             Holding(robot, 'grasp succeeded', holding=True)])
 
     carry = task('carry',
                  steps=[py_trees.decorators.EternalGuard(
-                     'while holding', Navigate(robot, 'place_area'),
+                     'while holding', Navigate(robot, 'place_area1'),
                      condition=robot.is_holding)])
 
     place = task('place',

@@ -11,6 +11,7 @@
 #   pre-commit install           # activate the git hook (one time)
 #   pre-commit run --all-files   # check everything now
 #   git commit --no-verify       # bypass in an emergency
+default_install_hook_types: [pre-commit, commit-msg]
 
 exclude: |
   (?x)^(
@@ -75,3 +76,12 @@ repos:
         # in mypy.ini doesn't reach it for import-untyped (PyYAML ships no py.typed
         # marker) -- the stub package has to be installed into that venv directly.
         additional_dependencies: [types-PyYAML]
+
+  - repo: local
+    hooks:
+      - id: no-ai-coauthor
+        name: no AI co-author in the commit message
+        language: pygrep
+        entry: '(co-authored-by:.*(claude|anthropic|copilot|chatgpt|openai|gemini|cursor|codex|aider)|generated with .*(claude|copilot|chatgpt))'
+        args: [--ignore-case]
+        stages: [commit-msg]

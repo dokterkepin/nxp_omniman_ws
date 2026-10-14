@@ -36,6 +36,7 @@ class OmnimanPolicy(_Step, BaseAction):
 
     def _clear(self):
         self.phase, self.future, self.busy_seen = 'fresh', None, False
+        self.begin = None               # first tick: the pause is counted from here
         self.since = time.monotonic()
         self.announced = False
 
@@ -47,6 +48,10 @@ class OmnimanPolicy(_Step, BaseAction):
                 for line in policy_info(self.policy_path):
                     self.log_info(line)
                 self.announced = True
+            if self.begin is None:
+                self.begin = now
+            if now - self.begin < om.setting('policy_pause_s'):
+                return RUNNING          # the pause set in mission.yaml
             status = self.wait_settled(self.since, self.timeout_s)
             if status != SUCCESS:
                 return status
