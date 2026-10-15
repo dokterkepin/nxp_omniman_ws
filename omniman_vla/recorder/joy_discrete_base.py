@@ -209,6 +209,7 @@ class JoyDiscreteBase(Node):
 
         stale = (
             self.joy is None
+            or self.last_joy_time is None
             or (self.get_clock().now() - self.last_joy_time).nanoseconds * 1e-9
             > self.joy_timeout
         )

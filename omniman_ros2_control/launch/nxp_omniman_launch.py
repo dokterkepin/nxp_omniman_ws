@@ -90,6 +90,9 @@ def generate_launch_description():
         output="both",
         remappings=[
             ("/mecanum_drive_controller/reference", "/cmd_vel_stamped"),
+            # mecanum_drive_controller publishes odom -> base_footprint on its
+            # own ~/tf_odometry topic, not /tf; relay it so slam_toolbox/AMCL see it.
+            ("/mecanum_drive_controller/tf_odometry", "/tf"),
         ],
     )
 
