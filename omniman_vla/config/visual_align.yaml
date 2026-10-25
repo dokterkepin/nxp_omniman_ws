@@ -64,9 +64,9 @@ visual_align:
   # Where the cup should end up in the image (640x480), and how close counts
   # as there. After correcting in the base_correct demos the cup sat at
   # x 299-343, y 201-260 (middle half of the episodes).
-  aim_x: 320.0
+  aim_x: 300.0
   tolerance_x: 30.0
-  aim_y: 320.0
+  aim_y: 300.0
   tolerance_y: 30.0
   # Aligned = this many detections in a row with every axis in tolerance.
   settle_frames: 5

@@ -474,7 +474,6 @@ class PolicyStep(Step):
     def initialise(self):
         self.future = None
         self.phase, self.busy_seen, self.since = 'fresh', False, time.monotonic()
-        self.begin = self.since         # the pause is counted from here
         self.feedback_message = ''
         self.log.info(f'{self.name}: "{self.instruction}"')
         for line in policy_info(self.policy_path):
@@ -492,13 +491,10 @@ class PolicyStep(Step):
                 self.feedback_message = 'waiting for the base to be still'
             elif r.camera_at < settled:
                 self.feedback_message = 'waiting for a camera frame after the robot settled'
-            elif time.monotonic() - self.begin < float(r.settings.get('policy_pause_s', 0.0)):
-                left = float(r.settings['policy_pause_s']) - (time.monotonic() - self.begin)
-                self.feedback_message = f'pausing {left:.1f}s before the policy starts'
             else:
                 waited = time.monotonic() - self.since
-                self.log.info(f'{self.name}: paused {waited:.1f}s after the base correction '
-                              '(base, arm and camera settled) - starting' if waited >= 0.05 else
+                self.log.info(f'{self.name}: waited {waited:.1f}s for the base, the arm and '
+                              'a camera frame - starting' if waited >= 0.05 else
                               f'{self.name}: base, arm and camera were already settled - '
                               'starting')
                 self.phase, self.since = 'call', time.monotonic()
@@ -552,8 +548,6 @@ class PolicyStep(Step):
         r = self.robot
         waited = time.monotonic() - self.since
         if self.phase == 'fresh':
-            if self.feedback_message.startswith('pausing'):
-                return self.feedback_message
             return f'/image_raw/compressed: {self.feedback_message}'
         if self.phase == 'call':
             return f'/policy_runner/run: calling ("{self.instruction}")'
