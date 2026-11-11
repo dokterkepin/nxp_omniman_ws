@@ -37,7 +37,7 @@ mecanum_drive_controller:
     # EKF have both been removed from the nav stack, so nothing else publishes
     # that transform - AMCL only supplies map -> odom.
     enable_odom_tf: true
-    reference_timeout: 10.0
+    reference_timeout: 1.0
 
     # false -> the controller subscribes to ~/reference_unstamped (plain Twist),
     # remapped to /cmd_vel in the launch file. true would use ~/reference

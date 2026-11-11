@@ -1,6 +1,10 @@
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
+
+import os
+from ament_index_python.packages import get_package_share_directory
+
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     Command,
@@ -120,6 +124,10 @@ def generate_launch_description():
         )
     )
 
+    calibration_url = 'file://' + os.path.join(
+        get_package_share_directory('omniman_ros2_control'),
+        'config', 'camera_calibration.yaml')
+
     # Wrist camera (mounted on palm_link, moves with the arm).
     usb_cam = Node(
         package='usb_cam',
@@ -131,6 +139,7 @@ def generate_launch_description():
             'focus_auto': 0,
             'focus_absolute': 30,
             'brightness': 128,
+            'camera_info_url': calibration_url,
         }],
     )
 

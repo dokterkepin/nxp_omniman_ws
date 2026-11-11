@@ -20,7 +20,7 @@ policy_runner:
     # whenever its queue runs low (Cyclo's default); sync = only when the queue
     # is empty, one request per step. omniman_act (native/policy/lerobot_backend.yaml)
     # works with either: it returns one action per answer.
-    action_request_mode: sync
+    action_request_mode: async
     # How often actions are sent to the arm (Cyclo interpolates the chunk).
     control_hz: 100
 
@@ -34,7 +34,7 @@ policy_runner:
     # are much further out. Keep the resting pose well inside it (read "worst
     # joint" in `ros2 topic echo /policy_runner/arm`) - an arm resting near the
     # limit flips in and out of home and never finishes. Raise it if that happens.
-    home_tolerance: 0.20
+    home_tolerance: 0.40
     # Finished = at home for this long in a row (it does not have to have moved:
     # a policy stops moving once the object is picked). Must be longer than any
     # pause at home that is not the end - a reset between grasp attempts, which
@@ -47,9 +47,9 @@ policy_runner:
     # not counting the time the policy spends loading, which has its own limit
     # (the first run of a policy loads it; later runs of it start at once).
     warmup_timeout_s: 10.0
-    load_timeout_s: 300.0
+    load_timeout_s: 50.0
     # Stop a run that can never finish: the arm never leaves home (the policy
     # does nothing), or never comes back (it keeps reaching for something that
     # is not there). FINISH, release, report idle - a mission then sees the
     # run end and can retry. 0 = no limit (wait for ever).
-    run_timeout_s: 120.0
+    run_timeout_s: 100.0
