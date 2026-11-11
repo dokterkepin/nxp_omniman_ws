@@ -27,6 +27,7 @@ if os.path.exists(_ZENOH_SDK_PATH) and _ZENOH_SDK_PATH not in sys.path:
 from .protocol import (
     CMD_GET_ACTION,
     CMD_LOAD_POLICY,
+    CMD_RESET_POLICY,
     CMD_UNLOAD_POLICY,
     ENGINE_COMMAND_REQUEST_DEF,
     ENGINE_COMMAND_RESPONSE_DEF,
@@ -76,6 +77,8 @@ class EngineWorker:
                 return self._get_action(req)
             if req.command == CMD_UNLOAD_POLICY:
                 return self._unload_policy(req)
+            if req.command == CMD_RESET_POLICY:
+                return self._reset_policy(req)
             return EngineCommandResponse(
                 success=False,
                 seq_id=req.seq_id,
@@ -124,6 +127,16 @@ class EngineWorker:
             success=True,
             seq_id=request.seq_id,
             message="unloaded",
+        )
+
+    def _reset_policy(self, request: EngineCommandRequest) -> EngineCommandResponse:
+        reset = getattr(self._engine, "reset_policy", None)
+        if callable(reset):
+            reset()
+        return EngineCommandResponse(
+            success=True,
+            seq_id=request.seq_id,
+            message="policy state reset",
         )
 
     def make_ros_callback(self):

@@ -82,8 +82,8 @@ visual_align:
   k_lateral: 0.0005
   max_lateral: 0.08
   # forward/back: m/s per px of y error. 0 = never drive forward or back.
-  k_forward: 0.0005
-  max_forward: 0.08
+  k_forward: 0.001
+  max_forward: 0.1
   min_linear: 0.02
   # strafe only: hold the heading the cup was first seen at, rad/s per rad
   # of error. 0 = never turn. Nothing else corrects heading, so if strafing

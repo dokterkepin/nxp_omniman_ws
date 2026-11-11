@@ -73,6 +73,12 @@ class OmnimanActEngine(LeRobotEngine):
         self._watch(start)
         return result
 
+    def reset_policy(self):
+        """Clear state accumulated by the previous inference run."""
+        if self._policy is not None:
+            self._policy.reset()
+        self._last_call = None
+
     def _watch(self, started):
         """Every few seconds: how often it is asked and how long a prediction takes."""
         now = time.monotonic()

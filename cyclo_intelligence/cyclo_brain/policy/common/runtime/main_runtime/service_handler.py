@@ -80,6 +80,9 @@ class ServiceHandler:
     def _start(self, request):
         if not self._session.loaded:
             raise RuntimeError("LOAD first")
+        reset = self._requester.reset_policy()
+        if not reset.success:
+            raise RuntimeError(f"policy reset failed: {reset.message}")
         syncing = self._control_loop.start(
             publish_to_robot=bool(getattr(request, "publish_to_robot", False))
         )

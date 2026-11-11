@@ -75,13 +75,11 @@ def build(robot):
                        PolicyStep(robot, 'pick', 'pick the object',
                                   policy_path=policy, timeout_s=90),
                        Holding(robot, 'grasp succeeded', holding=True)],
-                attempts=2,
                 # Back to the pick area and straight into the policy - no base
                 # correction this time. If this grasp works too, carry on.
-                on_failure=[Navigate(robot, 'pick_area1'),
-                            PolicyStep(robot, 'pick', 'pick the object',
+                on_failure=[PolicyStep(robot, 'pick', 'pick the object',
                                        policy_path=policy, timeout_s=90),
-                            Holding(robot, 'grasp succeeded', holding=True)])
+                            Holding(robot, 'grasp succeeded', holding=True)], attempts=2)
 
     carry = task('carry',
                  steps=[py_trees.decorators.EternalGuard(

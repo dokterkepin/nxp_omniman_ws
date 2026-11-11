@@ -14,6 +14,7 @@ from typing import Any
 from engine_process.protocol import (
     CMD_GET_ACTION,
     CMD_LOAD_POLICY,
+    CMD_RESET_POLICY,
     CMD_UNLOAD_POLICY,
     EngineCommandRequest,
     EngineCommandResponse,
@@ -93,6 +94,14 @@ class InferenceRequester:
         return self._call(
             request,
             self._load_policy_timeout_s if timeout_s is None else timeout_s,
+        )
+
+    def reset_policy(self, timeout_s: float | None = None) -> EngineCommandResponse:
+        seq_id = self._next_seq_id()
+        request = EngineCommandRequest(command=CMD_RESET_POLICY, seq_id=seq_id)
+        return self._call(
+            request,
+            self._get_action_timeout_s if timeout_s is None else timeout_s,
         )
 
     def _next_seq_id(self) -> int:
