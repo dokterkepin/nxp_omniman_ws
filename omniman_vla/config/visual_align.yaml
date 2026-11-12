@@ -66,7 +66,7 @@ visual_align:
   # x 299-343, y 201-260 (middle half of the episodes).
   aim_x: 300.0
   tolerance_x: 30.0
-  aim_y: 400.0
+  aim_y: 350.0
   tolerance_y: 30.0
   # Aligned = this many detections in a row with every axis in tolerance.
   settle_frames: 5

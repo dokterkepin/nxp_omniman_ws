@@ -63,7 +63,7 @@ grasp_monitor:
   joint_states_topic: /joint_states
   joint: gripper_prismatic_joint
   # Below this the fingers closed past where the cup would stop them: empty.
-  closed_empty_position: -0.0025
+  closed_empty_position: 0.02
   # |effort| above this: the servo is pushing against something.
   holding_min_effort: 2
   # Both must hold this long before the state changes (no flicker while the
